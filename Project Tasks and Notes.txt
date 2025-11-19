@@ -1,0 +1,8 @@
+Project Task List
+
+maps 
+message from location page
+"to enable map view, add your Google Maps API key in android/app/src/main/AndriodManifest.xml and configure google_mapsflutter package"
+
+cannot currently read eachothers chat even if in same family
+
