@@ -48,18 +48,34 @@ class FamilyWalletService {
     try {
       final familyRef = _firestore.collection('families').doc(userModel.familyId);
       
+      debugPrint('FamilyWalletService.creditFamilyWallet: Starting transaction for amount $amount');
+      debugPrint('FamilyWalletService.creditFamilyWallet: Family ID: ${userModel.familyId}');
+      
       // Use transaction to ensure atomic update
       await _firestore.runTransaction((transaction) async {
         final familyDoc = await transaction.get(familyRef);
         final currentBalance = (familyDoc.data()?['walletBalance'] as num?)?.toDouble() ?? 0.0;
+        final newBalance = currentBalance + amount;
+        
+        debugPrint('FamilyWalletService.creditFamilyWallet: Current balance: $currentBalance, New balance: $newBalance');
+        
         transaction.set(familyRef, {
-          'walletBalance': currentBalance + amount,
+          'walletBalance': newBalance,
         }, SetOptions(merge: true));
       });
       
-      debugPrint('FamilyWalletService: Credited $amount to family wallet');
+      // Verify the credit was applied
+      final verifyDoc = await familyRef.get();
+      final verifyBalance = (verifyDoc.data()?['walletBalance'] as num?)?.toDouble() ?? 0.0;
+      debugPrint('FamilyWalletService.creditFamilyWallet: Verified balance after credit: $verifyBalance');
+      
+      if (verifyBalance < amount) {
+        throw Exception('Wallet credit verification failed: Expected at least $amount, but balance is $verifyBalance');
+      }
+      
+      debugPrint('FamilyWalletService.creditFamilyWallet: Successfully credited $amount to family wallet. New balance: $verifyBalance');
     } catch (e) {
-      debugPrint('Error crediting family wallet: $e');
+      debugPrint('FamilyWalletService.creditFamilyWallet: Error crediting family wallet: $e');
       rethrow;
     }
   }
@@ -190,11 +206,17 @@ class FamilyWalletService {
       ).toList();
       
       for (var job in createdJobs) {
-        // Liability exists until job is completed AND approved (money paid out)
-        if (!job.isCompleted || job.isAwaitingApproval) {
-          final rewardAmount = job.reward ?? 0.0;
-          balance -= rewardAmount;
+        // For Bankers: liability persists even after job is paid
+        // The negative balance represents "minted" money that hasn't been earned back
+        // It only gets "paid back" when the Banker completes jobs themselves
+        final rewardAmount = job.reward ?? 0.0;
+        // If job is refunded, don't count it as a liability
+        if (job.isRefunded == true) {
+          continue;
         }
+        // Always subtract the liability (even if completed and approved)
+        // This maintains the negative balance to track net minting
+        balance -= rewardAmount;
       }
     } else {
       // Non-Bankers: subtract from balance when creating jobs (must have sufficient funds)

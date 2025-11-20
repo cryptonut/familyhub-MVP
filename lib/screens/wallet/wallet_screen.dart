@@ -10,6 +10,8 @@ import '../../models/task.dart';
 import '../../models/recurring_payment.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../tasks/view_task_screen.dart';
+import '../../utils/app_theme.dart';
+import '../../widgets/ui_components.dart';
 import 'request_payout_dialog.dart';
 import 'recurring_payments_screen.dart';
 import 'package:intl/intl.dart';
@@ -45,13 +47,17 @@ class _WalletScreenState extends State<WalletScreen> {
     setState(() => _isLoading = true);
     
     try {
-      // Get transactions using WalletService
-      final transactions = await _walletService.getTransactions();
+      // Fetch tasks once to ensure consistency between transactions and balance
+      final taskService = TaskService();
+      final allTasks = await taskService.getTasks(forceRefresh: true);
+      
+      // Get transactions using WalletService (pass tasks to avoid duplicate fetch)
+      final transactions = await _walletService.getTransactions(tasks: allTasks);
       _createdJobs = transactions['created'] ?? [];
       _completedJobs = transactions['completed'] ?? [];
       
-      // Calculate total balance
-      _totalBalance = await _walletService.calculateWalletBalance();
+      // Calculate total balance using the same tasks list
+      _totalBalance = await _walletService.calculateWalletBalance(tasks: allTasks);
       
       // Check if user is Banker
       final userModel = await _authService.getCurrentUserModel();

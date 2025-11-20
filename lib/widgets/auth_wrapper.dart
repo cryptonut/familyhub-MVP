@@ -8,6 +8,8 @@ import '../screens/family/join_family_screen.dart';
 import '../screens/hubs/hub_invite_screen.dart';
 import '../services/auth_service.dart';
 import '../services/app_state.dart';
+import '../services/calendar_sync_service.dart';
+import '../services/background_sync_service.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -147,6 +149,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
               if (mounted) {
                 appState.setCurrentIndex(0);
                 _hasResetToDashboard = true;
+                
+                // Trigger calendar sync on app start if enabled
+                _triggerCalendarSyncIfEnabled();
               }
             });
           }
@@ -185,6 +190,26 @@ class _AuthWrapperState extends State<AuthWrapper> {
         return LoginScreen(pendingInviteCode: pendingCode);
       },
     );
+  }
+
+  Future<void> _triggerCalendarSyncIfEnabled() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userModel = await authService.getCurrentUserModel();
+      
+      if (userModel?.calendarSyncEnabled == true && userModel?.localCalendarId != null) {
+        // Register background sync if not already registered
+        await BackgroundSyncService.registerPeriodicSync();
+        
+        // Perform initial sync in background (don't block UI)
+        final syncService = CalendarSyncService();
+        syncService.performSync().catchError((e) {
+          debugPrint('Error performing initial calendar sync: $e');
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking calendar sync status: $e');
+    }
   }
 }
 

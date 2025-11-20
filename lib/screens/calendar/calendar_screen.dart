@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../models/calendar_event.dart';
 import '../../services/calendar_service.dart';
+import '../../services/calendar_sync_service.dart';
+import '../../services/auth_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
+import '../../utils/app_theme.dart';
+import '../../widgets/ui_components.dart';
 import 'add_edit_event_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -14,9 +18,12 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> {
   final CalendarService _calendarService = CalendarService();
+  final CalendarSyncService _syncService = CalendarSyncService();
+  final AuthService _authService = AuthService();
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
   Map<DateTime, List<CalendarEvent>> _eventsMap = {};
+  Map<String, bool> _eventSyncStatus = {}; // eventId -> isSynced
 
   @override
   void initState() {
@@ -29,6 +36,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
     setState(() {
       _eventsMap = _groupEventsByDate(events);
     });
+    
+    // Check sync status for events
+    _checkEventSyncStatus(events);
+  }
+
+  Future<void> _checkEventSyncStatus(List<CalendarEvent> events) async {
+    try {
+      final userModel = await _authService.getCurrentUserModel();
+      if (userModel?.calendarSyncEnabled != true || userModel?.localCalendarId == null) {
+        return;
+      }
+
+      final syncStatus = <String, bool>{};
+      for (var event in events) {
+        final exists = await _syncService.eventExistsInDevice(
+          userModel!.localCalendarId!,
+          event.id,
+        );
+        syncStatus[event.id] = exists;
+      }
+
+      if (mounted) {
+        setState(() {
+          _eventSyncStatus = syncStatus;
+        });
+      }
+    } catch (e) {
+      // Silently fail - sync status check is non-critical
+    }
   }
 
   Map<DateTime, List<CalendarEvent>> _groupEventsByDate(
@@ -139,25 +175,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final dayEvents = _getEventsForDay(_selectedDay);
     
     if (dayEvents.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.event_busy,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No events for ${app_date_utils.AppDateUtils.formatDate(_selectedDay)}',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
+      return EmptyState(
+        icon: Icons.event_busy,
+        title: 'No events',
+        message: 'No events for ${app_date_utils.AppDateUtils.formatDate(_selectedDay)}',
       );
     }
 
@@ -166,8 +187,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
       itemCount: dayEvents.length,
       itemBuilder: (context, index) {
         final event = dayEvents[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 4),
+        return ModernCard(
+          margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
+          padding: EdgeInsets.zero,
           child: ListTile(
             leading: Container(
               width: 4,
@@ -176,9 +198,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            title: Text(
-              event.title,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    event.title,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (_eventSyncStatus[event.id] == true) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.calendar_today,
+                    size: 16,
+                    color: Colors.green[700],
+                  ),
+                ],
+              ],
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,6 +225,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
                 if (event.location != null && event.location!.isNotEmpty)
                   Text('📍 ${event.location}'),
+                if (event.isRecurring) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.repeat, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatRecurrence(event.recurrenceRule ?? ''),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
             trailing: PopupMenuButton(
@@ -261,6 +313,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
       return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
     } catch (e) {
       return Colors.blue;
+    }
+  }
+
+  String _formatRecurrence(String rule) {
+    switch (rule.toLowerCase()) {
+      case 'daily':
+        return 'Daily';
+      case 'weekly':
+        return 'Weekly';
+      case 'monthly':
+        return 'Monthly';
+      case 'yearly':
+        return 'Yearly';
+      default:
+        return rule;
     }
   }
 }

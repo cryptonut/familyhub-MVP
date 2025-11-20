@@ -7,6 +7,8 @@ import '../../models/task.dart';
 import '../../services/task_service.dart';
 import '../../services/app_state.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
+import '../../utils/app_theme.dart';
+import '../../widgets/ui_components.dart';
 import 'add_edit_task_screen.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -532,8 +534,8 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
       );
     } else if (!task.isClaimed && !task.hasPendingClaim) {
       // Not claimed - check if claim is required
-      if (task.requiresClaim) {
-        // Job requires claim but hasn't been claimed - don't show "Job Done!" button
+      if (task.requiresClaim && !isCreator) {
+        // Job requires claim but hasn't been claimed - don't show "Job Done!" button (unless creator)
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
@@ -547,34 +549,18 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
           ),
         );
       }
-      // Not claimed and doesn't require claim - show "Job Done!" button
-      if (isClaimer || !isCreator) {
-        // Claimer or non-creator can complete
-        return ElevatedButton.icon(
-          onPressed: () => _toggleTask(task),
-          icon: const Icon(Icons.check_circle, size: 18),
-          label: const Text('Job Done!'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-          ),
-        );
-      } else {
-        // Creator can't claim their own job
-        return ElevatedButton.icon(
-          onPressed: () => _toggleTask(task),
-          icon: const Icon(Icons.check_circle, size: 18),
-          label: const Text('Job Done!'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-          ),
-        );
-      }
+      // Not claimed and doesn't require claim - anyone (including creator) can complete
+      return ElevatedButton.icon(
+        onPressed: () => _toggleTask(task),
+        icon: const Icon(Icons.check_circle, size: 18),
+        label: const Text('Job Done!'),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+        ),
+      );
     } else {
       // Claimed or other status - can complete
       return ElevatedButton.icon(
@@ -810,6 +796,16 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
             // Wait a moment for Firestore to process, then force refresh
             await Future.delayed(const Duration(milliseconds: 500));
             await _loadTasks(forceRefresh: true);
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Job created successfully!'),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
           }
         },
         child: const Icon(Icons.add),
@@ -946,33 +942,16 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     debugPrint('_buildTasksList: Building list with ${tasks.length} tasks (isCompleted: $isCompleted)');
     
     if (tasks.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isCompleted ? Icons.check_circle_outline : Icons.assignment_outlined,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isCompleted ? 'No completed jobs' : 'No active jobs',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () async {
-                debugPrint('Manual refresh from empty state');
-                await _loadTasks(forceRefresh: true);
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Refresh'),
-            ),
-          ],
+      return EmptyState(
+        icon: isCompleted ? Icons.check_circle_outline : Icons.assignment_outlined,
+        title: isCompleted ? 'No completed jobs' : 'No active jobs',
+        action: TextButton.icon(
+          onPressed: () async {
+            debugPrint('Manual refresh from empty state');
+            await _loadTasks(forceRefresh: true);
+          },
+          icon: const Icon(Icons.refresh),
+          label: const Text('Refresh'),
         ),
       );
     }
@@ -987,8 +966,9 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
         final isClaimer = task.claimedBy == currentUserId;
         final canClaim = !isCreator && !task.isClaimed && !task.hasPendingClaim;
         
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 4),
+        return ModernCard(
+          margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
+          padding: EdgeInsets.zero,
           child: ListTile(
             leading: _buildLeadingWidget(task, isCompleted),
             title: Text(

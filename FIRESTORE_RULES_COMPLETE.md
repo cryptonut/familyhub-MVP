@@ -23,25 +23,45 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Helper function to get user's family ID
+    // Helper function to check if user document exists
+    function userDocumentExists() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    // Helper function to get user's family ID (safely handles missing document or field)
     function getUserFamilyId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.familyId;
+      return userDocumentExists() && 
+        'familyId' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data ?
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.familyId :
+        null;
     }
     
     // Helper function to check if user belongs to a family
     function belongsToFamily(familyId) {
-      return isAuthenticated() && getUserFamilyId() == familyId;
+      return isAuthenticated() && 
+        userDocumentExists() &&
+        getUserFamilyId() != null &&
+        getUserFamilyId() is string &&
+        getUserFamilyId() == familyId;
     }
     
-    // Helper function to check if user is Banker or Admin
+    // Helper function to check if user is Banker or Admin (safely handles missing document)
     function isBankerOrAdmin() {
       return isAuthenticated() && 
+        userDocumentExists() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['banker', 'admin']);
     }
     
     // Users collection - users can read/write their own data
     match /users/{userId} {
+      // Users can read their own document
       allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can read other users' documents (needed for family members list and invitation verification)
+      allow read: if isAuthenticated();
+      
+      // Users can write their own document
       allow write: if isAuthenticated() && request.auth.uid == userId;
       
       // Allow Bankers/Admins to update roles field of other users in their family
@@ -50,12 +70,30 @@ service cloud.firestore {
         (isBankerOrAdmin() && 
          belongsToFamily(resource.data.familyId) &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles']));
+      
+      // Allow Bankers/Admins to update relationship field of other users in their family
+      allow update: if isAuthenticated() && 
+        request.auth.uid != userId &&
+        isBankerOrAdmin() &&
+        belongsToFamily(resource.data.familyId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['relationship']);
     }
     
     // Family collections - tasks, events, messages, etc.
     match /families/{familyId} {
       // Allow read if user belongs to the family
       allow read: if belongsToFamily(familyId);
+      
+      // Allow creating family document if it doesn't exist (for first job creation)
+      allow create: if belongsToFamily(familyId) &&
+        request.resource.data.walletBalance is number;
+      
+      // Allow updating walletBalance field for family members (for job creation/approval)
+      // This handles both updates to existing documents and set() with merge on new documents
+      allow update: if belongsToFamily(familyId) && 
+        request.resource.data.walletBalance is number &&
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['walletBalance']) ||
+         !exists(/databases/$(database)/documents/families/$(familyId)));
       
       // Tasks subcollection
       match /tasks/{taskId} {
@@ -65,7 +103,9 @@ service cloud.firestore {
         allow update: if belongsToFamily(familyId) && 
           (resource.data.createdBy == request.auth.uid ||
            resource.data.claimedBy == request.auth.uid ||
-           resource.data.assignedTo == request.auth.uid);
+           resource.data.assignedTo == request.auth.uid ||
+           // Allow any family member to complete tasks that don't require claim
+           (resource.data.requiresClaim == false || !('requiresClaim' in resource.data)));
         allow delete: if belongsToFamily(familyId) && 
           resource.data.createdBy == request.auth.uid;
       }
@@ -85,6 +125,66 @@ service cloud.firestore {
           resource.data.senderId == request.auth.uid;
         allow delete: if belongsToFamily(familyId) && 
           resource.data.senderId == request.auth.uid;
+      }
+      
+      // Private messages subcollection
+      match /privateMessages/{chatId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId);
+        // Nested messages collection
+        match /messages/{messageId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId) && 
+            request.resource.data.senderId == request.auth.uid;
+          allow update: if belongsToFamily(familyId) && 
+            resource.data.senderId == request.auth.uid;
+          allow delete: if belongsToFamily(familyId) && 
+            resource.data.senderId == request.auth.uid;
+        }
+      }
+      
+      // Game stats subcollection
+      match /game_stats/{userId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId) && 
+          request.resource.data.userId == request.auth.uid;
+        allow update: if belongsToFamily(familyId) && 
+          request.resource.data.userId == request.auth.uid;
+      }
+      
+      // Photo albums subcollection
+      match /albums/{albumId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if belongsToFamily(familyId) && 
+          (resource.data.createdBy == request.auth.uid ||
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coverPhotoId', 'photoCount', 'lastPhotoAddedAt']));
+        allow delete: if belongsToFamily(familyId) && 
+          resource.data.createdBy == request.auth.uid;
+      }
+      
+      // Photos subcollection
+      match /photos/{photoId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId) && 
+          request.resource.data.uploadedBy == request.auth.uid;
+        allow update: if belongsToFamily(familyId) && 
+          (resource.data.uploadedBy == request.auth.uid ||
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount', 'lastViewedAt']));
+        allow delete: if belongsToFamily(familyId) && 
+          resource.data.uploadedBy == request.auth.uid;
+        
+        // Photo comments subcollection
+        match /comments/{commentId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId) && 
+            request.resource.data.authorId == request.auth.uid;
+          allow update: if belongsToFamily(familyId) && 
+            resource.data.authorId == request.auth.uid;
+          allow delete: if belongsToFamily(familyId) && 
+            resource.data.authorId == request.auth.uid;
+        }
       }
       
       // Payout requests subcollection
@@ -214,6 +314,20 @@ service cloud.firestore {
       allow update: if isAuthenticated();
       allow delete: if isAuthenticated();
     }
+    
+    // Privacy activity collection
+    match /privacy_activity/{activityId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // Video calls collection
+    match /calls/{hubId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
   }
 }
 ```
@@ -222,7 +336,10 @@ service cloud.firestore {
 
 1. **Family Membership Check**: The rules use `belongsToFamily(familyId)` to ensure users can only access data from their own family.
 
-2. **Tasks**: Users can read all tasks in their family, but can only create/update/delete tasks they created or are assigned to.
+2. **Tasks**: Users can read all tasks in their family. They can:
+   - Create tasks (must set themselves as creator)
+   - Update tasks if they are the creator, claimer, assigned user, OR if the task doesn't require claim (any family member can complete open tasks)
+   - Delete tasks they created
 
 3. **Banker/Admin Privileges**: Bankers and Admins have additional permissions for:
    - Updating user roles

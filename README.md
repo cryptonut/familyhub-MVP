@@ -6,7 +6,7 @@ All-in-one family organizer: Calendar, Tasks, Chat, Location
 
 Family Hub is a comprehensive mobile application designed to help families stay organized and connected. The app provides four core features:
 
-- **📅 Calendar**: Manage family events, appointments, and schedules
+- **📅 Calendar**: Manage family events, appointments, and schedules with two-way sync to device calendars (Google, Apple, Outlook)
 - **✅ Tasks**: Create and track shared family tasks and to-dos
 - **💬 Chat**: Real-time family messaging and communication
 - **📍 Location**: Share and view family member locations
@@ -46,6 +46,92 @@ Family Hub is a comprehensive mobile application designed to help families stay 
    flutter run
    ```
 
+## ✨ Features
+
+### Calendar Sync
+FamilyHub can sync events with your device calendar (Google Calendar, Apple Calendar, Outlook, etc.):
+
+- **Two-way sync**: Events created in FamilyHub appear in your personal calendar, and external events can be imported
+- **Automatic background sync**: Syncs every 30 minutes automatically
+- **Recurring events**: Full support for daily, weekly, monthly, and yearly recurring events
+- **Conflict resolution**: FamilyHub events take priority when conflicts occur
+
+**To enable calendar sync:**
+1. Go to Menu (⋮) → Calendar Sync
+2. Grant calendar permissions
+3. Select or create a calendar
+4. Sync starts automatically
+
+### Birthday Tracking
+- Track family member birthdays
+- View upcoming birthdays on the dashboard
+- Receive reminders 1 day before birthdays
+- Edit birthdays in Profile settings
+
+### Enhanced Event Management
+- Create recurring events (daily, weekly, monthly, yearly)
+- Invite family members with RSVP tracking
+- View event details with sync status indicators
+
+### Privacy Center
+- **Master toggle**: One-tap control for all active sharing
+- **Active shares list**: See what you're sharing (location, calendar, birthday, geofence)
+- **Individual controls**: Pause or stop specific sharing types
+- **Activity log**: View last 8 privacy actions
+- **Turn off all**: Instantly disable all sharing with one button
+
+**To access Privacy Center:**
+1. Go to Menu (⋮) → Privacy Center
+2. View active shares and recent activity
+3. Control your sharing preferences
+
+### Family Games
+- **Three game modes**: Chess Puzzles (solo), Word Scramble (daily + random), Family Bingo (5×5 auto-generated)
+- **Real-time leaderboard**: Compete with family members
+- **Stats tracking**: Wins, streaks, and personal bests
+- **Confetti celebrations**: Visual feedback on wins
+- **Pure fun**: No monetary rewards, just family competition
+
+**To play games:**
+1. Navigate to the Games tab (bottom navigation)
+2. Choose a game (Chess Puzzles, Word Scramble, or Family Bingo)
+3. Play and compete on the leaderboard!
+
+### Video Calls (Agora Integration)
+- **Hub-based video calls**: Start calls within any hub
+- **Multi-participant support**: Grid layout for 2+ participants
+- **Creator control**: Hub creators can enable/disable video calls
+- **Push notifications**: Receive call invitations via FCM
+- **Background handling**: Auto-mute when minimized, return via notification
+
+**To start a video call:**
+1. Open a hub (e.g., Family Hub, My Friends)
+2. Tap the video camera icon in the app bar
+3. Hub members receive push notifications to join
+4. Full-screen video call with mute/video controls
+
+**Note**: Video calls require Agora App ID and Certificate (configure in `lib/services/video_call_service.dart`)
+
+### Family Photo Albums
+- **Shared gallery**: Upload and organize family photos in albums
+- **Photo upload**: Camera or gallery selection with automatic thumbnail generation
+- **Albums**: Create custom albums to organize photos by event, date, or theme
+- **Comments**: Add comments on photos for family discussions
+- **View tracking**: See how many times photos have been viewed
+- **Real-time updates**: Photos and comments sync in real-time across devices
+- **Photo management**: Delete your own photos, view full-screen with zoom
+
+**To use Photo Albums:**
+1. Navigate to the Photos tab (bottom navigation)
+2. Create an album or upload directly to "All Photos"
+3. Tap any photo to view full-screen and add comments
+4. Organize photos by creating albums for special events
+
+**Note**: 
+- Requires Firebase Storage to be enabled in your Firebase project
+- Configure Firebase Storage rules to allow authenticated users to upload/download photos
+- Photos are stored in `photos/{familyId}/{photoId}.jpg` and thumbnails in `thumbnails/{familyId}/{photoId}.jpg`
+
 ## 📁 Project Structure
 
 ```
@@ -58,7 +144,11 @@ familyhub-MVP/
 │   │   ├── calendar/             # Calendar feature screens
 │   │   ├── tasks/                # Tasks feature screens
 │   │   ├── chat/                 # Chat feature screens
-│   │   └── location/             # Location feature screens
+│   │   ├── location/             # Location feature screens
+│   │   ├── games/                # Family games screens
+│   │   ├── settings/             # Settings screens (Privacy Center)
+│   │   ├── video/                # Video call screens
+│   │   └── photos/               # Photo albums screens
 │   ├── services/                 # Business logic & API services
 │   ├── widgets/                  # Reusable UI components
 │   └── utils/                    # Utility functions
@@ -87,6 +177,14 @@ familyhub-MVP/
 - `geolocator`: Location services
 - `google_maps_flutter`: Map integration
 - `table_calendar`: Calendar widget
+- `agora_rtc_engine`: Video calling (Agora)
+- `chess`: Chess puzzle game logic
+- `confetti`: Celebration animations
+- `permission_handler`: Device permissions
+- `shared_preferences`: Local storage
+- `firebase_storage`: Photo storage
+- `image_picker`: Camera and gallery access
+- `cached_network_image`: Efficient image loading and caching
 
 ## 🏗️ Development
 
@@ -146,8 +244,12 @@ flutter test --coverage
 - [x] Backend integration (Firestore)
 - [x] Real-time data sync
 - [x] Data persistence
-- [ ] Push notifications
-- [ ] Family invitation system
+- [x] Privacy Center with sharing controls
+- [x] Family Games (Chess, Word Scramble, Bingo)
+- [x] Video Calls (Agora integration)
+- [x] Family Photo Albums with comments
+- [x] Push notifications
+- [x] Family invitation system
 - [ ] Google Maps integration
 
 ## 🔒 Security

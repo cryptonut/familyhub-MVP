@@ -6,6 +6,7 @@ class Hub {
   final List<String> memberIds;
   final DateTime createdAt;
   final String? icon; // Optional icon identifier
+  final bool videoCallsEnabled; // Whether video calls are enabled in this hub
 
   Hub({
     required this.id,
@@ -15,7 +16,8 @@ class Hub {
     this.memberIds = const [],
     required this.createdAt,
     this.icon,
-  });
+    bool? videoCallsEnabled,
+  }) : videoCallsEnabled = videoCallsEnabled ?? true; // Default true for family hubs
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -25,6 +27,7 @@ class Hub {
         'memberIds': memberIds,
         'createdAt': createdAt.toIso8601String(),
         'icon': icon,
+        'videoCallsEnabled': videoCallsEnabled,
       };
 
   factory Hub.fromJson(Map<String, dynamic> json) => Hub(
@@ -35,6 +38,7 @@ class Hub {
         memberIds: List<String>.from(json['memberIds'] as List? ?? []),
         createdAt: DateTime.parse(json['createdAt'] as String),
         icon: json['icon'] as String?,
+        videoCallsEnabled: json['videoCallsEnabled'] as bool? ?? true,
       );
 
   Hub copyWith({
@@ -45,6 +49,7 @@ class Hub {
     List<String>? memberIds,
     DateTime? createdAt,
     String? icon,
+    bool? videoCallsEnabled,
   }) =>
       Hub(
         id: id ?? this.id,
@@ -54,6 +59,7 @@ class Hub {
         memberIds: memberIds ?? this.memberIds,
         createdAt: createdAt ?? this.createdAt,
         icon: icon ?? this.icon,
+        videoCallsEnabled: videoCallsEnabled ?? this.videoCallsEnabled,
       );
 }
 

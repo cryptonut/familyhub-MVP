@@ -7,6 +7,14 @@ class UserModel {
   final String? familyId;
   final List<String> roles; // e.g., ['admin', 'banker', 'approver']
   final String? relationship; // Relationship from family creator's perspective (e.g., 'father', 'mother', 'daughter', 'son')
+  final DateTime? birthday; // User's birthday
+  final bool birthdayNotificationsEnabled; // Whether to send birthday reminder notifications
+  // Calendar Sync Settings
+  final bool calendarSyncEnabled; // Whether calendar sync is enabled
+  final String? localCalendarId; // device_calendar plugin ID
+  final String? googleCalendarId; // Optional if using Google API directly
+  final DateTime? lastSyncedAt; // Last successful sync timestamp
+  final bool locationPermissionGranted; // Whether location sharing is enabled
 
   UserModel({
     required this.uid,
@@ -17,7 +25,17 @@ class UserModel {
     this.familyId,
     List<String>? roles,
     this.relationship,
-  }) : roles = roles ?? [];
+    this.birthday,
+    bool? birthdayNotificationsEnabled,
+    bool? calendarSyncEnabled,
+    this.localCalendarId,
+    this.googleCalendarId,
+    this.lastSyncedAt,
+    bool? locationPermissionGranted,
+  }) : roles = roles ?? [],
+       birthdayNotificationsEnabled = birthdayNotificationsEnabled ?? true,
+       calendarSyncEnabled = calendarSyncEnabled ?? false,
+       locationPermissionGranted = locationPermissionGranted ?? false;
 
   Map<String, dynamic> toJson() => {
         'uid': uid,
@@ -28,6 +46,13 @@ class UserModel {
         'familyId': familyId,
         'roles': roles,
         if (relationship != null) 'relationship': relationship,
+        if (birthday != null) 'birthday': birthday!.toIso8601String(),
+        'birthdayNotificationsEnabled': birthdayNotificationsEnabled,
+        'calendarSyncEnabled': calendarSyncEnabled,
+        if (localCalendarId != null) 'localCalendarId': localCalendarId,
+        if (googleCalendarId != null) 'googleCalendarId': googleCalendarId,
+        if (lastSyncedAt != null) 'lastSyncedAt': lastSyncedAt!.toIso8601String(),
+        'locationPermissionGranted': locationPermissionGranted,
       };
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -48,6 +73,17 @@ class UserModel {
       familyId: json['familyId'] as String?,
       roles: roles,
       relationship: json['relationship'] as String?,
+      birthday: json['birthday'] != null 
+          ? DateTime.parse(json['birthday'] as String)
+          : null,
+      birthdayNotificationsEnabled: json['birthdayNotificationsEnabled'] as bool? ?? true,
+      calendarSyncEnabled: json['calendarSyncEnabled'] as bool? ?? false,
+      localCalendarId: json['localCalendarId'] as String?,
+      googleCalendarId: json['googleCalendarId'] as String?,
+      lastSyncedAt: json['lastSyncedAt'] != null
+          ? DateTime.parse(json['lastSyncedAt'] as String)
+          : null,
+      locationPermissionGranted: json['locationPermissionGranted'] as bool? ?? false,
     );
   }
 
@@ -60,6 +96,13 @@ class UserModel {
     String? familyId,
     List<String>? roles,
     String? relationship,
+    DateTime? birthday,
+    bool? birthdayNotificationsEnabled,
+    bool? calendarSyncEnabled,
+    String? localCalendarId,
+    String? googleCalendarId,
+    DateTime? lastSyncedAt,
+    bool? locationPermissionGranted,
   }) =>
       UserModel(
         uid: uid ?? this.uid,
@@ -70,6 +113,13 @@ class UserModel {
         familyId: familyId ?? this.familyId,
         roles: roles ?? this.roles,
         relationship: relationship ?? this.relationship,
+        birthday: birthday ?? this.birthday,
+        birthdayNotificationsEnabled: birthdayNotificationsEnabled ?? this.birthdayNotificationsEnabled,
+        calendarSyncEnabled: calendarSyncEnabled ?? this.calendarSyncEnabled,
+        localCalendarId: localCalendarId ?? this.localCalendarId,
+        googleCalendarId: googleCalendarId ?? this.googleCalendarId,
+        lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+        locationPermissionGranted: locationPermissionGranted ?? this.locationPermissionGranted,
       );
   
   // Helper methods for role checking

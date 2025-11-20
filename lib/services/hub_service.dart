@@ -159,6 +159,25 @@ class HubService {
     }
   }
 
+  /// Update hub settings
+  Future<void> updateHub(String hubId, Map<String, dynamic> updates) async {
+    final userId = currentUserId;
+    if (userId == null) throw Exception('User not logged in');
+
+    final hub = await getHub(hubId);
+    if (hub == null) throw Exception('Hub not found');
+    if (hub.creatorId != userId) {
+      throw Exception('Only the hub creator can update the hub');
+    }
+
+    try {
+      await _firestore.collection('hubs').doc(hubId).update(updates);
+    } catch (e) {
+      debugPrint('Error updating hub: $e');
+      rethrow;
+    }
+  }
+
   /// Delete a hub
   Future<void> deleteHub(String hubId) async {
     final userId = currentUserId;

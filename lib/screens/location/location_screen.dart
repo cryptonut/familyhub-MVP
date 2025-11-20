@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/family_member.dart';
 import '../../services/location_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
+import '../../utils/app_theme.dart';
+import '../../widgets/ui_components.dart';
 
 class LocationScreen extends StatefulWidget {
   const LocationScreen({super.key});
@@ -65,25 +67,10 @@ class _LocationScreenState extends State<LocationScreen> {
         ],
       ),
       body: _familyMembers.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.location_off,
-                    size: 64,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No family members',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
+          ? EmptyState(
+              icon: Icons.location_off,
+              title: 'No family members',
+              message: 'Family members will appear here when they share their location',
             )
           : Column(
               children: [
@@ -138,8 +125,9 @@ class _LocationScreenState extends State<LocationScreen> {
   Widget _buildMemberCard(FamilyMember member) {
     final hasLocation = member.latitude != null && member.longitude != null;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
+    return ModernCard(
+      margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
+      padding: EdgeInsets.zero,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: Colors.blue,

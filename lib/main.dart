@@ -3,15 +3,19 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-import 'screens/home_screen.dart';
-import 'screens/auth/login_screen.dart';
 import 'services/app_state.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
+import 'services/background_sync_service.dart';
 import 'widgets/auth_wrapper.dart';
+import 'utils/app_theme.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize timezone data for device_calendar
+  tz.initializeTimeZones();
   
   try {
     if (kIsWeb) {
@@ -58,6 +62,15 @@ void main() async {
     debugPrint('Notification service initialization error: $e');
     // Don't fail app startup if notifications fail
   }
+
+  // Initialize background sync service
+  try {
+    await BackgroundSyncService.initialize();
+    debugPrint('Background sync service initialized');
+  } catch (e) {
+    debugPrint('Background sync service initialization error: $e');
+    // Don't fail app startup if background sync fails
+  }
   
   runApp(const FamilyHubApp());
 }
@@ -75,28 +88,8 @@ class FamilyHubApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Family Hub',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 0,
-          ),
-        ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 0,
-          ),
-        ),
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
         home: const AuthWrapper(),
       ),

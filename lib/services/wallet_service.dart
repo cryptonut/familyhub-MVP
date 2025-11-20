@@ -22,15 +22,20 @@ class WalletService {
   /// For Bankers: can go negative when creating jobs (minting AUD)
   /// Uses positive balance first, then goes negative
   /// For all users: positive balance for jobs they completed with rewards
-  Future<double> calculateWalletBalance() async {
+  /// 
+  /// If [tasks] is provided, uses that list instead of fetching from Firestore
+  Future<double> calculateWalletBalance({List<Task>? tasks}) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return 0.0;
 
     final userModel = await _authService.getCurrentUserModel();
     if (userModel == null) return 0.0;
 
-    final allTasks = await _taskService.getTasks();
+    final allTasks = tasks ?? await _taskService.getTasks(forceRefresh: true);
     double balance = 0.0;
+    
+    debugPrint('WalletService.calculateWalletBalance: Starting calculation for user ${currentUserId}');
+    debugPrint('WalletService.calculateWalletBalance: User is Banker: ${userModel.isBanker()}, Admin: ${userModel.isAdmin()}');
 
     // Start with earnings from completed jobs
     final completedJobs = allTasks.where((task) => 
@@ -41,9 +46,14 @@ class WalletService {
       (task.claimedBy == currentUserId || task.assignedTo == currentUserId)
     ).toList();
     
+    debugPrint('WalletService.calculateWalletBalance: Found ${completedJobs.length} completed jobs');
+    debugPrint('WalletService.calculateWalletBalance: Total tasks: ${allTasks.length}');
+    
     for (var job in completedJobs) {
       balance += (job.reward ?? 0.0);
     }
+    
+    debugPrint('WalletService.calculateWalletBalance: Balance after completed jobs: $balance');
 
     // For Bankers: subtract rewards from jobs they created (liability)
     // Uses positive balance first, then goes negative
@@ -54,6 +64,8 @@ class WalletService {
         task.reward! > 0
       ).toList();
       
+      debugPrint('WalletService.calculateWalletBalance: Found ${createdJobs.length} created jobs for Banker/Admin');
+      
       for (var job in createdJobs) {
         // For Bankers: liability persists even after job is paid
         // The negative balance represents "minted" money that hasn't been earned back
@@ -61,10 +73,12 @@ class WalletService {
         final rewardAmount = job.reward ?? 0.0;
         // If job is refunded, don't count it as a liability
         if (job.isRefunded == true) {
+          debugPrint('WalletService.calculateWalletBalance: Skipping refunded job ${job.id}');
           continue;
         }
         // Always subtract the liability (even if completed and approved)
         // This maintains the negative balance to track net minting
+        debugPrint('WalletService.calculateWalletBalance: Subtracting ${rewardAmount} for job ${job.id} (${job.title})');
         balance -= rewardAmount;
       }
     } else {
@@ -76,50 +90,73 @@ class WalletService {
         task.reward! > 0
       ).toList();
       
+      debugPrint('WalletService.calculateWalletBalance: Found ${createdJobs.length} created jobs for non-Banker');
+      
       for (var job in createdJobs) {
         // If job is refunded, don't count it as a liability
         if (job.isRefunded == true) {
+          debugPrint('WalletService.calculateWalletBalance: Skipping refunded job ${job.id}');
           continue;
         }
         // For non-Bankers: subtract reward for all created jobs
         // The money is deducted when the job is completed and approved (paid out)
         // So we always subtract it (whether pending, completed, or approved)
         // This represents the money they've committed/spent
+        debugPrint('WalletService.calculateWalletBalance: Subtracting ${job.reward} for job ${job.id} (${job.title})');
         balance -= (job.reward ?? 0.0);
       }
     }
+    
+    debugPrint('WalletService.calculateWalletBalance: Balance after created jobs: $balance');
 
     // Add pocket money payments (recurring payments received)
-    final pocketMoneyPayments = await _recurringPaymentService.getUserPocketMoneyPayments(currentUserId);
-    for (var payment in pocketMoneyPayments) {
-      final amount = payment['amount'] as num?;
-      if (amount != null) {
-        balance += amount.toDouble();
+    // Wrap in try-catch to handle missing Firestore indexes gracefully
+    try {
+      final pocketMoneyPayments = await _recurringPaymentService.getUserPocketMoneyPayments(currentUserId);
+      for (var payment in pocketMoneyPayments) {
+        final amount = payment['amount'] as num?;
+        if (amount != null) {
+          balance += amount.toDouble();
+        }
       }
+      debugPrint('WalletService.calculateWalletBalance: Added pocket money payments');
+    } catch (e) {
+      debugPrint('WalletService.calculateWalletBalance: Error loading pocket money payments (non-critical): $e');
+      // Continue with balance calculation even if this fails
     }
 
     // Subtract approved payouts (money that has been paid out outside the app)
-    final approvedPayouts = await _payoutService.getUserApprovedPayouts(currentUserId);
-    for (var payout in approvedPayouts) {
-      final amount = payout['amount'] as num?;
-      if (amount != null) {
-        balance -= amount.toDouble();
+    // Wrap in try-catch to handle missing Firestore indexes gracefully
+    try {
+      final approvedPayouts = await _payoutService.getUserApprovedPayouts(currentUserId);
+      for (var payout in approvedPayouts) {
+        final amount = payout['amount'] as num?;
+        if (amount != null) {
+          balance -= amount.toDouble();
+        }
       }
+      debugPrint('WalletService.calculateWalletBalance: Subtracted approved payouts');
+    } catch (e) {
+      debugPrint('WalletService.calculateWalletBalance: Error loading approved payouts (non-critical): $e');
+      // Continue with balance calculation even if this fails
     }
 
+    debugPrint('WalletService.calculateWalletBalance: Final balance: $balance');
     return balance;
   }
 
   /// Get all transactions (both created jobs and completed jobs)
   /// Only returns transactions for the current user
-  Future<Map<String, List<Task>>> getTransactions() async {
+  /// 
+  /// If [tasks] is provided, uses that list instead of fetching from Firestore
+  Future<Map<String, List<Task>>> getTransactions({List<Task>? tasks}) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return {'created': [], 'completed': []};
 
     final userModel = await _authService.getCurrentUserModel();
     if (userModel == null) return {'created': [], 'completed': []};
 
-    final allTasks = await _taskService.getTasks();
+    final allTasks = tasks ?? await _taskService.getTasks(forceRefresh: true);
     
     // Jobs created by current user (show for ALL users, not just Bankers/Admins)
     // Only show jobs created by THIS user

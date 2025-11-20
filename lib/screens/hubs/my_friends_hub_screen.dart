@@ -7,8 +7,11 @@ import '../../services/auth_service.dart';
 import '../../services/calendar_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../calendar/add_edit_event_screen.dart';
+import '../video/video_call_screen.dart';
+import '../../services/video_call_service.dart';
 import 'create_hub_event_dialog.dart';
 import 'invite_members_dialog.dart';
+import 'hub_settings_screen.dart';
 
 class MyFriendsHubScreen extends StatefulWidget {
   final Hub hub;
@@ -23,6 +26,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
   final HubService _hubService = HubService();
   final AuthService _authService = AuthService();
   final CalendarService _calendarService = CalendarService();
+  final VideoCallService _videoCallService = VideoCallService();
   
   List<UserModel> _members = [];
   List<CalendarEvent> _upcomingEvents = [];
@@ -114,11 +118,58 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
     }
   }
 
+  Future<void> _startVideoCall() async {
+    try {
+      final channelName = await _videoCallService.createCall(widget.hub.id);
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VideoCallScreen(
+              hubId: widget.hub.id,
+              channelName: channelName,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error starting video call: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.hub.name),
+        actions: [
+          if (widget.hub.videoCallsEnabled)
+            IconButton(
+              icon: const Icon(Icons.videocam),
+              onPressed: _startVideoCall,
+              tooltip: 'Start Video Call',
+            ),
+          if (_isHubCreator)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HubSettingsScreen(hub: widget.hub),
+                  ),
+                ).then((_) => _loadHubData());
+              },
+              tooltip: 'Hub Settings',
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

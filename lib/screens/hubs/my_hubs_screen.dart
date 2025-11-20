@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/hub_service.dart';
 import '../../models/hub.dart';
+import '../../utils/app_theme.dart';
+import '../../widgets/ui_components.dart';
 import 'my_friends_hub_screen.dart';
 import 'create_hub_dialog.dart';
 
@@ -110,7 +112,7 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
   }
 
   Widget _buildHubCard(Hub hub) {
-    return InkWell(
+    return ModernCard(
       onTap: () {
         if (hub.name == 'My Friends') {
           Navigator.push(
@@ -130,42 +132,36 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
           );
         }
       },
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                _getHubIcon(hub.icon),
-                size: 48,
-                color: Theme.of(context).primaryColor,
+      padding: const EdgeInsets.all(AppTheme.spacingMD),
+      child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _getHubIcon(hub.icon),
+              size: 48,
+              color: Theme.of(context).primaryColor,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              hub.name,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 12),
-              Text(
-                hub.name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${hub.memberIds.length} member${hub.memberIds.length == 1 ? '' : 's'}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${hub.memberIds.length} member${hub.memberIds.length == 1 ? '' : 's'}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ),
     );
   }
 

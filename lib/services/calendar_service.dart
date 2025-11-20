@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/calendar_event.dart';
 import 'auth_service.dart';
+import 'recurrence_service.dart';
+import 'notification_service.dart';
 
 class CalendarService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -59,11 +61,41 @@ class CalendarService {
 
   Future<List<CalendarEvent>> getEventsForDate(DateTime date) async {
     final allEvents = await getEvents();
-    return allEvents.where((event) {
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    
+    // Use recurrence service to expand recurring events
+    final expandedEvents = RecurrenceService.getAllEventsForRange(
+      allEvents,
+      startOfDay,
+      endOfDay,
+    );
+    
+    // Filter to exact date
+    return expandedEvents.where((event) {
       return event.startTime.year == date.year &&
           event.startTime.month == date.month &&
           event.startTime.day == date.day;
     }).toList();
+  }
+
+  /// Update RSVP status for an event
+  Future<void> updateRsvpStatus(String eventId, String memberId, String status) async {
+    final familyId = await _familyId;
+    if (familyId == null) throw Exception('User not part of a family');
+    
+    final eventRef = _firestore.collection('families/$familyId/events').doc(eventId);
+    final eventDoc = await eventRef.get();
+    
+    if (!eventDoc.exists) {
+      throw Exception('Event not found');
+    }
+    
+    final eventData = eventDoc.data() as Map<String, dynamic>;
+    final rsvpStatus = Map<String, String>.from(eventData['rsvpStatus'] as Map? ?? {});
+    rsvpStatus[memberId] = status;
+    
+    await eventRef.update({'rsvpStatus': rsvpStatus});
   }
 
   Future<void> addEvent(CalendarEvent event) async {
@@ -80,6 +112,15 @@ class CalendarService {
           .collection('families/$familyId/events')
           .doc(event.id)
           .set(data);
+      
+      // Trigger calendar sync notification for family members
+      try {
+        final notificationService = NotificationService();
+        await notificationService.notifyCalendarSyncTrigger(familyId);
+      } catch (e) {
+        debugPrint('Error triggering calendar sync notification: $e');
+        // Don't fail event creation if notification fails
+      }
     } catch (e) {
       // Log the actual error for debugging
       debugPrint('CalendarService.addEvent error: $e');
@@ -103,6 +144,15 @@ class CalendarService {
           .collection('families/$familyId/events')
           .doc(event.id)
           .set(data, SetOptions(merge: true));
+      
+      // Trigger calendar sync notification for family members
+      try {
+        final notificationService = NotificationService();
+        await notificationService.notifyCalendarSyncTrigger(familyId);
+      } catch (e) {
+        debugPrint('Error triggering calendar sync notification: $e');
+        // Don't fail event update if notification fails
+      }
     } catch (e) {
       debugPrint('CalendarService.updateEvent error: $e');
       debugPrint('Family ID: $familyId');

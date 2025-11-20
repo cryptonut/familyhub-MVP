@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../../models/chat_message.dart';
 import '../../services/chat_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
+import '../../utils/app_theme.dart';
+import '../../widgets/ui_components.dart';
 import 'package:uuid/uuid.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -107,8 +108,28 @@ class _ChatScreenState extends State<ChatScreen> {
             if (snapshot.hasError) {
               return Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text('Error: ${snapshot.error}'),
+                  padding: const EdgeInsets.all(AppTheme.spacingMD),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: AppTheme.spacingMD),
+                      Text(
+                        'Error loading messages',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: AppTheme.spacingSM),
+                      Text(
+                        '${snapshot.error}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               );
             }
@@ -129,37 +150,14 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 Expanded(
                   child: messages.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.chat_bubble_outline,
-                                size: 64,
-                                color: Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No messages yet',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Start the conversation!',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
-                            ],
-                          ),
+                      ? EmptyState(
+                          icon: Icons.chat_bubble_outline,
+                          title: 'No messages yet',
+                          message: 'Start the conversation!',
                         )
                       : ListView.builder(
                           controller: _scrollController,
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(AppTheme.spacingSM),
                           itemCount: messages.length,
                           itemBuilder: (context, index) {
                             final message = messages[index];
@@ -178,50 +176,76 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(ChatMessage message, bool isCurrentUser) {
+    final theme = Theme.of(context);
+    
     return LayoutBuilder(
       builder: (context, constraints) {
         return Align(
           alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            margin: const EdgeInsets.symmetric(
+              vertical: AppTheme.spacingXS,
+              horizontal: AppTheme.spacingSM,
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.spacingMD,
+              vertical: AppTheme.spacingSM,
+            ),
             decoration: BoxDecoration(
-              color: isCurrentUser ? Colors.blue : Colors.grey[300]!,
-              borderRadius: BorderRadius.circular(20),
+              color: isCurrentUser
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(AppTheme.radiusMD),
+                topRight: const Radius.circular(AppTheme.radiusMD),
+                bottomLeft: Radius.circular(isCurrentUser ? AppTheme.radiusMD : AppTheme.radiusSM),
+                bottomRight: Radius.circular(isCurrentUser ? AppTheme.radiusSM : AppTheme.radiusMD),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             constraints: BoxConstraints(
-              maxWidth: constraints.maxWidth * 0.7,
+              maxWidth: constraints.maxWidth * 0.75,
             ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.senderName,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: isCurrentUser ? Colors.white70 : Colors.black87,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!isCurrentUser) ...[
+                  Text(
+                    message.senderName,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                    color: isCurrentUser
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.spacingXS),
+                ],
+                Text(
+                  message.content,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: isCurrentUser
+                        ? Colors.white
+                        : theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingXS),
+                Text(
+                  app_date_utils.AppDateUtils.formatTime(message.timestamp),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: isCurrentUser
+                        ? Colors.white.withValues(alpha: 0.7)
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              message.content,
-              style: TextStyle(
-                color: isCurrentUser ? Colors.white : Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              app_date_utils.AppDateUtils.formatTime(message.timestamp),
-              style: TextStyle(
-                fontSize: 10,
-                color: isCurrentUser
-                    ? Colors.white70
-                    : Colors.black54,
-              ),
-            ),
-          ],
-        ),
           ),
         );
       },
@@ -229,57 +253,60 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageInput() {
-    return Builder(
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 4,
-                offset: const Offset(0, -2),
-              ),
-            ],
+    final theme = Theme.of(context);
+    
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacingSM),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  decoration: InputDecoration(
-                    hintText: 'Type a message...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _messageController,
+                decoration: InputDecoration(
+                  hintText: 'Type a message...',
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusXL),
+                    borderSide: BorderSide.none,
                   ),
-                  maxLines: null,
-                  textCapitalization: TextCapitalization.sentences,
-                  onSubmitted: (_) => _sendMessage(),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppTheme.spacingMD,
+                    vertical: AppTheme.spacingSM,
+                  ),
                 ),
+                maxLines: null,
+                textCapitalization: TextCapitalization.sentences,
+                onSubmitted: (_) => _sendMessage(),
               ),
-              const SizedBox(width: 8),
-              Builder(
-                builder: (btnContext) {
-                  return IconButton(
-                    onPressed: _sendMessage,
-                    icon: const Icon(Icons.send),
-                    color: Theme.of(btnContext).primaryColor,
-                    style: IconButton.styleFrom(
-                      backgroundColor: Theme.of(btnContext).primaryColor.withValues(alpha: 0.1),
-                    ),
-                  );
-                },
+            ),
+            const SizedBox(width: AppTheme.spacingSM),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                shape: BoxShape.circle,
               ),
-            ],
-          ),
-        );
-      },
+              child: IconButton(
+                onPressed: _sendMessage,
+                icon: const Icon(Icons.send, color: Colors.white),
+                padding: const EdgeInsets.all(AppTheme.spacingSM),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

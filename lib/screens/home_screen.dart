@@ -13,6 +13,11 @@ import 'family/join_family_screen.dart';
 import 'admin/role_management_screen.dart';
 import 'admin/migration_screen.dart';
 import 'admin/database_reset_screen.dart';
+import 'profile/edit_profile_screen.dart';
+import 'settings/calendar_sync_settings_screen.dart';
+import 'settings/privacy_center_screen.dart';
+import 'games/games_home_screen.dart';
+import 'photos/photos_home_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -53,6 +58,36 @@ class HomeScreen extends StatelessWidget {
               Icon(Icons.group_add, size: 20),
               SizedBox(width: 8),
               Text('Join Family'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'profile',
+          child: Row(
+            children: [
+              Icon(Icons.person, size: 20),
+              SizedBox(width: 8),
+              Text('Edit Profile'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'calendar_sync',
+          child: Row(
+            children: [
+              Icon(Icons.sync, size: 20),
+              SizedBox(width: 8),
+              Text('Calendar Sync'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'privacy',
+          child: Row(
+            children: [
+              Icon(Icons.privacy_tip, size: 20),
+              SizedBox(width: 8),
+              Text('Privacy Center'),
             ],
           ),
         ),
@@ -131,6 +166,27 @@ class HomeScreen extends StatelessWidget {
               ),
             );
           }
+        } else if (value == 'profile') {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const EditProfileScreen(),
+            ),
+          );
+        } else if (value == 'calendar_sync') {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CalendarSyncSettingsScreen(),
+            ),
+          );
+        } else if (value == 'privacy') {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PrivacyCenterScreen(),
+            ),
+          );
         } else if (value == 'roles') {
           // Check if user is Admin before allowing role management
           final userModel = await authService.getCurrentUserModel();
@@ -523,6 +579,8 @@ class HomeScreen extends StatelessWidget {
               CalendarScreen(),
               TasksScreen(),
               ChatScreen(),
+              GamesHomeScreen(),
+              PhotosHomeScreen(),
               LocationScreen(),
             ],
           ),
@@ -551,6 +609,16 @@ class HomeScreen extends StatelessWidget {
                 icon: Icon(Icons.chat_bubble_outline),
                 selectedIcon: Icon(Icons.chat_bubble),
                 label: 'Chat',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.sports_esports_outlined),
+                selectedIcon: Icon(Icons.sports_esports),
+                label: 'Games',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.photo_library_outlined),
+                selectedIcon: Icon(Icons.photo_library),
+                label: 'Photos',
               ),
               NavigationDestination(
                 icon: Icon(Icons.location_on_outlined),

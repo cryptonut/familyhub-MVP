@@ -104,6 +104,17 @@ service cloud.firestore {
       // For new users, this allows them to read their own family data even if collection is empty
       allow read: if canAccessFamilyData(familyId);
       
+      // Allow creating family document if it doesn't exist (for first job creation)
+      allow create: if canAccessFamilyData(familyId) &&
+        request.resource.data.walletBalance is number;
+      
+      // Allow updating walletBalance field for family members (for job creation/approval)
+      // This handles both updates to existing documents and set() with merge on new documents
+      allow update: if canAccessFamilyData(familyId) && 
+        request.resource.data.walletBalance is number &&
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['walletBalance']) ||
+         !exists(/databases/$(database)/documents/families/$(familyId)));
+      
       // Tasks subcollection
       match /tasks/{taskId} {
         // Allow read if user belongs to the family
@@ -249,6 +260,60 @@ service cloud.firestore {
     // Hub invites collection (top-level, for backward compatibility)
     match /hubInvites/{inviteId} {
       allow read, write: if request.auth != null;
+    }
+
+    // Privacy activity collection
+    match /privacy_activity/{activityId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Game stats subcollection
+    match /families/{familyId}/game_stats/{userId} {
+      allow read: if canAccessFamilyData(familyId);
+      allow create, update: if canAccessFamilyData(familyId) && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Video calls collection
+    match /calls/{hubId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // Photo albums subcollection
+    match /families/{familyId}/albums/{albumId} {
+      allow read: if canAccessFamilyData(familyId);
+      allow create: if canAccessFamilyData(familyId) && 
+                     request.resource.data.createdBy == request.auth.uid;
+      allow update: if canAccessFamilyData(familyId) && 
+                     (resource.data.createdBy == request.auth.uid ||
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coverPhotoId', 'photoCount', 'lastPhotoAddedAt']));
+      allow delete: if canAccessFamilyData(familyId) && 
+                     resource.data.createdBy == request.auth.uid;
+    }
+
+    // Photos subcollection
+    match /families/{familyId}/photos/{photoId} {
+      allow read: if canAccessFamilyData(familyId);
+      allow create: if canAccessFamilyData(familyId) && 
+                     request.resource.data.uploadedBy == request.auth.uid;
+      allow update: if canAccessFamilyData(familyId) && 
+                     (resource.data.uploadedBy == request.auth.uid ||
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount', 'lastViewedAt']));
+      allow delete: if canAccessFamilyData(familyId) && 
+                     resource.data.uploadedBy == request.auth.uid;
+      
+      // Photo comments subcollection
+      match /comments/{commentId} {
+        allow read: if canAccessFamilyData(familyId);
+        allow create: if canAccessFamilyData(familyId) && 
+                       request.resource.data.authorId == request.auth.uid;
+        allow update: if canAccessFamilyData(familyId) && 
+                       resource.data.authorId == request.auth.uid;
+        allow delete: if canAccessFamilyData(familyId) && 
+                       resource.data.authorId == request.auth.uid;
+      }
     }
   }
 }

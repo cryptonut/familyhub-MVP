@@ -257,6 +257,100 @@ class NotificationService {
       debugPrint('Error sending job refund notification: $e');
     }
   }
+
+  /// Send birthday reminder notification to family members
+  /// This should be called by a Cloud Function scheduled to run daily
+  /// For now, we'll create a notification document that can trigger push notifications
+  Future<void> notifyBirthdayReminder(String birthdayUserId, String birthdayUserName, int ageTurning, DateTime birthdayDate) async {
+    try {
+      final userModel = await _authService.getCurrentUserModel();
+      final familyId = userModel?.familyId;
+      if (familyId == null) return;
+
+      // Get all family members except the birthday person
+      final familyMembers = await _authService.getFamilyMembers();
+      final recipients = familyMembers.where((member) => 
+        member.uid != birthdayUserId && 
+        member.birthdayNotificationsEnabled
+      ).toList();
+
+      // Create notification for each family member
+      final batch = _firestore.batch();
+      for (var recipient in recipients) {
+        final notificationRef = _firestore.collection('notifications').doc();
+        batch.set(notificationRef, {
+          'userId': recipient.uid,
+          'type': 'birthday_reminder',
+          'birthdayUserId': birthdayUserId,
+          'birthdayUserName': birthdayUserName,
+          'ageTurning': ageTurning,
+          'birthdayDate': birthdayDate.toIso8601String(),
+          'message': '$birthdayUserName is turning $ageTurning tomorrow!',
+          'read': false,
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+      }
+
+      await batch.commit();
+      debugPrint('Birthday reminder notifications created for ${recipients.length} family members');
+    } catch (e) {
+      debugPrint('Error sending birthday reminder notifications: $e');
+    }
+  }
+
+  /// Send push notification to trigger calendar sync when another family member creates/edits event
+  /// This is called by Cloud Functions or when events are created/updated
+  Future<void> notifyCalendarSyncTrigger(String familyId) async {
+    try {
+      // Get all family members
+      final familyMembers = await _authService.getFamilyMembers();
+      
+      // Send quiet push to all members with calendar sync enabled
+      final batch = _firestore.batch();
+      for (var member in familyMembers) {
+        if (member.calendarSyncEnabled && member.localCalendarId != null) {
+          final notificationRef = _firestore.collection('notifications').doc();
+          batch.set(notificationRef, {
+            'userId': member.uid,
+            'type': 'calendar_sync_trigger',
+            'message': 'New calendar event - syncing...',
+            'read': false,
+            'createdAt': DateTime.now().toIso8601String(),
+            'data': {
+              'action': 'sync_calendar',
+            },
+          });
+        }
+      }
+      
+      await batch.commit();
+      debugPrint('Calendar sync trigger notifications created');
+    } catch (e) {
+      debugPrint('Error sending calendar sync trigger: $e');
+    }
+  }
+
+  /// Send a generic notification to a user
+  Future<void> sendNotification({
+    required String userId,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': title,
+        'body': body,
+        'data': data ?? {},
+        'read': false,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+      debugPrint('Notification sent to user $userId');
+    } catch (e) {
+      debugPrint('Error sending notification: $e');
+    }
+  }
 }
 
 // Background message handler (must be top-level function)

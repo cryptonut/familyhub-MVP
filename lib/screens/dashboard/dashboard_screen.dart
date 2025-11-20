@@ -21,8 +21,12 @@ import '../tasks/add_edit_task_screen.dart';
 import '../tasks/refund_notification_dialog.dart';
 import '../wallet/approve_payout_dialog.dart';
 import '../../widgets/relationship_dialog.dart';
+import '../../widgets/ui_components.dart';
+import '../../utils/app_theme.dart';
 import '../../services/payout_service.dart';
 import '../../models/payout_request.dart';
+import '../../services/birthday_service.dart';
+import '../../screens/profile/edit_profile_screen.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -38,10 +42,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final WalletService _walletService = WalletService();
   final FamilyWalletService _familyWalletService = FamilyWalletService();
   final PayoutService _payoutService = PayoutService();
+  final BirthdayService _birthdayService = BirthdayService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   List<CalendarEvent> _upcomingEvents = [];
+  List<BirthdayInfo> _upcomingBirthdays = [];
   List<Task> _upcomingTasks = [];
   List<Task> _pendingApprovals = [];
   List<Map<String, dynamic>> _refundNotifications = []; // List of refund notification documents
@@ -142,6 +148,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Clear familyId cache to ensure we have the latest value
       _taskService.clearFamilyIdCache();
       
+      // Load upcoming birthdays (next 30 days)
+      try {
+        _upcomingBirthdays = await _birthdayService.getUpcomingBirthdays(days: 30);
+      } catch (e) {
+        debugPrint('Error loading upcoming birthdays (non-critical): $e');
+        _upcomingBirthdays = [];
+      }
+
       // Load upcoming events (next 7 days)
       final allEvents = await _calendarService.getEvents();
       final now = DateTime.now();
@@ -172,8 +186,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       });
 
       // Calculate wallet balance using WalletService (handles negative balances for Bankers)
+      // Pass the already-loaded tasks to avoid duplicate fetch and ensure consistency
       try {
-        _walletBalance = await _walletService.calculateWalletBalance();
+        _walletBalance = await _walletService.calculateWalletBalance(tasks: allTasks);
       } catch (e) {
         debugPrint('Error calculating wallet balance (non-critical): $e');
         _walletBalance = 0.0;
@@ -283,7 +298,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const LoadingIndicator(message: 'Loading dashboard...');
     }
 
     return RefreshIndicator(
@@ -320,6 +335,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildQuickStats(),
             const SizedBox(height: 24),
             
+            // Upcoming Birthdays
+            if (_upcomingBirthdays.isNotEmpty) ...[
+              _buildUpcomingBirthdays(),
+              const SizedBox(height: 24),
+            ],
+            
             // Upcoming Events
             _buildUpcomingEvents(),
             const SizedBox(height: 24),
@@ -337,7 +358,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildWalletCard() {
-    return InkWell(
+    return ModernCard(
       onTap: () {
         // Navigate to wallet/transaction history screen
         Navigator.push(
@@ -347,86 +368,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
-        elevation: 2,
-        color: Colors.blue.shade50,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      color: Theme.of(context).colorScheme.primaryContainer,
+      padding: const EdgeInsets.all(AppTheme.spacingLG),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(Icons.account_balance_wallet, 
-                      color: Colors.blue.shade700, size: 28),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'My Wallet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+              Icon(Icons.account_balance_wallet, 
+                  color: Colors.blue.shade700, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'My Wallet',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  Icon(Icons.chevron_right, color: Colors.blue.shade700),
-                ],
+                ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                '${_walletBalance >= 0 ? '' : '-'}\$${_walletBalance.abs().toStringAsFixed(2)} AUD',
+              Icon(Icons.chevron_right, color: Colors.blue.shade700),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '${_walletBalance >= 0 ? '' : '-'}\$${_walletBalance.abs().toStringAsFixed(2)} AUD',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: _walletBalance >= 0 ? Colors.blue.shade700 : Colors.red.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Earned from completed jobs',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.account_balance, 
+                  color: Colors.green.shade700, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Family Wallet:',
                 style: TextStyle(
-                  fontSize: 32,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '\$${_familyWalletBalance.toStringAsFixed(2)} AUD',
+                style: TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: _walletBalance >= 0 ? Colors.blue.shade700 : Colors.red.shade700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Earned from completed jobs',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(Icons.account_balance, 
-                      color: Colors.green.shade700, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Family Wallet:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '\$${_familyWalletBalance.toStringAsFixed(2)} AUD',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green.shade700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Available for job rewards',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
+                  color: Colors.green.shade700,
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 4),
+          Text(
+            'Available for job rewards',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -434,13 +449,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildMyFamily() {
     final currentUserId = _auth.currentUser?.uid;
     
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return ModernCard(
+      padding: const EdgeInsets.all(AppTheme.spacingMD),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Row(
               children: [
                 Icon(Icons.people, 
@@ -704,19 +717,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
           ],
         ),
-      ),
     );
   }
 
   Widget _buildPendingApprovals() {
-    return Card(
-      elevation: 3,
+    return ModernCard(
       color: Colors.orange.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      padding: const EdgeInsets.all(AppTheme.spacingMD),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Row(
               children: [
                 Icon(Icons.notifications_active, 
@@ -775,8 +785,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: Text('View all $_pendingApprovalsCount approvals'),
                 ),
               ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -1470,7 +1479,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       targetTab = 2; // Jobs tab (to see approvals)
     }
     
-    return InkWell(
+    return StatCard(
+      title: label,
+      value: value,
+      icon: icon,
+      color: color,
       onTap: targetTab != null
           ? () {
               final appState = Provider.of<AppState>(context, listen: false);
@@ -1481,44 +1494,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
             }
           : null,
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
-        elevation: 1,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 32),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  if (targetTab != null) ...[
-                    const SizedBox(width: 4),
-                    Icon(Icons.chevron_right, size: 16, color: Colors.grey[600]),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -1526,36 +1501,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Upcoming Events',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                // Navigate to calendar tab (index 1)
-                Provider.of<AppState>(context, listen: false).setCurrentIndex(1);
-              },
-              child: const Text('View All'),
-            ),
-          ],
+        SectionHeader(
+          title: 'Upcoming Events',
+          onSeeAll: () {
+            // Navigate to calendar tab (index 1)
+            Provider.of<AppState>(context, listen: false).setCurrentIndex(1);
+          },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppTheme.spacingSM),
         if (_upcomingEvents.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Center(
-                child: Text(
-                  'No upcoming events',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ),
+          ModernCard(
+            child: EmptyState(
+              icon: Icons.event_outlined,
+              title: 'No upcoming events',
+              message: 'Create your first event!',
             ),
           )
         else
@@ -1593,36 +1552,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Upcoming Jobs',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                // Navigate to jobs tab (index 2)
-                Provider.of<AppState>(context, listen: false).setCurrentIndex(2);
-              },
-              child: const Text('View All'),
-            ),
-          ],
+        SectionHeader(
+          title: 'Upcoming Jobs',
+          onSeeAll: () {
+            // Navigate to jobs tab (index 2)
+            Provider.of<AppState>(context, listen: false).setCurrentIndex(2);
+          },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppTheme.spacingSM),
         if (_upcomingTasks.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Center(
-                child: Text(
-                  'No active jobs',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ),
+          ModernCard(
+            child: EmptyState(
+              icon: Icons.task_outlined,
+              title: 'No active jobs',
+              message: 'Create your first job!',
             ),
           )
         else
@@ -1640,6 +1583,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isCreator = task.createdBy == currentUserId;
     final isClaimed = task.isClaimed;
     final hasPendingClaim = task.hasPendingClaim;
+    final isClaimer = isClaimed && task.claimedBy == currentUserId;
+    
+    // For tasks that don't require claim: anyone (including creator) can complete if not claimed
+    // For tasks that require claim: only the claimer can complete (after claiming)
+    // Creators can always complete their own jobs (to get funds back)
+    final canComplete = (!isClaimed && !hasPendingClaim && !task.requiresClaim) || isCreator;
+    final canCompleteAsClaimer = isClaimer && task.requiresClaim;
     final canClaim = !isCreator && !isClaimed && !hasPendingClaim && !task.requiresClaim;
     final canClaimWithApproval = !isCreator && !isClaimed && !hasPendingClaim && task.requiresClaim;
     
@@ -1790,79 +1740,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-              if (canClaim) ...[
-                // Job doesn't require claiming - show "Job Done!" button
+              if (canComplete || canCompleteAsClaimer) ...[
+                // Job doesn't require claiming OR user is the claimer - show "Job Done!" button
                 const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      try {
-                        await _taskService.completeTask(task.id);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Job completed!'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                          _loadDashboardData();
+                GestureDetector(
+                  onTap: () {}, // Stop event propagation to parent InkWell
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        try {
+                          await _taskService.completeTask(task.id);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Job completed!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            _loadDashboardData();
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error completing job: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
                         }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error completing job: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.check_circle, size: 16),
-                    label: const Text('Job Done!'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      },
+                      icon: const Icon(Icons.check_circle, size: 16),
+                      label: const Text('Job Done!'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
                     ),
                   ),
                 ),
               ] else if (canClaimWithApproval) ...[
                 // Job requires claiming - show "Claim Now" button
                 const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      try {
-                        await _taskService.claimJob(task.id);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Job claimed successfully!'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                          _loadDashboardData();
+                GestureDetector(
+                  onTap: () {}, // Stop event propagation to parent InkWell
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        try {
+                          await _taskService.claimJob(task.id);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Job claimed successfully!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            _loadDashboardData();
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error claiming job: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
                         }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error claiming job: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.person_add, size: 16),
-                    label: const Text('Claim Now'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      },
+                      icon: const Icon(Icons.person_add, size: 16),
+                      label: const Text('Claim Now'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
                     ),
                   ),
                 ),
@@ -1885,6 +1841,171 @@ class _DashboardScreenState extends State<DashboardScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  // Member colors for avatars (consistent with existing pattern)
+  static final List<Color> _memberColors = [
+    Colors.purple,
+    Colors.blue,
+    Colors.green,
+    Colors.orange,
+    Colors.pink,
+    Colors.teal,
+    Colors.indigo,
+    Colors.cyan,
+  ];
+
+  Color _getMemberColor(int index) {
+    return _memberColors[index % _memberColors.length];
+  }
+
+  Widget _buildUpcomingBirthdays() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(
+          title: 'Upcoming Birthdays',
+          action: TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EditProfileScreen(),
+                ),
+              ).then((_) {
+                // Refresh dashboard after profile edit
+                _loadDashboardData();
+              });
+            },
+            child: const Text('Edit Profile'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 140,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: _upcomingBirthdays.length,
+            itemBuilder: (context, index) {
+              final birthday = _upcomingBirthdays[index];
+              final member = birthday.user;
+              final daysUntil = birthday.upcomingDate.difference(DateTime.now()).inDays;
+              
+              String relativeTime;
+              if (daysUntil == 0) {
+                relativeTime = 'Today!';
+              } else if (daysUntil == 1) {
+                relativeTime = 'Tomorrow';
+              } else {
+                relativeTime = 'In $daysUntil days';
+              }
+
+              return Container(
+                width: 140,
+                margin: const EdgeInsets.only(right: 12),
+                child: Card(
+                  elevation: 2,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const EditProfileScreen(),
+                        ),
+                      ).then((_) {
+                        _loadDashboardData();
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 26,
+                                backgroundColor: _getMemberColor(index),
+                                child: Text(
+                                  member.displayName.isNotEmpty
+                                      ? member.displayName[0].toUpperCase()
+                                      : member.email[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.pink,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.cake,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Flexible(
+                            child: Text(
+                              member.displayName.isNotEmpty
+                                  ? member.displayName
+                                  : member.email.split('@')[0],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Turning ${birthday.ageTurning}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            relativeTime,
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: daysUntil <= 1 
+                                  ? Colors.pink[700] 
+                                  : Colors.grey[600],
+                              fontWeight: daysUntil <= 1 
+                                  ? FontWeight.bold 
+                                  : FontWeight.normal,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 }
 

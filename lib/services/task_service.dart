@@ -140,6 +140,10 @@ class TaskService {
     final familyId = await _familyId;
     if (familyId == null) throw Exception('User not part of a family');
     
+    // Track if wallet was credited in case we need to rollback
+    bool walletCredited = false;
+    double? creditedAmount;
+    
     try {
       // If task has a reward, handle family wallet and balance checks
       if (task.reward != null && task.reward! > 0) {
@@ -159,6 +163,8 @@ class TaskService {
         
         // Credit family wallet with the full reward amount
         await _familyWalletService.creditFamilyWallet(rewardAmount);
+        walletCredited = true;
+        creditedAmount = rewardAmount;
         debugPrint('TaskService.addTask: Credited $rewardAmount to family wallet');
       }
       
@@ -173,9 +179,30 @@ class TaskService {
       final docRef = _firestore.collection(collectionPath).doc(task.id);
       await docRef.set(data);
       
-      debugPrint('TaskService.addTask: Task ${task.id} written to Firestore');
+      debugPrint('TaskService.addTask: Task ${task.id} written to Firestore successfully');
+      
+      // Verify the task was actually written
+      final verifyDoc = await docRef.get();
+      if (!verifyDoc.exists) {
+        throw Exception('Task was not saved to Firestore - verification failed');
+      }
+      
+      debugPrint('TaskService.addTask: Task ${task.id} verified in Firestore');
     } catch (e) {
       debugPrint('TaskService.addTask error: $e');
+      
+      // If wallet was credited but task save failed, try to rollback
+      if (walletCredited && creditedAmount != null) {
+        try {
+          debugPrint('TaskService.addTask: Attempting to rollback wallet credit of $creditedAmount');
+          await _familyWalletService.debitFamilyWallet(creditedAmount!);
+          debugPrint('TaskService.addTask: Wallet credit rolled back successfully');
+        } catch (rollbackError) {
+          debugPrint('TaskService.addTask: Failed to rollback wallet credit: $rollbackError');
+          // Don't throw here - the original error is more important
+        }
+      }
+      
       rethrow;
     }
   }

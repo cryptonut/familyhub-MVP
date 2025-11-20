@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../models/calendar_event.dart';
+import '../../models/user_model.dart';
 import '../../services/calendar_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/calendar_sync_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import 'package:uuid/uuid.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AddEditEventScreen extends StatefulWidget {
   final CalendarEvent? event;
@@ -24,10 +28,20 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
   final _calendarService = CalendarService();
+  final _authService = AuthService();
+  final _syncService = CalendarSyncService();
+  final _auth = FirebaseAuth.instance;
   
   DateTime _startTime = DateTime.now();
   DateTime _endTime = DateTime.now().add(const Duration(hours: 1));
   String _selectedColor = '#2196F3';
+  bool _isRecurring = false;
+  String? _selectedRecurrenceRule;
+  List<String> _selectedInvitees = [];
+  List<UserModel> _familyMembers = [];
+  bool _addToPersonalCalendar = true;
+  bool _calendarSyncEnabled = false;
+  
   final List<String> _colors = [
     '#2196F3', // Blue
     '#4CAF50', // Green
@@ -36,10 +50,19 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
     '#9C27B0', // Purple
     '#00BCD4', // Cyan
   ];
+  
+  final List<String> _recurrenceOptions = [
+    'daily',
+    'weekly',
+    'monthly',
+    'yearly',
+  ];
 
   @override
   void initState() {
     super.initState();
+    _loadFamilyMembers();
+    
     if (widget.event != null) {
       _titleController.text = widget.event!.title;
       _descriptionController.text = widget.event!.description;
@@ -47,6 +70,9 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
       _startTime = widget.event!.startTime;
       _endTime = widget.event!.endTime;
       _selectedColor = widget.event!.color;
+      _isRecurring = widget.event!.isRecurring;
+      _selectedRecurrenceRule = widget.event!.recurrenceRule;
+      _selectedInvitees = List<String>.from(widget.event!.invitedMemberIds);
     } else if (widget.selectedDate != null) {
       _startTime = DateTime(
         widget.selectedDate!.year,
@@ -55,6 +81,20 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
         9,
       );
       _endTime = _startTime.add(const Duration(hours: 1));
+    }
+  }
+
+  Future<void> _loadFamilyMembers() async {
+    try {
+      final members = await _authService.getFamilyMembers();
+      final userModel = await _authService.getCurrentUserModel();
+      setState(() {
+        _familyMembers = members;
+        _calendarSyncEnabled = userModel?.calendarSyncEnabled ?? false;
+        _addToPersonalCalendar = _calendarSyncEnabled; // Default to true if sync enabled
+      });
+    } catch (e) {
+      // Handle error silently
     }
   }
 
@@ -126,12 +166,26 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
             ? null
             : _locationController.text.trim(),
         color: _selectedColor,
+        isRecurring: _isRecurring,
+        recurrenceRule: _isRecurring ? _selectedRecurrenceRule : null,
+        invitedMemberIds: _selectedInvitees,
+        rsvpStatus: widget.event?.rsvpStatus ?? {},
       );
 
       if (widget.event != null) {
         await _calendarService.updateEvent(event);
       } else {
         await _calendarService.addEvent(event);
+      }
+
+      // Sync to device calendar if enabled and checkbox is checked
+      if (_calendarSyncEnabled && _addToPersonalCalendar) {
+        try {
+          await _syncService.performSync();
+        } catch (e) {
+          debugPrint('Error syncing event to device calendar: $e');
+          // Don't block the user if sync fails
+        }
       }
 
       if (mounted) {
@@ -251,6 +305,138 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
               ),
             ),
             const SizedBox(height: 24),
+            
+            // Recurrence Section
+            SwitchListTile(
+              title: const Text('Recurring Event'),
+              subtitle: const Text('Repeat this event'),
+              value: _isRecurring,
+              onChanged: (value) {
+                setState(() {
+                  _isRecurring = value;
+                  if (!value) {
+                    _selectedRecurrenceRule = null;
+                  } else if (_selectedRecurrenceRule == null) {
+                    _selectedRecurrenceRule = 'weekly';
+                  }
+                });
+              },
+              secondary: const Icon(Icons.repeat),
+            ),
+            if (_isRecurring) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedRecurrenceRule,
+                decoration: const InputDecoration(
+                  labelText: 'Repeat Frequency',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.schedule),
+                ),
+                items: _recurrenceOptions.map((option) {
+                  String label;
+                  switch (option) {
+                    case 'daily':
+                      label = 'Daily';
+                      break;
+                    case 'weekly':
+                      label = 'Weekly';
+                      break;
+                    case 'monthly':
+                      label = 'Monthly';
+                      break;
+                    case 'yearly':
+                      label = 'Yearly';
+                      break;
+                    default:
+                      label = option;
+                  }
+                  return DropdownMenuItem(
+                    value: option,
+                    child: Text(label),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedRecurrenceRule = value;
+                  });
+                },
+                validator: (value) {
+                  if (_isRecurring && (value == null || value.isEmpty)) {
+                    return 'Please select a recurrence frequency';
+                  }
+                  return null;
+                },
+              ),
+            ],
+            const SizedBox(height: 24),
+            
+            // RSVP Invitees Section
+            const Text(
+              'Invite Family Members',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Select family members to invite (optional)',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            if (_familyMembers.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(
+                  child: Text(
+                    'No family members available',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              ..._familyMembers.map((member) {
+                final isSelected = _selectedInvitees.contains(member.uid);
+                return CheckboxListTile(
+                  title: Text(member.displayName.isNotEmpty
+                      ? member.displayName
+                      : member.email),
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedInvitees.add(member.uid);
+                      } else {
+                        _selectedInvitees.remove(member.uid);
+                      }
+                    });
+                  },
+                  secondary: CircleAvatar(
+                    backgroundColor: Colors.blue,
+                    child: Text(
+                      member.displayName.isNotEmpty
+                          ? member.displayName[0].toUpperCase()
+                          : member.email[0].toUpperCase(),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                );
+              }),
+            const SizedBox(height: 24),
+            
+            // Add to Personal Calendar Toggle (only show if sync is enabled)
+            if (_calendarSyncEnabled) ...[
+              SwitchListTile(
+                title: const Text('Add to my personal calendar'),
+                subtitle: const Text('Sync this event to your device calendar'),
+                value: _addToPersonalCalendar,
+                onChanged: (value) {
+                  setState(() {
+                    _addToPersonalCalendar = value;
+                  });
+                },
+                secondary: const Icon(Icons.calendar_today),
+              ),
+              const SizedBox(height: 16),
+            ],
+            
             const Text(
               'Color',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
