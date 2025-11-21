@@ -12,7 +12,20 @@
           "package_name": "com.example.familyhub_mvp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "559662117534-2g5q5vot1gkodl6r1gstpu6prik7mivl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.familyhub_mvp",
+            "certificate_hash": "bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c"
+          }
+        },
+        {
+          "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
