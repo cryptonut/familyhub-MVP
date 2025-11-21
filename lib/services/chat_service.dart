@@ -227,6 +227,7 @@ class ChatService {
         timestamp: message.timestamp,
         type: message.type,
         recipientId: recipientId,
+        audioUrl: message.audioUrl,
       );
       
       await _firestore

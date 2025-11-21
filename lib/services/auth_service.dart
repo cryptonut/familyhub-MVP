@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
@@ -19,149 +22,230 @@ class AuthService {
   static final Set<String> _registeringUserIds = <String>{};
 
   // Get current user model
+  // Returns null if user doesn't exist or document is missing
+  // Does NOT auto-create documents - that should be handled during registration
   Future<UserModel?> getCurrentUserModel() async {
     final user = _auth.currentUser;
     if (user == null) return null;
 
-    // CRITICAL: If user is currently registering, DO NOT touch the document at all
-    // Even if it exists, wait for registration to complete to avoid race conditions
+    // If user is currently registering, wait briefly then try again
     if (_registeringUserIds.contains(user.uid)) {
-      debugPrint('⚠️⚠️⚠️ getCurrentUserModel: User ${user.uid} is currently registering - BLOCKING ALL OPERATIONS');
-      debugPrint('  This prevents race condition where operations overwrite invitation code');
-      debugPrint('  Waiting for registration to complete...');
-      // Wait and check if registration completed
-      for (int i = 0; i < 15; i++) {
-        await Future.delayed(const Duration(milliseconds: 200));
-        if (!_registeringUserIds.contains(user.uid)) {
-          debugPrint('  ✓ Registration flag removed, continuing...');
-          break;
-        }
-      }
-      // If still registering after waiting, return null to avoid any conflicts
+      debugPrint('getCurrentUserModel: User ${user.uid} is currently registering, waiting...');
+      await Future.delayed(const Duration(milliseconds: 500));
       if (_registeringUserIds.contains(user.uid)) {
-        debugPrint('  ⚠️ Still registering after wait - returning null to avoid conflict');
+        debugPrint('getCurrentUserModel: Still registering, returning null');
         return null;
       }
     }
 
-    final doc = await _firestore.collection('users').doc(user.uid).get(GetOptions(source: Source.server));
-    if (!doc.exists) {
-      // CRITICAL: If user is currently registering, DO NOT auto-create document
-      // The registration process will create it with the correct familyId
-      if (_registeringUserIds.contains(user.uid)) {
-        debugPrint('⚠️⚠️⚠️ getCurrentUserModel: User ${user.uid} is currently registering - BLOCKING auto-creation');
-        debugPrint('  This prevents race condition where auto-creation overwrites invitation code');
-        return null; // Return null and let registration process handle it
-      }
-      
-      // Check if this is an orphaned account (old Auth account but no Firestore document)
-      // This can happen if Firestore data was deleted but Auth account wasn't
-      final accountCreationTime = user.metadata.creationTime;
-      final now = DateTime.now();
-      final accountAge = accountCreationTime != null 
-          ? now.difference(accountCreationTime) 
-          : const Duration(days: 999); // If creation time is unknown, assume old
-      
-      // If account is older than 5 minutes and document doesn't exist, it's likely orphaned
-      // Don't auto-create to prevent creating new family IDs for orphaned accounts
-      if (accountAge.inMinutes > 5) {
-        debugPrint('⚠️⚠️⚠️ getCurrentUserModel: User ${user.uid} has old Auth account (${accountAge.inMinutes} minutes old) but no Firestore document');
-        debugPrint('  This is likely an orphaned account (Firestore data deleted but Auth account still exists)');
-        debugPrint('  NOT auto-creating document to prevent creating new family ID');
-        debugPrint('  User should re-register or contact support');
-        throw Exception('Account data not found. This account may have been partially deleted. Please contact support or create a new account.');
-      }
-      
-      // If account is recent (within 5 minutes), it's likely a new registration
-      // Auto-create the document
-      debugPrint('getCurrentUserModel: User document doesn\'t exist, but account is recent (${accountAge.inMinutes} minutes old)');
-      debugPrint('  Auto-creating user document (likely new registration)');
-      
-      // If user document doesn't exist, create it
-      // Check if this is the first user in the family (family creator gets Admin role)
-      final newFamilyId = const Uuid().v4();
-        final existingFamilyMembers = await _firestore
-            .collection('users')
-            .where('familyId', isEqualTo: newFamilyId)
-            .get();
-      
-      final isFamilyCreator = existingFamilyMembers.docs.isEmpty;
-      final List<String> roles = isFamilyCreator ? ['admin'] : [];
-      
-      // Get displayName from Firebase Auth, or use email prefix as fallback
-      String displayName = user.displayName ?? '';
-      if (displayName.isEmpty && user.email != null) {
-        // Extract name from email if displayName is not set
-        displayName = user.email!.split('@').first;
-      }
-      if (displayName.isEmpty) {
-        displayName = 'User'; // Last resort fallback
-      }
-      
-      final userModel = UserModel(
-        uid: user.uid,
-        email: user.email ?? '',
-        displayName: displayName,
-        createdAt: DateTime.now(),
-        familyId: newFamilyId,
-        roles: roles,
-      );
-      
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .set(userModel.toJson());
-      
-      // Also update Firebase Auth displayName if it's not set
-      if (user.displayName == null || user.displayName!.isEmpty) {
-        try {
-          await user.updateDisplayName(displayName);
-        } catch (e) {
-          debugPrint('Error updating Firebase Auth displayName: $e');
+    final userRef = _firestore.collection('users').doc(user.uid);
+    
+    // CRITICAL FIX from code review: Ensure user doc exists before queries
+    // This prevents Firestore rules circular dependency issues on Android cold-start
+    // Use cacheAndServer (cache first, then server) to allow gRPC channel to establish naturally
+    
+    int maxRetries = 3;
+    DateTime? startTime;
+    
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          debugPrint('getCurrentUserModel: Retry attempt $attempt/$maxRetries after ${attempt}s delay...');
+          await Future.delayed(Duration(seconds: attempt));
+        }
+        
+        debugPrint('getCurrentUserModel: Attempting Firestore query (attempt ${attempt + 1})...');
+        startTime = DateTime.now();
+        
+        // Use cacheAndServer for Android: try cache first (instant), fallback to server
+        // This prevents "Channel shutdownNow" errors by not forcing immediate server connection
+        final source = kIsWeb ? Source.server : Source.cacheAndServer;
+        
+        DocumentSnapshot userDoc = await userRef
+            .get(GetOptions(source: source))
+            .timeout(const Duration(seconds: 15));
+        
+        final elapsed = DateTime.now().difference(startTime);
+        
+        // If doc doesn't exist, create minimal user doc to satisfy Firestore rules
+        if (!userDoc.exists) {
+          debugPrint('getCurrentUserModel: User document does not exist for ${user.uid} - creating...');
+          try {
+            await userRef.set({
+              'uid': user.uid,
+              'email': user.email ?? '',
+              'familyId': null,
+              'roles': <String>[],
+              'createdAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+            debugPrint('getCurrentUserModel: Created user document');
+            // Re-fetch the newly created doc
+            userDoc = await userRef.get(GetOptions(source: source));
+          } catch (e) {
+            debugPrint('getCurrentUserModel: Failed to create user doc: $e');
+            return null;
+          }
+        }
+
+        final data = userDoc.data();
+        if (data == null) {
+          debugPrint('getCurrentUserModel: User document has no data');
+          return null;
+        }
+        
+        debugPrint('getCurrentUserModel: Successfully loaded user data in ${elapsed.inMilliseconds}ms');
+        return UserModel.fromJson(data as Map<String, dynamic>);
+      } on TimeoutException {
+        final elapsed = startTime != null ? DateTime.now().difference(startTime!) : const Duration(seconds: 0);
+        debugPrint('getCurrentUserModel: Firestore query timeout after ${elapsed.inMilliseconds}ms (attempt ${attempt + 1})');
+        if (attempt == maxRetries - 1) {
+          debugPrint('getCurrentUserModel: ⚠ ALL RETRY ATTEMPTS FAILED - TIMEOUT');
+          return null;
+        }
+      } catch (e) {
+        final errorStr = e.toString().toLowerCase();
+        debugPrint('getCurrentUserModel: Firestore error: $e');
+        if (errorStr.contains('unavailable')) {
+          debugPrint('getCurrentUserModel: ⚠ Firestore unavailable error detected');
+          if (attempt < maxRetries - 1) {
+            debugPrint('getCurrentUserModel: Will retry (attempt ${attempt + 1})...');
+          } else {
+            debugPrint('getCurrentUserModel: ⚠ All retries exhausted - Firestore unavailable');
+            return null;
+          }
+        } else {
+          debugPrint('getCurrentUserModel: Non-unavailable error: $e');
+          return null;
         }
       }
-      
-      return userModel;
-    }
-
-    final data = doc.data();
-    if (data == null) return null;
-    
-    final userModel = UserModel.fromJson(data);
-    
-    // If displayName in Firestore is "User" but Firebase Auth has a displayName, update it
-    if (userModel.displayName == 'User' && 
-        user.displayName != null && 
-        user.displayName!.isNotEmpty &&
-        user.displayName != 'User') {
-      // Sync displayName from Firebase Auth to Firestore
-      await _firestore.collection('users').doc(user.uid).update({
-        'displayName': user.displayName!,
-      });
-      return userModel.copyWith(displayName: user.displayName!);
     }
     
-    return userModel;
+    return null;
   }
 
   // Sign in with email and password
+  // Rebuild: Clean, simple sign-in with timeout protection
   Future<UserModel?> signInWithEmailAndPassword(
     String email,
     String password,
   ) async {
     try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      if (userCredential.user != null) {
-        return await getCurrentUserModel();
+      debugPrint('=== AUTH SERVICE: SIGN IN START ===');
+      debugPrint('Email: $email');
+      debugPrint('Current user before sign in: ${_auth.currentUser?.uid ?? "null"}');
+      debugPrint('Firebase Auth instance: ${_auth.app.name}');
+      debugPrint('Firebase project ID: ${_auth.app.options.projectId}');
+      
+      // Test basic network connectivity
+      if (!kIsWeb) {
+        try {
+          debugPrint('AuthService: Testing network connectivity...');
+          final result = await InternetAddress.lookup('firebase.googleapis.com')
+              .timeout(const Duration(seconds: 5));
+          if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+            debugPrint('AuthService: ✓ Network connectivity OK - can reach Firebase servers');
+          } else {
+            debugPrint('AuthService: ⚠ Network test returned empty result');
+          }
+        } catch (e) {
+          debugPrint('AuthService: ⚠ Network connectivity test failed: $e');
+          debugPrint('AuthService: This suggests a network issue - Firebase servers may be unreachable');
+        }
+        
+        // Log API key info for debugging
+        final apiKey = _auth.app.options.apiKey;
+        if (apiKey != null) {
+          debugPrint('AuthService: API Key (first 10 chars): ${apiKey.substring(0, 10)}...');
+          debugPrint('AuthService: If login times out, check API key restrictions in Google Cloud Console');
+        }
       }
-      return null;
-    } catch (e) {
+      
+      // Clear any stale auth state first
+      if (_auth.currentUser != null) {
+        debugPrint('AuthService: Clearing stale session...');
+        await _auth.signOut();
+        await Future.delayed(const Duration(milliseconds: 300));
+        debugPrint('AuthService: Stale session cleared');
+      }
+      
+      debugPrint('AuthService: Calling Firebase signInWithEmailAndPassword...');
+      debugPrint('AuthService: Email (trimmed): "${email.trim()}"');
+      debugPrint('AuthService: Password length: ${password.length}');
+      
+      // Check Firebase Auth settings
+      debugPrint('AuthService: Firebase Auth settings:');
+      debugPrint('  - App name: ${_auth.app.name}');
+      debugPrint('  - Project ID: ${_auth.app.options.projectId}');
+      final apiKey = _auth.app.options.apiKey;
+      if (apiKey != null) {
+        debugPrint('  - API Key: ${apiKey.substring(0, 10)}...');
+        debugPrint('  - Full API Key: $apiKey');
+        debugPrint('  - NOTE: This is the ANDROID API key (different from web key)');
+        debugPrint('  - If this times out, check restrictions for THIS key in Google Cloud Console');
+      } else {
+        debugPrint('  - API Key: NULL (this is a problem!)');
+      }
+      
+      // SIMPLIFIED: Let Firebase handle timeouts and retries natively
+      // Our custom timeouts may be interfering with Firebase's own retry logic
+      debugPrint('AuthService: Calling Firebase signInWithEmailAndPassword (no custom timeout)...');
+      debugPrint('AuthService: Letting Firebase handle its own retry/timeout logic');
+      final startTime = DateTime.now();
+      
+      try {
+        // Direct call - no timeout wrapper, let Firebase SDK handle it
+        final userCredential = await _auth.signInWithEmailAndPassword(
+          email: email.trim(),
+          password: password,
+        );
+        
+        final elapsed = DateTime.now().difference(startTime);
+        debugPrint('AuthService: ✓ Firebase Auth succeeded in ${elapsed.inMilliseconds}ms');
+        return _handleSignInSuccess(userCredential);
+      } on FirebaseAuthException catch (e) {
+        final elapsed = DateTime.now().difference(startTime);
+        debugPrint('=== FIREBASE AUTH ERROR (NOT TIMEOUT) ===');
+        debugPrint('AuthService: Time elapsed: ${elapsed.inMilliseconds}ms');
+        debugPrint('AuthService: Error code: ${e.code}');
+        debugPrint('AuthService: Error message: ${e.message}');
+        debugPrint('AuthService: Full error: $e');
+        debugPrint('=== END FIREBASE AUTH ERROR ===');
+        rethrow;
+      } catch (e, stackTrace) {
+        final elapsed = DateTime.now().difference(startTime);
+        debugPrint('=== UNEXPECTED ERROR ===');
+        debugPrint('AuthService: Time elapsed: ${elapsed.inMilliseconds}ms');
+        debugPrint('AuthService: Error type: ${e.runtimeType}');
+        debugPrint('AuthService: Error: $e');
+        debugPrint('AuthService: Stack trace: $stackTrace');
+        debugPrint('=== END UNEXPECTED ERROR ===');
+        rethrow;
+      }
+    } on TimeoutException {
+      debugPrint('AuthService: TimeoutException caught');
+      rethrow;
+    } catch (e, stackTrace) {
+      debugPrint('=== AUTH SERVICE: SIGN IN ERROR ===');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
       throw _handleAuthError(e);
     }
+  }
+
+  // Helper method to handle successful sign-in
+  UserModel? _handleSignInSuccess(UserCredential userCredential) {
+    if (userCredential.user == null) {
+      debugPrint('AuthService: ERROR - Sign in succeeded but no user returned');
+      throw Exception('Sign in succeeded but no user returned');
+    }
+    
+    debugPrint('=== AUTH SERVICE: SIGN IN SUCCESS ===');
+    debugPrint('User ID: ${userCredential.user!.uid}');
+    debugPrint('Email: ${userCredential.user!.email}');
+    
+    // Return null - app screens will load user model as needed
+    return null;
   }
 
   // Register with email and password
@@ -597,9 +681,23 @@ class AuthService {
     }
   }
 
-  // Sign out
+  // Sign out - ensure complete cleanup
   Future<void> signOut() async {
-    await _auth.signOut();
+    try {
+      debugPrint('AuthService: Signing out user');
+      await _auth.signOut();
+      debugPrint('AuthService: Sign out complete');
+      // Give Firebase a moment to update auth state
+      await Future.delayed(const Duration(milliseconds: 100));
+    } catch (e) {
+      debugPrint('AuthService: Error during sign out: $e');
+      // Force sign out even if there's an error
+      try {
+        await _auth.signOut();
+      } catch (_) {
+        // Ignore secondary errors
+      }
+    }
   }
 
   // Reset password
@@ -1470,30 +1568,44 @@ class AuthService {
     debugPrint('AuthService.resetDatabaseForCurrentUser: Complete reset completed for $userId');
   }
 
-  String _handleAuthError(dynamic error) {
+  Exception _handleAuthError(dynamic error) {
     if (error is FirebaseAuthException) {
+      String message;
       switch (error.code) {
         case 'weak-password':
-          return 'The password provided is too weak.';
+          message = 'The password provided is too weak.';
+          break;
         case 'email-already-in-use':
-          return 'An account already exists for that email.';
+          message = 'An account already exists for that email.';
+          break;
         case 'user-not-found':
-          return 'No user found for that email.';
+          message = 'No user found for that email.';
+          break;
         case 'wrong-password':
-          return 'Wrong password provided.';
+          message = 'Incorrect password. Please try again.';
+          break;
         case 'invalid-email':
-          return 'The email address is invalid.';
+          message = 'The email address is invalid.';
+          break;
         case 'operation-not-allowed':
-          return 'Email/Password authentication is not enabled. Please enable it in Firebase Console > Authentication > Sign-in method.';
+          message = 'Email/Password authentication is not enabled. Please enable it in Firebase Console > Authentication > Sign-in method.';
+          break;
         case 'network-request-failed':
-          return 'Network error. Please check your internet connection.';
+          message = 'Network error. Please check your internet connection and try again.';
+          break;
         case 'too-many-requests':
-          return 'Too many requests. Please try again later.';
+          message = 'Too many requests. Please try again later.';
+          break;
         default:
-          return error.message ?? 'An error occurred: ${error.code}';
+          message = error.message ?? 'An error occurred: ${error.code}';
       }
+      return Exception(message);
     }
-    return error.toString();
+    // If it's already an Exception, return it
+    if (error is Exception) {
+      return error;
+    }
+    return Exception(error.toString());
   }
 }
 

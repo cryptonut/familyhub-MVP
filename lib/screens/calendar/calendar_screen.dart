@@ -20,10 +20,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
   final CalendarService _calendarService = CalendarService();
   final CalendarSyncService _syncService = CalendarSyncService();
   final AuthService _authService = AuthService();
+  final TextEditingController _searchController = TextEditingController();
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
   Map<DateTime, List<CalendarEvent>> _eventsMap = {};
   Map<String, bool> _eventSyncStatus = {}; // eventId -> isSynced
+  String _searchQuery = '';
+  List<CalendarEvent> _allEvents = [];
 
   @override
   void initState() {
@@ -31,14 +34,34 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _loadEvents();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadEvents() async {
     final events = await _calendarService.getEvents();
     setState(() {
-      _eventsMap = _groupEventsByDate(events);
+      _allEvents = events;
+      _eventsMap = _groupEventsByDate(_getFilteredEvents());
     });
     
     // Check sync status for events
     _checkEventSyncStatus(events);
+  }
+
+  List<CalendarEvent> _getFilteredEvents() {
+    if (_searchQuery.isEmpty) {
+      return _allEvents;
+    }
+    
+    final query = _searchQuery.toLowerCase();
+    return _allEvents.where((event) {
+      final titleMatch = event.title.toLowerCase().contains(query);
+      final descMatch = (event.description ?? '').toLowerCase().contains(query);
+      return titleMatch || descMatch;
+    }).toList();
   }
 
   Future<void> _checkEventSyncStatus(List<CalendarEvent> events) async {
@@ -107,6 +130,40 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
       body: Column(
         children: [
+          // Search bar
+          Container(
+            padding: const EdgeInsets.all(AppTheme.spacingMD),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search events...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                            _eventsMap = _groupEventsByDate(_getFilteredEvents());
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                  _eventsMap = _groupEventsByDate(_getFilteredEvents());
+                });
+              },
+            ),
+          ),
           TableCalendar<CalendarEvent>(
             firstDay: DateTime.utc(2020, 1, 1),
             lastDay: DateTime.utc(2030, 12, 31),

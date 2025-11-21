@@ -20,7 +20,7 @@ class TasksScreen extends StatefulWidget {
   State<TasksScreen> createState() => _TasksScreenState();
 }
 
-class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStateMixin {
+class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin {
   final TaskService _taskService = TaskService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -31,6 +31,12 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
   final Set<String> _claimingTaskIds = {}; // Track tasks being claimed
   final Set<String> _approvingTaskIds = {}; // Track tasks being approved
   Map<String, String> _userNames = {}; // Cache of user ID to display name
+  
+  // Search and filters
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _priorityFilter = 'All'; // 'All', 'High', 'Medium', 'Low'
+  String _statusFilter = 'All'; // 'All', 'Open', 'Claimed', 'Completed'
   
   // Filters for completed jobs
   String _completedFilter = 'Anyone'; // 'Me' or 'Anyone'
@@ -77,6 +83,7 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     final appState = Provider.of<AppState>(context, listen: false);
     appState.removeListener(_onAppStateChanged);
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -771,11 +778,20 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildTasksList(_activeTasks, false),
-          _buildCompletedTasksList(),
+          // Search and filter bar
+          _buildSearchAndFilterBar(),
+          // Tasks list
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTasksList(_getFilteredActiveTasks(), false),
+                _buildCompletedTasksList(),
+              ],
+            ),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -813,9 +829,186 @@ class _TasksScreenState extends State<TasksScreen> with SingleTickerProviderStat
     );
   }
 
+  Widget _buildSearchAndFilterBar() {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacingMD),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.grey.shade300,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Search bar
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search jobs...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        });
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.grey.shade100,
+            ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          // Filter chips
+          Row(
+            children: [
+              Expanded(
+                child: FilterChip(
+                  label: Text('Priority: $_priorityFilter'),
+                  selected: _priorityFilter != 'All',
+                  onSelected: (selected) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Filter by Priority'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: ['All', 'High', 'Medium', 'Low']
+                              .map((priority) => ListTile(
+                                    title: Text(priority),
+                                    trailing: _priorityFilter == priority
+                                        ? const Icon(Icons.check)
+                                        : null,
+                                    onTap: () {
+                                      setState(() {
+                                        _priorityFilter = priority;
+                                      });
+                                      Navigator.pop(context);
+                                    },
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilterChip(
+                  label: Text('Status: $_statusFilter'),
+                  selected: _statusFilter != 'All',
+                  onSelected: (selected) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Filter by Status'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: ['All', 'Open', 'Claimed', 'Completed']
+                              .map((status) => ListTile(
+                                    title: Text(status),
+                                    trailing: _statusFilter == status
+                                        ? const Icon(Icons.check)
+                                        : null,
+                                    onTap: () {
+                                      setState(() {
+                                        _statusFilter = status;
+                                      });
+                                      Navigator.pop(context);
+                                    },
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Task> _getFilteredActiveTasks() {
+    var filtered = List<Task>.from(_activeTasks);
+    
+    // Filter by search query
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      filtered = filtered.where((task) {
+        final titleMatch = task.title.toLowerCase().contains(query);
+        final descMatch = task.description.toLowerCase().contains(query);
+        final creatorName = _userNames[task.createdBy] ?? '';
+        final creatorMatch = creatorName.toLowerCase().contains(query);
+        return titleMatch || descMatch || creatorMatch;
+      }).toList();
+    }
+    
+    // Filter by priority
+    if (_priorityFilter != 'All') {
+      filtered = filtered.where((task) {
+        return task.priority.toLowerCase() == _priorityFilter.toLowerCase();
+      }).toList();
+    }
+    
+    // Filter by status
+    if (_statusFilter != 'All') {
+      filtered = filtered.where((task) {
+        switch (_statusFilter) {
+          case 'Open':
+            return !task.isClaimed && !task.hasPendingClaim;
+          case 'Claimed':
+            return task.isClaimed || task.hasPendingClaim;
+          case 'Completed':
+            return task.isCompleted;
+          default:
+            return true;
+        }
+      }).toList();
+    }
+    
+    return filtered;
+  }
+
   List<Task> _getFilteredCompletedTasks() {
     final currentUserId = _auth.currentUser?.uid;
     var filtered = List<Task>.from(_completedTasks);
+    
+    // Filter by search query
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      filtered = filtered.where((task) {
+        final titleMatch = task.title.toLowerCase().contains(query);
+        final descMatch = task.description.toLowerCase().contains(query);
+        final creatorName = _userNames[task.createdBy] ?? '';
+        final creatorMatch = creatorName.toLowerCase().contains(query);
+        return titleMatch || descMatch || creatorMatch;
+      }).toList();
+    }
+    
+    // Filter by priority
+    if (_priorityFilter != 'All') {
+      filtered = filtered.where((task) {
+        return task.priority.toLowerCase() == _priorityFilter.toLowerCase();
+      }).toList();
+    }
     
     // Filter by completer
     if (_completedFilter == 'Me' && currentUserId != null) {

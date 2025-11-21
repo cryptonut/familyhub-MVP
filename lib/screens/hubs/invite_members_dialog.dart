@@ -21,7 +21,7 @@ class InviteMembersDialog extends StatefulWidget {
   State<InviteMembersDialog> createState() => _InviteMembersDialogState();
 }
 
-class _InviteMembersDialogState extends State<InviteMembersDialog> with SingleTickerProviderStateMixin {
+class _InviteMembersDialogState extends State<InviteMembersDialog> with TickerProviderStateMixin {
   final HubService _hubService = HubService();
   final AuthService _authService = AuthService();
   

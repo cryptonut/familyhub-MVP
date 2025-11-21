@@ -6,6 +6,7 @@ class ChatMessage {
   final DateTime timestamp;
   final MessageType type;
   final String? recipientId; // For private chats - null means family chat
+  final String? audioUrl; // For voice messages
 
   ChatMessage({
     required this.id,
@@ -15,6 +16,7 @@ class ChatMessage {
     required this.timestamp,
     this.type = MessageType.text,
     this.recipientId,
+    this.audioUrl,
   });
 
   Map<String, dynamic> toJson() => {
@@ -25,6 +27,7 @@ class ChatMessage {
         'timestamp': timestamp.toIso8601String(),
         'type': type.toString().split('.').last,
         if (recipientId != null) 'recipientId': recipientId,
+        if (audioUrl != null) 'audioUrl': audioUrl,
       };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -38,6 +41,7 @@ class ChatMessage {
           orElse: () => MessageType.text,
         ),
         recipientId: json['recipientId'] as String?,
+        audioUrl: json['audioUrl'] as String?,
       );
 }
 
@@ -45,5 +49,6 @@ enum MessageType {
   text,
   image,
   location,
+  voice,
 }
 

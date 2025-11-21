@@ -22,7 +22,7 @@ class PhotosHomeScreen extends StatefulWidget {
 }
 
 class _PhotosHomeScreenState extends State<PhotosHomeScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final PhotoService _photoService = PhotoService();
   final AuthService _authService = AuthService();
 

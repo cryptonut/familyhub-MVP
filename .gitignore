@@ -52,3 +52,7 @@ coverage/
 # Generated files
 *.g.dart
 *.freezed.dart
+
+# Debug logs and logcat files
+*.logcat
+debug logs/

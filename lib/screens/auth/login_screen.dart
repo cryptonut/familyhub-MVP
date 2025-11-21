@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../services/auth_service.dart';
 import 'register_screen.dart';
 
@@ -32,10 +33,25 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signInWithEmailAndPassword(
+      final userModel = await _authService.signInWithEmailAndPassword(
         _emailController.text.trim(),
         _passwordController.text,
       );
+      
+      // Sign-in succeeded - userModel may be null if document doesn't exist
+      // That's okay - the app will handle it gracefully
+      debugPrint('Login successful - user: ${_authService.currentUser?.uid}');
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login successful!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
       
       // If there's a pending invite code, join the family after login
       final inviteCode = widget.pendingInviteCode;
@@ -63,15 +79,54 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
       
-      if (mounted) {
-        // Navigation will be handled by auth state listener
+      // Navigation will be handled by auth state listener in AuthWrapper
+    } catch (e, stackTrace) {
+      debugPrint('=== LOGIN SCREEN: ERROR CAUGHT ===');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      // Check if it's a Firebase error
+      if (e.toString().contains('FirebaseAuthException')) {
+        debugPrint('This is a Firebase Auth error - check Firebase Console settings');
+      } else if (e.toString().contains('Timeout')) {
+        debugPrint('This is a timeout - check network or API key restrictions');
+      } else {
+        debugPrint('This is an unexpected error type');
       }
-    } catch (e) {
+      
       if (mounted) {
+        // Extract error message from Exception
+        String errorMessage;
+        if (e is Exception) {
+          errorMessage = e.toString().replaceFirst('Exception: ', '');
+        } else {
+          errorMessage = e.toString();
+        }
+        
+        // Clean up error messages to be more user-friendly
+        final lowerMessage = errorMessage.toLowerCase();
+        if (lowerMessage.contains('user-not-found')) {
+          errorMessage = 'No account found with this email address. Please check your email or sign up.';
+        } else if (lowerMessage.contains('wrong-password')) {
+          errorMessage = 'Incorrect password. Please try again.';
+        } else if (lowerMessage.contains('invalid-email')) {
+          errorMessage = 'Invalid email address. Please check your email format.';
+        } else if (lowerMessage.contains('user-disabled')) {
+          errorMessage = 'This account has been disabled. Please contact support.';
+        } else if (lowerMessage.contains('too-many-requests')) {
+          errorMessage = 'Too many failed login attempts. Please try again later.';
+        } else if (lowerMessage.contains('network-request-failed') || lowerMessage.contains('unavailable')) {
+          errorMessage = 'Network error. Please check your internet connection and try again.';
+        } else if (lowerMessage.contains('account data not found')) {
+          errorMessage = 'Your account data is missing. Please contact support or create a new account.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }

@@ -7,7 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:559662117534:android:071669932f665866e7c18f",
+        "mobilesdk_app_id": "1:559662117534:android:a59145c8a69587aee7c18f",
         "android_client_info": {
           "package_name": "com.example.familyhub_mvp"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk"
+          "current_key": "AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4"
         }
       ],
       "services": {
