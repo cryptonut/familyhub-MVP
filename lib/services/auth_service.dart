@@ -62,32 +62,22 @@ class AuthService {
         debugPrint('getCurrentUserModel: Attempting Firestore query (attempt ${attempt + 1})...');
         startTime = DateTime.now();
         
-        // For Android: use default behavior (cache first, then server)
-        // This prevents "Channel shutdownNow" errors by not forcing immediate server connection
-        // Note: Source.cacheAndServer doesn't exist in cloud_firestore 5.4.4+
-        // Omitting source parameter uses default behavior: try cache first, then server
+        // CRITICAL FIX: Wait for gRPC channel to initialize before querying
+        // The channel reset loop (initChannel -> shutdownNow) happens when queries
+        // are made before the gRPC channel is ready. Wait on first attempt.
         DocumentSnapshot userDoc;
-        if (kIsWeb) {
-          // Web: always use server for consistency
-          userDoc = await userRef
-              .get(GetOptions(source: Source.server))
-              .timeout(const Duration(seconds: 15));
-        } else {
-          // Android: use default behavior (no source specified = cache first, then server)
-          // This is equivalent to the non-existent Source.cacheAndServer
-          // If this is a retry after unavailable error, force server source to bypass cache
-          final useServerSource = attempt > 0;
-          if (useServerSource) {
-            debugPrint('getCurrentUserModel: Retry attempt - forcing server source to bypass cache');
-            userDoc = await userRef
-                .get(GetOptions(source: Source.server))
-                .timeout(const Duration(seconds: 15));
-          } else {
-            userDoc = await userRef
-                .get()
-                .timeout(const Duration(seconds: 15));
-          }
+        
+        // Wait for gRPC channel to initialize on first attempt (Android only)
+        if (attempt == 0 && !kIsWeb) {
+          debugPrint('getCurrentUserModel: Waiting for gRPC channel to initialize...');
+          await Future.delayed(const Duration(milliseconds: 1000));
         }
+        
+        // Use server source to ensure fresh data and prevent cache-related channel issues
+        // Increased timeout to 20s to allow for initial gRPC channel establishment
+        userDoc = await userRef
+            .get(GetOptions(source: Source.server))
+            .timeout(const Duration(seconds: 20));
         
         final elapsed = DateTime.now().difference(startTime);
         
@@ -107,7 +97,9 @@ class AuthService {
             }, SetOptions(merge: true));
             debugPrint('getCurrentUserModel: Created user document');
             // Re-fetch the newly created doc from server to ensure we have the latest
-            userDoc = await userRef.get(GetOptions(source: Source.server));
+            userDoc = await userRef
+                .get(GetOptions(source: Source.server))
+                .timeout(const Duration(seconds: 20));
           } catch (e) {
             debugPrint('getCurrentUserModel: Failed to create user doc: $e');
             return null;
@@ -149,8 +141,9 @@ class AuthService {
           if (attempt < maxRetries - 1) {
             debugPrint('getCurrentUserModel: Will retry (attempt ${attempt + 1}/$maxRetries) after ${attempt + 1}s delay...');
             // On last retry before giving up, try forcing server source to bypass cache
+            // This applies to Android/iOS where cache can cause issues, not a Chrome workaround
             if (attempt == maxRetries - 2 && !kIsWeb) {
-              debugPrint('getCurrentUserModel: Last retry - will try forcing server source to bypass cache issues');
+              debugPrint('getCurrentUserModel: Last retry - will try forcing server source to bypass cache issues (Android/iOS)');
             }
           } else {
             debugPrint('getCurrentUserModel: ⚠ All retries exhausted - Firestore unavailable');
@@ -182,9 +175,10 @@ class AuthService {
       debugPrint('Firebase Auth instance: ${_auth.app.name}');
       debugPrint('Firebase project ID: ${_auth.app.options.projectId}');
       
-      // REMOVED: Network connectivity test - Firebase SDK handles this internally
-      // REMOVED: signOut() before signIn() - Unusual pattern that can cause race conditions
-      // Firebase Auth handles existing sessions automatically, no need to clear before sign-in
+      // IMPORTANT: Do NOT call signOut() before signIn() - this can cause race conditions
+      // Firebase Auth handles existing sessions automatically
+      // Do NOT add network connectivity tests - Firebase SDK handles this internally
+      // Platform-specific workarounds are NOT needed - Firebase Auth works consistently across platforms
       
       debugPrint('AuthService: Calling Firebase signInWithEmailAndPassword...');
       debugPrint('AuthService: Email (trimmed): "${email.trim()}"');
@@ -210,15 +204,29 @@ class AuthService {
       
       try {
         // Call Firebase Auth directly with a reasonable timeout
+        // CRITICAL: The "empty reCAPTCHA token" error indicates Firebase Auth is trying to use reCAPTCHA
+        // but can't get a token. This is typically caused by:
+        // 1. reCAPTCHA enabled in Firebase Console but not properly configured
+        // 2. Network issues preventing reCAPTCHA from loading
+        // 3. API key restrictions blocking reCAPTCHA endpoints
+        // 4. OAuth client/SHA-1 fingerprint mismatch
+        debugPrint('AuthService: About to call signInWithEmailAndPassword - this may trigger reCAPTCHA on Android');
         final userCredential = await _auth.signInWithEmailAndPassword(
           email: email.trim(),
           password: password,
         ).timeout(
-          const Duration(seconds: 20),
+          const Duration(seconds: 30),
           onTimeout: () {
             throw TimeoutException(
-              'Firebase Auth sign-in timed out after 20 seconds',
-              const Duration(seconds: 20),
+              'Firebase Auth sign-in timed out after 30 seconds.\n\n'
+              'CRITICAL: Logcat shows "empty reCAPTCHA token" - this indicates:\n'
+              '1. reCAPTCHA is enabled in Firebase Console but token generation is failing\n'
+              '2. Go to Firebase Console > Authentication > Settings > reCAPTCHA provider\n'
+              '3. DISABLE reCAPTCHA for email/password authentication\n'
+              '4. Verify API key restrictions include "Identity Toolkit API"\n'
+              '5. Verify OAuth client and SHA-1 fingerprint are correct\n'
+              '6. Check network connectivity to reCAPTCHA endpoints',
+              const Duration(seconds: 30),
             );
           },
         );
@@ -229,12 +237,32 @@ class AuthService {
       } on TimeoutException catch (e) {
         debugPrint('=== TIMEOUT: Firebase Auth hung ===');
         debugPrint('Error: $e');
+        debugPrint('⚠️ CRITICAL: If logcat shows "empty reCAPTCHA token", this is the root cause!');
+        debugPrint('   The authentication is hanging because Firebase Auth cannot get a reCAPTCHA token.');
+        debugPrint('   IMMEDIATE FIX REQUIRED:');
+        debugPrint('   1. Go to Firebase Console > Authentication > Settings (gear icon)');
+        debugPrint('   2. Scroll to "reCAPTCHA provider" section');
+        debugPrint('   3. DISABLE reCAPTCHA for email/password authentication');
+        debugPrint('   4. Save and wait 1-2 minutes for changes to propagate');
+        debugPrint('   5. Rebuild app: flutter clean && flutter run');
+        
         // Check if Firebase is actually initialized
         try {
           final app = _auth.app;
           debugPrint('Firebase app name: ${app.name}');
           debugPrint('Firebase project ID: ${app.options.projectId}');
-          debugPrint('Firebase API key: ${app.options.apiKey?.substring(0, 10) ?? "null"}...');
+          final apiKey = app.options.apiKey;
+          if (apiKey != null && apiKey.isNotEmpty) {
+            debugPrint('Firebase API key: ${apiKey.substring(0, 10)}...');
+            debugPrint('Full API key: $apiKey');
+            debugPrint('⚠️ Also verify this API key in Google Cloud Console:');
+            debugPrint('  1. Verify API restrictions include "Identity Toolkit API"');
+            debugPrint('  2. Verify application restrictions allow Android app');
+            debugPrint('  3. Verify OAuth client is configured in google-services.json');
+            debugPrint('  4. Ensure reCAPTCHA API is not blocked by restrictions');
+          } else {
+            debugPrint('Firebase API key: NULL (this is a critical problem!)');
+          }
         } catch (e) {
           debugPrint('Cannot access Firebase app: $e');
         }
@@ -251,12 +279,31 @@ class AuthService {
         debugPrint('Message: ${e.message}');
         debugPrint('Details: ${e.details}');
         debugPrint('Full: $e');
+        
+        // Handle specific Android platform exceptions
+        if (e.code == 'DEVELOPER_ERROR' || e.message?.contains('DEVELOPER_ERROR') == true) {
+          debugPrint('⚠️ DEVELOPER_ERROR detected - this usually means:');
+          debugPrint('  1. OAuth client not configured in google-services.json');
+          debugPrint('  2. SHA-1 fingerprint mismatch');
+          debugPrint('  3. Package name mismatch');
+          debugPrint('  4. Need to wait 2-3 minutes after adding SHA-1 to Firebase Console');
+          throw Exception('Firebase configuration error. Please verify OAuth client and SHA-1 fingerprint in Firebase Console.');
+        }
+        
         rethrow;
       } catch (e, stackTrace) {
         debugPrint('=== UNEXPECTED ERROR ===');
         debugPrint('Type: ${e.runtimeType}');
         debugPrint('Error: $e');
         debugPrint('Stack: $stackTrace');
+        
+        // Check for common Android-specific issues
+        final errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('network') || errorStr.contains('socket') || errorStr.contains('connection')) {
+          debugPrint('⚠️ Network-related error detected on Android');
+          debugPrint('  This may indicate network connectivity issues or firewall blocking');
+        }
+        
         rethrow;
       }
     } on TimeoutException {

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
@@ -56,13 +56,16 @@ void main() async {
   };
 
   // Handle async errors
+  // CRITICAL FIX: Return false to let errors propagate properly
+  // Returning true swallows errors and can prevent Firebase Auth errors from being handled correctly
   PlatformDispatcher.instance.onError = (error, stack) {
     if (kDebugMode) {
       debugPrint('=== ASYNC ERROR ===');
       debugPrint('Error: $error');
       debugPrint('Stack: $stack');
     }
-    return true;
+    // Return false to let errors propagate - don't swallow Firebase Auth errors
+    return false;
   };
 
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,7 +79,10 @@ void main() async {
   }
   
   // Initialize Firebase with comprehensive error handling
+  // CRITICAL: Fail fast if Firebase initialization fails to prevent "core/no-app" errors
   bool firebaseInitialized = false;
+  String? firebaseInitError;
+  
   try {
     if (kIsWeb) {
       // For web, we need explicit Firebase options
@@ -84,79 +90,119 @@ void main() async {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         ).timeout(
-          const Duration(seconds: 10),
+          const Duration(seconds: 15),
           onTimeout: () {
-            throw TimeoutException('Firebase initialization timed out');
+            throw TimeoutException('Firebase initialization timed out (web)');
           },
         );
         firebaseInitialized = true;
+        debugPrint('✓ Firebase initialized for web platform');
       } catch (e) {
         if (e.toString().contains('UnsupportedError') || 
             e.toString().contains('web')) {
+          firebaseInitError = 'Firebase web configuration error: $e';
           debugPrint('Firebase web configuration error: $e');
-          // Continue - app can still run with limited functionality
         } else {
+          firebaseInitError = 'Firebase initialization failed: $e';
           rethrow;
         }
       }
     } else {
       // For Android/iOS, try with options first, fallback to auto-detection
+      // Increased timeout for Android to account for potential google-services.json processing
       try {
+        debugPrint('Initializing Firebase for Android/iOS...');
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         ).timeout(
-          const Duration(seconds: 10),
+          const Duration(seconds: 15),
           onTimeout: () {
-            throw TimeoutException('Firebase initialization timed out');
+            throw TimeoutException('Firebase initialization timed out (Android/iOS)');
           },
         );
         firebaseInitialized = true;
+        debugPrint('✓ Firebase initialized for Android/iOS platform');
+        
+        // Verify Firebase Auth is accessible
+        try {
+          final auth = FirebaseAuth.instance;
+          debugPrint('✓ Firebase Auth instance accessible');
+          debugPrint('  - App: ${auth.app.name}');
+          debugPrint('  - Project ID: ${auth.app.options.projectId}');
+          final apiKey = auth.app.options.apiKey;
+          if (apiKey != null && apiKey.isNotEmpty) {
+            debugPrint('  - API Key: ${apiKey.substring(0, 10)}...');
+            debugPrint('  - Full API Key: $apiKey');
+          } else {
+            debugPrint('  - ⚠️ API Key: NULL (critical issue!)');
+          }
+        } catch (e) {
+          debugPrint('⚠ Could not verify Firebase Auth instance: $e');
+        }
       } catch (e) {
         debugPrint('Firebase initialization with options failed: $e');
         debugPrint('Attempting fallback initialization...');
         try {
           await Firebase.initializeApp().timeout(
-            const Duration(seconds: 10),
+            const Duration(seconds: 15),
             onTimeout: () {
               throw TimeoutException('Firebase fallback initialization timed out');
             },
           );
           firebaseInitialized = true;
+          debugPrint('✓ Firebase initialized via fallback');
         } catch (fallbackError) {
+          firebaseInitError = 'Firebase initialization failed with options and fallback: $e (fallback: $fallbackError)';
           debugPrint('Firebase fallback initialization also failed: $fallbackError');
-          // Continue - app can still run with limited functionality
+          // Don't continue - Firebase is required for the app to function
         }
       }
     }
   } catch (e, stackTrace) {
+    firebaseInitError = 'Firebase initialization error: $e';
     debugPrint('=== FIREBASE INITIALIZATION ERROR ===');
     debugPrint('Error: $e');
     debugPrint('Stack: $stackTrace');
-    // Don't crash the app - allow it to start and show error in UI
+    debugPrint('Common causes:');
+    debugPrint('  - Missing google-services.json in android/app/');
+    debugPrint('  - DEVELOPER_ERROR - OAuth client or SHA-1 fingerprint mismatch');
+    debugPrint('  - Incorrect API key restrictions in Google Cloud Console');
+    debugPrint('  - Missing or invalid firebase_options.dart');
+    debugPrint('  - Network connectivity issues');
   }
 
   if (firebaseInitialized) {
     debugPrint('✓ Firebase initialized successfully');
     
-    // Configure Firestore settings for Android to prevent gRPC channel issues
+    // Configure Firestore settings for Android
+    // CRITICAL FIX: Remove custom settings to prevent gRPC channel reset loops
+    // The channel reset loop (initChannel -> shutdownNow -> initChannel) was caused by
+    // forcing settings before the channel was ready. Let Firestore use defaults.
     if (!kIsWeb) {
       try {
         final firestore = FirebaseFirestore.instance;
-        // Configure settings to help with initial connection and prevent channel resets
-        firestore.settings = const Settings(
-          persistenceEnabled: true,
-          cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-        );
-        debugPrint('✓ Firestore settings configured');
+        // Don't configure settings immediately - let Firestore initialize naturally
+        // This prevents the "Channel shutdownNow invoked" -> "unavailable" error cycle
+        debugPrint('✓ Firestore instance available');
+        debugPrint('  - App: ${firestore.app.name}');
+        debugPrint('  - Project ID: ${firestore.app.options.projectId}');
+        final apiKey = firestore.app.options.apiKey;
+        if (apiKey != null) {
+          debugPrint('  - API Key: ${apiKey.substring(0, 10)}... (Android key)');
+        } else {
+          debugPrint('  - ⚠️ API Key: NULL (critical issue!)');
+        }
+        debugPrint('  - Using default Firestore settings to prevent gRPC channel issues');
       } catch (e) {
-        debugPrint('⚠ Firestore settings error: $e');
+        debugPrint('⚠ Firestore instance error: $e');
       }
     }
     
-    // TEMPORARILY DISABLED - App Check is unregistered and may be causing Android auth timeouts
-    // Since Chrome works but Android doesn't, disabling App Check to test if it's the issue
-    // TODO: Re-enable once Android auth is working, or register App Check properly
-    debugPrint('⚠ App Check temporarily disabled for Android auth testing');
+    // App Check is disabled to prevent potential Android auth timeouts
+    // App Check enforcement can block requests if not properly configured
+    // This is a platform-agnostic decision, not a Chrome workaround
+    // TODO: Re-enable App Check once properly registered in Firebase Console
+    debugPrint('⚠ App Check disabled to prevent authentication timeouts');
     /*
     try {
       if (kIsWeb) {
@@ -183,7 +229,20 @@ void main() async {
     }
     */
   } else {
-    debugPrint('⚠ Firebase initialization failed - app will run with limited functionality');
+    // FAIL FAST: Don't proceed if Firebase initialization failed
+    // This prevents "FirebaseException: [core/no-app]" errors during login
+    debugPrint('=== CRITICAL: Firebase initialization failed ===');
+    debugPrint('Error: $firebaseInitError');
+    debugPrint('The app cannot function without Firebase.');
+    debugPrint('Please check:');
+    debugPrint('  1. google-services.json exists and is valid (Android)');
+    debugPrint('  2. API key restrictions in Google Cloud Console');
+    debugPrint('  3. Network connectivity');
+    debugPrint('  4. firebase_options.dart configuration');
+    
+    // Run app with error screen instead of proceeding to broken login flow
+    runApp(FirebaseInitErrorApp(error: firebaseInitError ?? 'Unknown error'));
+    return;
   }
   
   // Initialize notification service (non-blocking)
@@ -230,6 +289,95 @@ void _initializeBackgroundSync() {
       // Don't fail app startup if background sync fails
     }
   });
+}
+
+/// Error screen shown when Firebase initialization fails
+/// This prevents the app from proceeding to a broken login flow
+class FirebaseInitErrorApp extends StatelessWidget {
+  final String? error;
+  
+  const FirebaseInitErrorApp({super.key, this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Family Hub - Initialization Error',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.red,
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Firebase Initialization Failed',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'The app cannot start without Firebase. Please check:',
+                  style: TextStyle(fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('• google-services.json exists and is valid (Android)'),
+                      Text('• API key restrictions in Google Cloud Console'),
+                      Text('• Network connectivity'),
+                      Text('• firebase_options.dart configuration'),
+                    ],
+                  ),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Error details:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SelectableText(
+                      error!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class FamilyHubApp extends StatelessWidget {

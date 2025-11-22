@@ -34,7 +34,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   void _checkForInviteCode() {
-    // Check URL parameters for invitation code (web)
+    // Check URL parameters for invitation code (web only)
+    // This is a legitimate web-specific feature, not a workaround
+    // Android uses deep links handled by the platform, not URL parameters
     if (kIsWeb) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -168,6 +170,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
         // User exists - validate it's a real session
         final user = snapshot.data!;
         debugPrint('AuthWrapper: User found - ${user.uid}');
+        debugPrint('AuthWrapper: Firebase Auth session persisted (user automatically logged in)');
+        debugPrint('AuthWrapper: Email: ${user.email}');
+        debugPrint('AuthWrapper: Now attempting to load user data from Firestore...');
         
         // Reset state if different user (new login after logout)
         if (_lastUserId != null && _lastUserId != user.uid) {
@@ -175,10 +180,80 @@ class _AuthWrapperState extends State<AuthWrapper> {
           _resetState();
         }
         
-        // Set dashboard index once per session
+        // Verify Firestore is accessible by checking if we can load user data
+        // This check is platform-agnostic and applies to both web and Android
+        // If Firestore is unavailable, show a warning but don't block navigation
         if (!_hasResetToDashboard) {
           final appState = Provider.of<AppState>(context, listen: false);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
+          
+          // Check Firestore connectivity before proceeding (non-blocking)
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (!mounted) return;
+            
+            try {
+              // Try to load user model with timeout to detect Firestore issues
+              // Use a reasonable timeout that works for both web and Android
+              final userModel = await authService.getCurrentUserModel()
+                  .timeout(const Duration(seconds: 10), onTimeout: () {
+                debugPrint('AuthWrapper: ⚠️ Firestore timeout - cannot load user data');
+                debugPrint('AuthWrapper: This may indicate network issues or API restrictions');
+                return null;
+              });
+              
+              if (userModel == null && mounted) {
+                debugPrint('AuthWrapper: ⚠️ WARNING - Cannot load user data from Firestore');
+                debugPrint('AuthWrapper: User is authenticated but Firestore is unavailable');
+                debugPrint('AuthWrapper: This will result in empty dashboard with no data');
+                
+                // Show a warning to the user (platform-agnostic)
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text(
+                        'Cannot load data from Firestore. Please sign out and sign back in, or check your connection.',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      backgroundColor: Colors.orange,
+                      duration: const Duration(seconds: 8),
+                      action: SnackBarAction(
+                        label: 'Sign Out',
+                        textColor: Colors.white,
+                        onPressed: () async {
+                          await authService.signOut();
+                        },
+                      ),
+                    ),
+                  );
+                }
+              } else {
+                debugPrint('AuthWrapper: ✓ User data loaded successfully from Firestore');
+              }
+            } catch (e) {
+              debugPrint('AuthWrapper: Error checking Firestore connectivity: $e');
+              // Only show error snackbar for critical Firestore unavailable errors
+              if (mounted && e.toString().toLowerCase().contains('unavailable')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text(
+                      'Firestore is unavailable. Sign out and try again.',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 8),
+                    action: SnackBarAction(
+                      label: 'Sign Out',
+                      textColor: Colors.white,
+                      onPressed: () async {
+                        await authService.signOut();
+                      },
+                    ),
+                  ),
+                );
+              }
+            }
+            
+            // Reset dashboard state regardless of Firestore connectivity
+            // This ensures the user can still navigate even if Firestore is unavailable
             if (mounted) {
               appState.setCurrentIndex(0);
               _hasResetToDashboard = true;

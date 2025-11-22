@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../../services/auth_service.dart';
 import 'register_screen.dart';
 
@@ -33,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final userModel = await _authService.signInWithEmailAndPassword(
+      await _authService.signInWithEmailAndPassword(
         _emailController.text.trim(),
         _passwordController.text,
       );
@@ -43,14 +42,19 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('Login successful - user: ${_authService.currentUser?.uid}');
       
       // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+      if (mounted && context.mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login successful!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } catch (e) {
+          // Widget disposed - ignore
+          debugPrint('Could not show success snackbar: $e');
+        }
       }
       
       // If there's a pending invite code, join the family after login
@@ -58,23 +62,31 @@ class _LoginScreenState extends State<LoginScreen> {
       if (inviteCode != null && inviteCode.isNotEmpty && mounted) {
         try {
           await _authService.joinFamilyByInvitationCode(inviteCode);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Successfully joined family!'),
-                backgroundColor: Colors.green,
-              ),
-            );
+          if (mounted && context.mounted) {
+            try {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Successfully joined family!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } catch (e) {
+              debugPrint('Could not show success snackbar: $e');
+            }
           }
         } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Logged in, but could not join family: $e'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 5),
-              ),
-            );
+          if (mounted && context.mounted) {
+            try {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Logged in, but could not join family: $e'),
+                  backgroundColor: Colors.orange,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            } catch (snackBarError) {
+              debugPrint('Could not show error snackbar: $snackBarError');
+            }
           }
         }
       }
@@ -96,39 +108,64 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       
       if (mounted) {
-        // Extract error message from Exception
-        String errorMessage;
-        if (e is Exception) {
-          errorMessage = e.toString().replaceFirst('Exception: ', '');
-        } else {
-          errorMessage = e.toString();
+        try {
+          // Extract error message from Exception
+          String errorMessage;
+          if (e is Exception) {
+            errorMessage = e.toString().replaceFirst('Exception: ', '');
+          } else {
+            errorMessage = e.toString();
+          }
+          
+          // Clean up error messages to be more user-friendly
+          final lowerMessage = errorMessage.toLowerCase();
+          if (lowerMessage.contains('user-not-found')) {
+            errorMessage = 'No account found with this email address. Please check your email or sign up.';
+          } else if (lowerMessage.contains('wrong-password')) {
+            errorMessage = 'Incorrect password. Please try again.';
+          } else if (lowerMessage.contains('invalid-email')) {
+            errorMessage = 'Invalid email address. Please check your email format.';
+          } else if (lowerMessage.contains('user-disabled')) {
+            errorMessage = 'This account has been disabled. Please contact support.';
+          } else if (lowerMessage.contains('too-many-requests')) {
+            errorMessage = 'Too many failed login attempts. Please try again later.';
+          } else if (lowerMessage.contains('network-request-failed') || lowerMessage.contains('unavailable')) {
+            errorMessage = 'Network error. Please check your internet connection and try again.';
+          } else if (lowerMessage.contains('account data not found')) {
+            errorMessage = 'Your account data is missing. Please contact support or create a new account.';
+          } else if (lowerMessage.contains('timeout') || lowerMessage.contains('timed out')) {
+            errorMessage = 'Login request timed out.\n\n'
+                'If you see "empty reCAPTCHA token" in logs:\n'
+                '• Go to Firebase Console > Authentication > Settings\n'
+                '• DISABLE reCAPTCHA for email/password\n'
+                '• Wait 1-2 minutes, then try again\n\n'
+                'Otherwise, check:\n'
+                '• Network connectivity\n'
+                '• API key restrictions\n'
+                '• Firebase configuration';
+          } else if (lowerMessage.contains('developer_error') || lowerMessage.contains('oauth')) {
+            errorMessage = 'Firebase configuration error. Please verify:\n'
+                '• OAuth client is configured in Firebase Console\n'
+                '• SHA-1 fingerprint is added\n'
+                '• Wait 2-3 minutes after configuration changes';
+          } else if (lowerMessage.contains('firebase configuration')) {
+            errorMessage = 'Firebase configuration issue. Please check Firebase Console settings.';
+          }
+          
+          // Safely show SnackBar - widget might be disposed during async operation
+          if (mounted && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
+        } catch (snackBarError) {
+          // Widget was disposed before we could show the snackbar - ignore
+          debugPrint('Could not show error snackbar: $snackBarError');
         }
-        
-        // Clean up error messages to be more user-friendly
-        final lowerMessage = errorMessage.toLowerCase();
-        if (lowerMessage.contains('user-not-found')) {
-          errorMessage = 'No account found with this email address. Please check your email or sign up.';
-        } else if (lowerMessage.contains('wrong-password')) {
-          errorMessage = 'Incorrect password. Please try again.';
-        } else if (lowerMessage.contains('invalid-email')) {
-          errorMessage = 'Invalid email address. Please check your email format.';
-        } else if (lowerMessage.contains('user-disabled')) {
-          errorMessage = 'This account has been disabled. Please contact support.';
-        } else if (lowerMessage.contains('too-many-requests')) {
-          errorMessage = 'Too many failed login attempts. Please try again later.';
-        } else if (lowerMessage.contains('network-request-failed') || lowerMessage.contains('unavailable')) {
-          errorMessage = 'Network error. Please check your internet connection and try again.';
-        } else if (lowerMessage.contains('account data not found')) {
-          errorMessage = 'Your account data is missing. Please contact support or create a new account.';
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
       }
     } finally {
       if (mounted) {
@@ -140,32 +177,46 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _resetPassword() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your email address'),
-        ),
-      );
+      if (mounted && context.mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please enter your email address'),
+            ),
+          );
+        } catch (e) {
+          debugPrint('Could not show snackbar: $e');
+        }
+      }
       return;
     }
 
     try {
       await _authService.resetPassword(email);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password reset email sent!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (mounted && context.mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Password reset email sent!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } catch (e) {
+          debugPrint('Could not show success snackbar: $e');
+        }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
-          ),
-        );
+      if (mounted && context.mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } catch (snackBarError) {
+          debugPrint('Could not show error snackbar: $snackBarError');
+        }
       }
     }
   }
@@ -209,7 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.all(12),
                       margin: const EdgeInsets.only(bottom: 16, top: 16),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.blue),
                       ),

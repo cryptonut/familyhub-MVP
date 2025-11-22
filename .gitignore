@@ -54,5 +54,5 @@ coverage/
 *.freezed.dart
 
 # Debug logs and logcat files
-*.logcat
+# *.logcat - COMMENTED OUT: User wants logcat files in public repo for AI review
 debug logs/

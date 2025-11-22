@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Allow Firebase endpoints -->
+    <!-- Allow Firebase endpoints and reCAPTCHA -->
     <domain-config cleartextTrafficPermitted="false">
+        <!-- Firebase core endpoints -->
         <domain includeSubdomains="true">firebase.googleapis.com</domain>
         <domain includeSubdomains="true">firebaseapp.com</domain>
         <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">identitytoolkit.googleapis.com</domain>
+        <!-- Google and reCAPTCHA endpoints - critical for Android authentication -->
         <domain includeSubdomains="true">google.com</domain>
         <domain includeSubdomains="true">gstatic.com</domain>
-        <domain includeSubdomains="true">identitytoolkit.googleapis.com</domain>
+        <domain includeSubdomains="true">recaptcha.net</domain>
+        <domain includeSubdomains="true">www.recaptcha.net</domain>
     </domain-config>
     
     <!-- Allow all HTTPS traffic by default -->
