@@ -30,7 +30,7 @@ When you see the "Filter" dialog with the list of Google Maps APIs, select these
 
 3. **Configure API Key Restrictions** (Important for security):
    - Go to [Google Cloud Console > Credentials](https://console.cloud.google.com/apis/credentials?project=family-hub-71ff0)
-   - Find your API key: `AIzaSyB2Ip9av7bWk-MJrgSqnBkEUMwLi1gU1hA`
+   - Find your API key: `YOUR_GOOGLE_MAPS_API_KEY_HERE` (get it from Google Cloud Console)
    - Click on it to edit
    - **Application restrictions**: Select "Android apps"
      - Add package name: `com.example.familyhub_mvp`
@@ -42,7 +42,7 @@ When you see the "Filter" dialog with the list of Google Maps APIs, select these
 ## ✅ What I've Already Done
 
 I've updated your `android/app/src/main/AndroidManifest.xml` with:
-- ✅ Google Maps API key: `AIzaSyB2Ip9av7bWk-MJrgSqnBkEUMwLi1gU1hA`
+- ✅ Google Maps API key: `YOUR_GOOGLE_MAPS_API_KEY_HERE` (configure in secrets.properties)
 - ✅ Location permissions (ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION)
 
 ## 🚀 Next Steps
@@ -59,7 +59,7 @@ flutter run
 
 - This is a **different API key** from your Firebase Auth key
 - Firebase Auth Key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` (for authentication)
-- Google Maps Key: `AIzaSyB2Ip9av7bWk-MJrgSqnBkEUMwLi1gU1hA` (for maps)
+- Google Maps Key: `YOUR_GOOGLE_MAPS_API_KEY_HERE` (for maps - get from Google Cloud Console)
 - Both are needed and serve different purposes
 
 ## 💰 Cost

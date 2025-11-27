@@ -1,7 +1,7 @@
 # Google Maps API Setup Guide
 
 ## API Key
-Your Google Maps API Key: `AIzaSyB2Ip9av7bWk-MJrgSqnBkEUMwLi1gU1hA`
+Your Google Maps API Key: `YOUR_GOOGLE_MAPS_API_KEY_HERE`
 
 ## Which APIs to Select
 
@@ -31,7 +31,7 @@ In the filter dialog you're seeing:
 ### 2. Configure API Key Restrictions
 After selecting APIs, configure the key:
 1. Go to [Google Cloud Console > Credentials](https://console.cloud.google.com/apis/credentials?project=family-hub-71ff0)
-2. Find your API key: `AIzaSyB2Ip9av7bWk-MJrgSqnBkEUMwLi1gU1hA`
+2. Find your API key: `YOUR_GOOGLE_MAPS_API_KEY_HERE` (get it from Google Cloud Console)
 3. Click on it to edit
 4. Set **Application restrictions**:
    - Select "Android apps"
@@ -57,7 +57,7 @@ Add the key to `android/app/src/main/AndroidManifest.xml`:
         <!-- Add this meta-data tag inside <application> -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyB2Ip9av7bWk-MJrgSqnBkEUMwLi1gU1hA"/>
+            android:value="YOUR_GOOGLE_MAPS_API_KEY_HERE"/>
         
         <!-- ... rest of application ... -->
     </application>
@@ -105,7 +105,7 @@ If maps don't load:
 
 This is a **different API key** from your Firebase Authentication key:
 - **Firebase Auth Key**: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` (for authentication)
-- **Google Maps Key**: `AIzaSyB2Ip9av7bWk-MJrgSqnBkEUMwLi1gU1hA` (for maps)
+- **Google Maps Key**: `YOUR_GOOGLE_MAPS_API_KEY_HERE` (for maps - get from Google Cloud Console)
 
 Both are needed and serve different purposes.
 
