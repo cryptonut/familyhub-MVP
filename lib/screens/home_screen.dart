@@ -19,8 +19,198 @@ import 'settings/privacy_center_screen.dart';
 import 'games/games_home_screen.dart';
 import 'photos/photos_home_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+
+  Future<void> _showFixFamilyDialog(BuildContext context, AuthService authService) async {
+    // Capture outer context before showing dialog to avoid using invalid context after pop
+    final outerContext = context;
+    final emailController = TextEditingController();
+    final familyIdController = TextEditingController();
+    bool isLoading = false;
+    String? kateFamilyId;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.family_restroom, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Fix Family Link'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This will update your familyId to match Kate\'s family.',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: "Kate's Email",
+                    hintText: 'Enter Kate\'s email to find her familyId',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.email),
+                  ),
+                  enabled: !isLoading && kateFamilyId == null,
+                ),
+                const SizedBox(height: 8),
+                if (kateFamilyId != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Found Kate\'s Family ID:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                        const SizedBox(height: 4),
+                        SelectableText(
+                          kateFamilyId!,
+                          style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                TextField(
+                  controller: familyIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Or Enter Family ID Directly',
+                    hintText: 'Paste family ID here',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.vpn_key),
+                  ),
+                  enabled: !isLoading,
+                ),
+                if (isLoading) ...[
+                  const SizedBox(height: 16),
+                  const Center(child: CircularProgressIndicator()),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              onPressed: isLoading ? null : () async {
+                if (emailController.text.isNotEmpty && kateFamilyId == null) {
+                  // Find Kate's familyId by email
+                  setState(() => isLoading = true);
+                  try {
+                    final familyId = await authService.getFamilyIdByEmail(emailController.text.trim());
+                    setState(() {
+                      isLoading = false;
+                      kateFamilyId = familyId;
+                    });
+                    if (familyId == null) {
+                      if (dialogContext.mounted) {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(
+                            content: Text('No user found with that email'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+                    } else {
+                      familyIdController.text = familyId;
+                    }
+                  } catch (e) {
+                    setState(() => isLoading = false);
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                } else if (familyIdController.text.isNotEmpty) {
+                  // Update familyId directly
+                  setState(() => isLoading = true);
+                  try {
+                    await authService.updateFamilyIdDirectly(familyIdController.text.trim());
+                    // Close dialog first, then show snackbar using outer context
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                    }
+                    // Use outer context for snackbar after dialog is closed
+                    if (outerContext.mounted) {
+                      ScaffoldMessenger.of(outerContext).showSnackBar(
+                        const SnackBar(
+                          content: Text('Family ID updated! Please restart the app to see changes.'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 5),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    setState(() => isLoading = false);
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        SnackBar(
+                          content: Text('Error updating family ID: $e'),
+                          backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 5),
+                        ),
+                      );
+                    }
+                  }
+                } else {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter Kate\'s email or family ID'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.check),
+              label: Text(kateFamilyId == null && emailController.text.isNotEmpty 
+                  ? 'Find Family ID' 
+                  : 'Update Family ID'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).then((_) {
+      // Dispose controllers when dialog is dismissed
+      emailController.dispose();
+      familyIdController.dispose();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +311,26 @@ class HomeScreen extends StatelessWidget {
                           ],
                         ),
                       ),
+        const PopupMenuItem(
+          value: 'fix_family',
+          child: Row(
+            children: [
+              Icon(Icons.family_restroom, size: 20, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Fix Family Link', style: TextStyle(color: Colors.orange)),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'force_signout',
+          child: Row(
+            children: [
+              Icon(Icons.refresh, size: 20, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Refresh Session', style: TextStyle(color: Colors.blue)),
+            ],
+          ),
+        ),
         const PopupMenuItem(
           value: 'debug',
           child: Row(
@@ -261,6 +471,48 @@ class HomeScreen extends StatelessWidget {
                               builder: (context) => const DatabaseResetScreen(),
                             ),
                           );
+                        }
+                      } else if (value == 'fix_family') {
+                        // Quick fix to re-link to Kate's family
+                        await _showFixFamilyDialog(context, authService);
+                      } else if (value == 'force_signout') {
+                        // Force sign out to clear persisted session and refresh
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Refresh Session'),
+                            content: const Text(
+                              'This will sign you out and clear your session. '
+                              'Use this if you\'re seeing an empty dashboard or missing data. '
+                              'You\'ll need to sign back in after.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Sign Out & Refresh'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true && context.mounted) {
+                          await authService.signOut();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Signed out. Please sign back in.'),
+                                backgroundColor: Colors.blue,
+                                duration: Duration(seconds: 3),
+                              ),
+                            );
+                          }
                         }
                       } else if (value == 'debug') {
                         // Show debug information

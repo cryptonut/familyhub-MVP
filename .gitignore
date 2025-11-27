@@ -56,3 +56,7 @@ coverage/
 # Debug logs and logcat files
 # *.logcat - COMMENTED OUT: User wants logcat files in public repo for AI review
 debug logs/
+
+# Android secrets (API keys, etc.)
+android/secrets.properties
+android/local.properties

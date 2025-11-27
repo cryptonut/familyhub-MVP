@@ -51,10 +51,12 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     debugPrint('TasksScreen.initState: Initializing, loading tasks... (initialTabIndex: $initialIndex)');
     // Clear familyId cache to ensure we have the latest value
     _taskService.clearFamilyIdCache();
-    // Clear the tasksTabIndex after using it
-    appState.clearTasksTabIndex();
-    // Use a small delay to ensure widget is fully mounted
+    
+    // Use post-frame callback to avoid setState during build
+    // This prevents "setState() or markNeedsBuild() called during build" errors
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Clear the tasksTabIndex after using it - deferred to post-frame
+      appState.clearTasksTabIndex();
       _loadTasks(forceRefresh: true);
       // Switch to the desired tab if specified
       if (initialIndex != 0 && _tabController.index != initialIndex) {
@@ -70,7 +72,10 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     final appState = Provider.of<AppState>(context, listen: false);
     if (appState.tasksTabIndex != null && _tabController.index != appState.tasksTabIndex) {
       _tabController.animateTo(appState.tasksTabIndex!);
-      appState.clearTasksTabIndex();
+      // Defer clearTasksTabIndex to avoid setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        appState.clearTasksTabIndex();
+      });
     }
     // Reload tasks when navigating to this screen (when currentIndex becomes 2)
     if (appState.currentIndex == 2) {

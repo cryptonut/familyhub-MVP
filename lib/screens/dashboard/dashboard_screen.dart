@@ -92,11 +92,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final authService = AuthService();
       final currentUserId = _auth.currentUser?.uid;
       
-      // Get current user model first
-      _currentUserModel = await authService.getCurrentUserModel();
+      // Get current user model first - with timeout to detect Firestore issues
+      _currentUserModel = await authService.getCurrentUserModel()
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        debugPrint('Dashboard: getCurrentUserModel timeout - Firestore unavailable');
+        return null;
+      });
+      
+      if (_currentUserModel == null) {
+        debugPrint('Dashboard: ⚠️ Cannot load user model - Firestore may be unavailable');
+        // Show error and return early
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot load user data. Firestore may be unavailable.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      }
       
       // Get all family members (this includes current user)
-      final allFamilyMembers = await authService.getFamilyMembers();
+      final allFamilyMembers = await authService.getFamilyMembers()
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        debugPrint('Dashboard: getFamilyMembers timeout - Firestore unavailable');
+        return <UserModel>[];
+      });
       
       debugPrint('=== LOADING FAMILY MEMBERS (PRIORITY) ===');
       debugPrint('Current User ID: $currentUserId');
@@ -138,6 +162,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (e) {
       debugPrint('Error loading family members: $e');
+      final errorStr = e.toString().toLowerCase();
+      
+      // Check if this is a Firestore unavailable error
+      if (errorStr.contains('unavailable') || errorStr.contains('timeout')) {
+        debugPrint('Dashboard: ⚠️ Firestore unavailable - cannot load family data');
+        // Don't set loading to false yet - we want to show an error state
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            // Keep empty lists to show error state
+          });
+          
+          // Show error message to user
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Cannot load data from Firestore. Please sign out and sign back in.',
+                style: TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 8),
+              action: SnackBarAction(
+                label: 'Sign Out',
+                textColor: Colors.white,
+                onPressed: () async {
+                  final authService = AuthService();
+                  await authService.signOut();
+                },
+              ),
+            ),
+          );
+        }
+        return; // Don't continue loading other data
+      }
+      
       // Even if this fails, try to at least show current user
       if (_currentUserModel != null && _familyMembers.isEmpty) {
         _familyMembers = [_currentUserModel!];

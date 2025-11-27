@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+
 class UserModel {
   final String uid;
   final String email;
@@ -64,25 +67,73 @@ class UserModel {
       }
     }
     
+    // Handle createdAt - can be Timestamp, String, or DateTime
+    // This fixes the Android login issue where FieldValue.serverTimestamp() creates Timestamp objects
+    DateTime parseCreatedAt(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      if (value is String) {
+        try {
+          return DateTime.parse(value);
+        } catch (e) {
+          debugPrint('UserModel.fromJson: Error parsing createdAt string "$value": $e');
+          return DateTime.now();
+        }
+      }
+      debugPrint('UserModel.fromJson: Unexpected createdAt type: ${value.runtimeType}, value: $value');
+      return DateTime.now();
+    }
+    
+    // Handle birthday - can be Timestamp, String, or DateTime
+    DateTime? parseBirthday(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      if (value is String) {
+        try {
+          return DateTime.parse(value);
+        } catch (e) {
+          debugPrint('UserModel.fromJson: Error parsing birthday string "$value": $e');
+          return null;
+        }
+      }
+      debugPrint('UserModel.fromJson: Unexpected birthday type: ${value.runtimeType}, value: $value');
+      return null;
+    }
+    
+    // Handle lastSyncedAt - can be Timestamp, String, or DateTime
+    DateTime? parseLastSyncedAt(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      if (value is String) {
+        try {
+          return DateTime.parse(value);
+        } catch (e) {
+          debugPrint('UserModel.fromJson: Error parsing lastSyncedAt string "$value": $e');
+          return null;
+        }
+      }
+      debugPrint('UserModel.fromJson: Unexpected lastSyncedAt type: ${value.runtimeType}, value: $value');
+      return null;
+    }
+    
     return UserModel(
       uid: json['uid'] as String,
       email: json['email'] as String,
       displayName: json['displayName'] as String,
       photoUrl: json['photoUrl'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: parseCreatedAt(json['createdAt']),
       familyId: json['familyId'] as String?,
       roles: roles,
       relationship: json['relationship'] as String?,
-      birthday: json['birthday'] != null 
-          ? DateTime.parse(json['birthday'] as String)
-          : null,
+      birthday: parseBirthday(json['birthday']),
       birthdayNotificationsEnabled: json['birthdayNotificationsEnabled'] as bool? ?? true,
       calendarSyncEnabled: json['calendarSyncEnabled'] as bool? ?? false,
       localCalendarId: json['localCalendarId'] as String?,
       googleCalendarId: json['googleCalendarId'] as String?,
-      lastSyncedAt: json['lastSyncedAt'] != null
-          ? DateTime.parse(json['lastSyncedAt'] as String)
-          : null,
+      lastSyncedAt: parseLastSyncedAt(json['lastSyncedAt']),
       locationPermissionGranted: json['locationPermissionGranted'] as bool? ?? false,
     );
   }

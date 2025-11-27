@@ -6,6 +6,13 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+// Load secrets from secrets.properties file
+val secretsPropertiesFile = rootProject.file("secrets.properties")
+val secretsProperties = java.util.Properties()
+if (secretsPropertiesFile.exists()) {
+    secretsProperties.load(java.io.FileInputStream(secretsPropertiesFile))
+}
+
 android {
     namespace = "com.example.familyhub_mvp"
     compileSdk = flutter.compileSdkVersion
@@ -29,6 +36,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Inject Google Maps API key from secrets.properties
+        val googleMapsApiKey = secretsProperties["GOOGLE_MAPS_API_KEY"] as String? ?: ""
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
     buildTypes {
