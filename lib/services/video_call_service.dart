@@ -1,8 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:uuid/uuid.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/hub.dart';
 import 'auth_service.dart';
 import 'notification_service.dart';
@@ -39,9 +40,9 @@ class VideoCallService {
       await _engine!.startPreview();
 
       _isInitialized = true;
-      debugPrint('VideoCallService: Agora engine initialized');
-    } catch (e) {
-      debugPrint('Error initializing Agora engine: $e');
+      Logger.info('Agora engine initialized', tag: 'VideoCallService');
+    } catch (e, st) {
+      Logger.error('Error initializing Agora engine', error: e, stackTrace: st, tag: 'VideoCallService');
       rethrow;
     }
   }
@@ -133,7 +134,7 @@ class VideoCallService {
       final data = doc.data();
       return data?['active_call'] as Map<String, dynamic>?;
     } catch (e) {
-      debugPrint('Error getting active call: $e');
+      Logger.error('Error getting active call', error: e, tag: 'VideoCallService');
       return null;
     }
   }
@@ -184,7 +185,7 @@ class VideoCallService {
         }
       }
     } catch (e) {
-      debugPrint('Error notifying call start: $e');
+      Logger.warning('Error notifying call start', error: e, tag: 'VideoCallService');
     }
   }
 

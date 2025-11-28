@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import '../../core/services/logger_service.dart';
+import '../../core/errors/app_exceptions.dart';
 
 /// Migration service to add birthday field to existing users
 /// This is a one-time migration that can be run manually or via Cloud Function
@@ -10,7 +11,7 @@ class BirthdayMigration {
   /// This is safe to run multiple times - it only adds the field if it doesn't exist
   Future<void> migrateAllUsers() async {
     try {
-      debugPrint('Starting birthday migration...');
+      Logger.info('Starting birthday migration...', tag: 'BirthdayMigration');
       
       final usersSnapshot = await _firestore.collection('users').get();
       int updatedCount = 0;
@@ -34,7 +35,7 @@ class BirthdayMigration {
           if (batchCount >= maxBatchSize) {
             await batch.commit();
             batchCount = 0;
-            debugPrint('Migrated batch of $maxBatchSize users...');
+            Logger.info('Migrated batch of $maxBatchSize users...', tag: 'BirthdayMigration');
           }
         }
       }
@@ -44,9 +45,9 @@ class BirthdayMigration {
         await batch.commit();
       }
       
-      debugPrint('Birthday migration completed. Updated $updatedCount users.');
-    } catch (e) {
-      debugPrint('Error during birthday migration: $e');
+      Logger.info('Birthday migration completed. Updated $updatedCount users.', tag: 'BirthdayMigration');
+    } catch (e, st) {
+      Logger.error('Error during birthday migration', error: e, stackTrace: st, tag: 'BirthdayMigration');
       rethrow;
     }
   }
@@ -58,7 +59,7 @@ class BirthdayMigration {
       final userDoc = await userRef.get();
       
       if (!userDoc.exists) {
-        throw Exception('User not found: $userId');
+        throw FirestoreException('User not found: $userId', code: 'not-found');
       }
       
       final data = userDoc.data();
@@ -69,10 +70,10 @@ class BirthdayMigration {
         await userRef.update({
           'birthdayNotificationsEnabled': true,
         });
-        debugPrint('Migrated user: $userId');
+        Logger.info('Migrated user: $userId', tag: 'BirthdayMigration');
       }
     } catch (e) {
-      debugPrint('Error migrating user $userId: $e');
+      Logger.error('Error migrating user $userId', error: e, tag: 'BirthdayMigration');
       rethrow;
     }
   }

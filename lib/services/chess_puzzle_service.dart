@@ -1,6 +1,6 @@
 import 'package:chess/chess.dart' as chess_lib;
 import 'dart:math';
-import 'package:flutter/foundation.dart';
+import '../core/services/logger_service.dart';
 
 /// Service for generating and managing chess puzzles
 class ChessPuzzleService {
@@ -187,7 +187,7 @@ class ChessPuzzleService {
 
       return false;
     } catch (e) {
-      debugPrint('Error checking solution: $e');
+      Logger.error('Error checking solution', error: e, tag: 'ChessPuzzleService');
       return false;
     }
   }

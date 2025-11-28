@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import '../core/services/logger_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -150,7 +150,7 @@ class PrivacyService {
               }))
           .toList();
     } catch (e) {
-      debugPrint('Error loading privacy activity: $e');
+      Logger.error('Error loading privacy activity', error: e, tag: 'PrivacyService');
       return [];
     }
   }

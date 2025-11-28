@@ -1,10 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:uuid/uuid.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/recurring_payment.dart';
 import '../models/user_model.dart';
 import 'auth_service.dart';
-import 'package:uuid/uuid.dart';
 
 class RecurringPaymentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -21,39 +22,39 @@ class RecurringPaymentService {
   }) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
-      throw Exception('User not authenticated');
+      throw AuthException('User not authenticated', code: 'not-authenticated');
     }
 
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel == null) throw Exception('User not found');
+    if (userModel == null) throw AuthException('User not found', code: 'user-not-found');
 
     // Only Bankers can create recurring payments
     if (!userModel.isBanker() && !userModel.isAdmin()) {
-      throw Exception('Only Bankers and Admins can set up recurring payments');
+      throw PermissionException('Only Bankers and Admins can set up recurring payments', code: 'insufficient-permissions');
     }
 
     final familyId = userModel.familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     // Validate amount
     if (amount <= 0) {
-      throw Exception('Amount must be greater than zero');
+      throw ValidationException('Amount must be greater than zero', code: 'invalid-amount');
     }
 
     // Validate frequency
     if (frequency != 'weekly' && frequency != 'monthly') {
-      throw Exception('Frequency must be weekly or monthly');
+      throw ValidationException('Frequency must be weekly or monthly', code: 'invalid-frequency');
     }
 
     // Check if recipient is in the same family
     final recipientDoc = await _firestore.collection('users').doc(toUserId).get();
     if (!recipientDoc.exists) {
-      throw Exception('Recipient not found');
+      throw FirestoreException('Recipient not found', code: 'not-found');
     }
 
     final recipientData = recipientDoc.data();
     if (recipientData?['familyId'] != familyId) {
-      throw Exception('Recipient must be in the same family');
+      throw ValidationException('Recipient must be in the same family', code: 'invalid-recipient');
     }
 
     // Check for existing active recurring payment
@@ -67,7 +68,7 @@ class RecurringPaymentService {
         .get();
 
     if (existing.docs.isNotEmpty) {
-      throw Exception('An active recurring payment already exists for this recipient');
+      throw ValidationException('An active recurring payment already exists for this recipient', code: 'duplicate-payment');
     }
 
     // Create the recurring payment
@@ -95,7 +96,7 @@ class RecurringPaymentService {
         .doc(paymentId)
         .set(payment.toJson());
 
-    debugPrint('RecurringPaymentService.createRecurringPayment: Created payment $paymentId');
+    Logger.info('createRecurringPayment: Created payment $paymentId', tag: 'RecurringPaymentService');
     return payment;
   }
 
@@ -211,9 +212,9 @@ class RecurringPaymentService {
         'lastPaymentDate': DateTime.now().toIso8601String(),
       });
 
-      debugPrint('RecurringPaymentService._processPayment: Processed payment ${payment.id}');
+      Logger.info('_processPayment: Processed payment ${payment.id}', tag: 'RecurringPaymentService');
     } catch (e) {
-      debugPrint('RecurringPaymentService._processPayment error: $e');
+      Logger.error('_processPayment error', error: e, tag: 'RecurringPaymentService');
     }
   }
 
@@ -221,18 +222,18 @@ class RecurringPaymentService {
   Future<void> deactivateRecurringPayment(String paymentId) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
-      throw Exception('User not authenticated');
+      throw AuthException('User not authenticated', code: 'not-authenticated');
     }
 
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel == null) throw Exception('User not found');
+    if (userModel == null) throw AuthException('User not found', code: 'user-not-found');
 
     if (!userModel.isBanker() && !userModel.isAdmin()) {
-      throw Exception('Only Bankers and Admins can deactivate recurring payments');
+      throw PermissionException('Only Bankers and Admins can deactivate recurring payments', code: 'insufficient-permissions');
     }
 
     final familyId = userModel.familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     await _firestore
         .collection('families')
@@ -243,7 +244,7 @@ class RecurringPaymentService {
       'isActive': false,
     });
 
-    debugPrint('RecurringPaymentService.deactivateRecurringPayment: Deactivated payment $paymentId');
+    Logger.info('deactivateRecurringPayment: Deactivated payment $paymentId', tag: 'RecurringPaymentService');
   }
 
   /// Get pocket money payments for a user

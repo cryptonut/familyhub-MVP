@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import '../core/services/logger_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import 'auth_service.dart';
@@ -63,7 +63,7 @@ class BirthdayService {
 
       return upcomingBirthdays;
     } catch (e) {
-      debugPrint('Error getting upcoming birthdays: $e');
+      Logger.error('Error getting upcoming birthdays', error: e, tag: 'BirthdayService');
       return [];
     }
   }
@@ -80,7 +80,7 @@ class BirthdayService {
                member.birthday!.day == today.day;
       }).toList();
     } catch (e) {
-      debugPrint('Error getting today birthdays: $e');
+      Logger.error('Error getting today birthdays', error: e, tag: 'BirthdayService');
       return [];
     }
   }

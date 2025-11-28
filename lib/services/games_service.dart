@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/services/logger_service.dart';
 import '../models/game_stats.dart';
 import '../models/user_model.dart';
 import 'auth_service.dart';
@@ -40,7 +40,7 @@ class GamesService {
         ...doc.data()!,
       });
     } catch (e) {
-      debugPrint('Error getting user stats: $e');
+      Logger.error('Error getting user stats', error: e, tag: 'GamesService');
       return null;
     }
   }
@@ -60,7 +60,7 @@ class GamesService {
           .doc(stats.userId)
           .set(data, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('Error updating game stats: $e');
+      Logger.error('Error updating game stats', error: e, tag: 'GamesService');
       rethrow;
     }
   }
@@ -138,7 +138,7 @@ class GamesService {
 
       return stats;
     } catch (e) {
-      debugPrint('Error getting leaderboard: $e');
+      Logger.error('Error getting leaderboard', error: e, tag: 'GamesService');
       return [];
     }
   }
@@ -175,7 +175,7 @@ class GamesService {
         yield stats;
       }
     } catch (e) {
-      debugPrint('Error in leaderboard stream: $e');
+      Logger.error('Error in leaderboard stream', error: e, tag: 'GamesService');
       yield [];
     }
   }

@@ -1,10 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:uuid/uuid.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/payout_request.dart';
 import '../models/user_model.dart';
 import 'auth_service.dart';
-import 'package:uuid/uuid.dart';
 
 class PayoutService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -17,24 +18,24 @@ class PayoutService {
   Future<PayoutRequest> createPayoutRequest(double amount, double currentBalance) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
-      throw Exception('User not authenticated');
+      throw AuthException('User not authenticated', code: 'not-authenticated');
     }
 
     // Validate amount
     if (amount <= 0) {
-      throw Exception('Payout amount must be greater than zero');
+      throw ValidationException('Payout amount must be greater than zero', code: 'invalid-amount');
     }
     
     if (amount > currentBalance) {
-      throw Exception('Payout amount cannot exceed your wallet balance of \$${currentBalance.toStringAsFixed(2)}');
+      throw ValidationException('Payout amount cannot exceed your wallet balance of \$${currentBalance.toStringAsFixed(2)}', code: 'insufficient-balance');
     }
 
     // Check for existing pending requests
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel == null) throw Exception('User not found');
+    if (userModel == null) throw AuthException('User not found', code: 'user-not-found');
     
     final familyId = userModel.familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     final pendingRequests = await _firestore
         .collection('families')
@@ -45,7 +46,7 @@ class PayoutService {
         .get();
 
     if (pendingRequests.docs.isNotEmpty) {
-      throw Exception('You already have a pending payout request');
+      throw ValidationException('You already have a pending payout request', code: 'pending-request-exists');
     }
 
     // Create the payout request
@@ -65,7 +66,7 @@ class PayoutService {
         .doc(requestId)
         .set(request.toJson());
 
-    debugPrint('PayoutService.createPayoutRequest: Created request $requestId for user $currentUserId');
+    Logger.info('createPayoutRequest: Created request $requestId for user $currentUserId', tag: 'PayoutService');
     return request;
   }
 
@@ -127,18 +128,18 @@ class PayoutService {
   }) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
-      throw Exception('User not authenticated');
+      throw AuthException('User not authenticated', code: 'not-authenticated');
     }
 
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel == null) throw Exception('User not found');
+    if (userModel == null) throw AuthException('User not found', code: 'user-not-found');
 
     if (!userModel.isBanker() && !userModel.isAdmin()) {
-      throw Exception('Only Bankers and Admins can approve payouts');
+      throw PermissionException('Only Bankers and Admins can approve payouts', code: 'insufficient-permissions');
     }
 
     final familyId = userModel.familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     final requestRef = _firestore
         .collection('families')
@@ -148,14 +149,14 @@ class PayoutService {
 
     final requestDoc = await requestRef.get();
     if (!requestDoc.exists) {
-      throw Exception('Payout request not found');
+      throw FirestoreException('Payout request not found', code: 'not-found');
     }
 
     final requestData = requestDoc.data()!;
     final request = PayoutRequest.fromJson({'id': requestId, ...requestData});
 
     if (request.status != 'pending') {
-      throw Exception('Payout request is not pending');
+      throw ValidationException('Payout request is not pending', code: 'invalid-status');
     }
 
     // Update the request
@@ -184,25 +185,25 @@ class PayoutService {
       'createdAt': DateTime.now().toIso8601String(),
     });
 
-    debugPrint('PayoutService.approvePayoutRequest: Approved request $requestId');
+    Logger.info('approvePayoutRequest: Approved request $requestId', tag: 'PayoutService');
   }
 
   /// Reject a payout request
   Future<void> rejectPayoutRequest(String requestId, String reason) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
-      throw Exception('User not authenticated');
+      throw AuthException('User not authenticated', code: 'not-authenticated');
     }
 
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel == null) throw Exception('User not found');
+    if (userModel == null) throw AuthException('User not found', code: 'user-not-found');
 
     if (!userModel.isBanker() && !userModel.isAdmin()) {
       throw Exception('Only Bankers and Admins can reject payouts');
     }
 
     final familyId = userModel.familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     final requestRef = _firestore
         .collection('families')
@@ -212,14 +213,14 @@ class PayoutService {
 
     final requestDoc = await requestRef.get();
     if (!requestDoc.exists) {
-      throw Exception('Payout request not found');
+      throw FirestoreException('Payout request not found', code: 'not-found');
     }
 
     final requestData = requestDoc.data()!;
     final request = PayoutRequest.fromJson({'id': requestId, ...requestData});
 
     if (request.status != 'pending') {
-      throw Exception('Payout request is not pending');
+      throw ValidationException('Payout request is not pending', code: 'invalid-status');
     }
 
     await requestRef.update({
@@ -229,7 +230,7 @@ class PayoutService {
       'rejectedReason': reason,
     });
 
-    debugPrint('PayoutService.rejectPayoutRequest: Rejected request $requestId');
+    Logger.info('rejectPayoutRequest: Rejected request $requestId', tag: 'PayoutService');
   }
 
   /// Get approved payouts for a user (to deduct from balance)
