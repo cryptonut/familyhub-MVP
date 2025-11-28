@@ -76,7 +76,7 @@ class HubService {
     String? icon,
   }) async {
     final userId = currentUserId;
-    if (userId == null) throw Exception('User not logged in');
+    if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
     final hub = Hub(
       id: const Uuid().v4(),
@@ -102,7 +102,7 @@ class HubService {
   /// Ensure "My Friends" hub exists for the current user
   Future<Hub> ensureMyFriendsHub() async {
     final userId = currentUserId;
-    if (userId == null) throw Exception('User not logged in');
+    if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
     // Check if "My Friends" hub already exists
     final existingHubs = await getUserHubs();
@@ -133,7 +133,7 @@ class HubService {
   Future<void> addMember(String hubId, String userId) async {
     try {
       final hub = await getHub(hubId);
-      if (hub == null) throw Exception('Hub not found');
+      if (hub == null) throw FirestoreException('Hub not found', code: 'not-found');
 
       if (hub.memberIds.contains(userId)) {
         return; // Already a member
@@ -163,12 +163,12 @@ class HubService {
   /// Update hub settings
   Future<void> updateHub(String hubId, Map<String, dynamic> updates) async {
     final userId = currentUserId;
-    if (userId == null) throw Exception('User not logged in');
+    if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
     final hub = await getHub(hubId);
     if (hub == null) throw Exception('Hub not found');
     if (hub.creatorId != userId) {
-      throw Exception('Only the hub creator can update the hub');
+      throw PermissionException('Only the hub creator can update the hub', code: 'insufficient-permissions');
     }
 
     try {
@@ -182,12 +182,12 @@ class HubService {
   /// Delete a hub
   Future<void> deleteHub(String hubId) async {
     final userId = currentUserId;
-    if (userId == null) throw Exception('User not logged in');
+    if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
     final hub = await getHub(hubId);
     if (hub == null) throw Exception('Hub not found');
     if (hub.creatorId != userId) {
-      throw Exception('Only the hub creator can delete the hub');
+      throw PermissionException('Only the hub creator can delete the hub', code: 'insufficient-permissions');
     }
 
     try {
@@ -206,16 +206,16 @@ class HubService {
     String? userId, // If inviting an existing user
   }) async {
     final currentUserId = this.currentUserId;
-    if (currentUserId == null) throw Exception('User not logged in');
+    if (currentUserId == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
     if (email == null && phoneNumber == null && userId == null) {
-      throw Exception('Must provide email, phone number, or user ID');
+      throw ValidationException('Must provide email, phone number, or user ID', code: 'missing-identifier');
     }
 
     final hub = await getHub(hubId);
     if (hub == null) throw Exception('Hub not found');
     if (hub.creatorId != currentUserId) {
-      throw Exception('Only the hub creator can invite members');
+      throw PermissionException('Only the hub creator can invite members', code: 'insufficient-permissions');
     }
 
     final currentUser = await _authService.getCurrentUserModel();
@@ -260,20 +260,20 @@ class HubService {
   /// Accept an invite (add user to hub)
   Future<void> acceptInvite(String inviteId) async {
     final userId = currentUserId;
-    if (userId == null) throw Exception('User not logged in');
+    if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
     final invite = await getInvite(inviteId);
-    if (invite == null) throw Exception('Invite not found');
+    if (invite == null) throw FirestoreException('Invite not found', code: 'not-found');
     if (invite.status != 'pending') {
-      throw Exception('Invite has already been ${invite.status}');
+      throw ValidationException('Invite has already been ${invite.status}', code: 'invalid-status');
     }
     if (invite.isExpired) {
-      throw Exception('Invite has expired');
+      throw ValidationException('Invite has expired', code: 'expired');
     }
 
     // If invite has a userId, verify it matches current user
     if (invite.userId != null && invite.userId != userId) {
-      throw Exception('This invite is for a different user');
+      throw ValidationException('This invite is for a different user', code: 'invalid-user');
     }
 
     try {

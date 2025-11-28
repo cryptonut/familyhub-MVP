@@ -560,7 +560,7 @@ class TaskService {
     
     try {
       final collectionPath = await _collectionPath;
-      Logger.deleteDuplicateByTaskId: Finding duplicates for task ID $taskId');
+      Logger.debug('deleteDuplicateByTaskId: Finding duplicates for task ID $taskId', tag: 'TaskService');
       
       // Find all documents that have this task ID in their 'id' field
       final snapshot = await _firestore
@@ -568,27 +568,27 @@ class TaskService {
           .where('id', isEqualTo: taskId)
           .get(GetOptions(source: Source.server));
       
-      Logger.deleteDuplicateByTaskId: Found ${snapshot.docs.length} document(s) with id=$taskId');
+      Logger.debug('deleteDuplicateByTaskId: Found ${snapshot.docs.length} document(s) with id=$taskId', tag: 'TaskService');
       
       final deleted = <String>[];
       for (var doc in snapshot.docs) {
         // Skip the one where document ID matches task ID (that's the correct one)
         if (doc.id != taskId) {
-          Logger.deleteDuplicateByTaskId: Deleting duplicate document ${doc.id}');
+          Logger.debug('deleteDuplicateByTaskId: Deleting duplicate document ${doc.id}', tag: 'TaskService');
           await doc.reference.delete();
           deleted.add(doc.id);
         } else {
-          Logger.deleteDuplicateByTaskId: Keeping document ${doc.id} (document ID matches task ID)');
+          Logger.debug('deleteDuplicateByTaskId: Keeping document ${doc.id} (document ID matches task ID)', tag: 'TaskService');
         }
       }
       
       if (deleted.isEmpty) {
-        Logger.deleteDuplicateByTaskId: No duplicates found to delete');
+        Logger.debug('deleteDuplicateByTaskId: No duplicates found to delete', tag: 'TaskService');
       } else {
-        Logger.deleteDuplicateByTaskId: Deleted ${deleted.length} duplicate(s): $deleted');
+        Logger.info('deleteDuplicateByTaskId: Deleted ${deleted.length} duplicate(s): $deleted', tag: 'TaskService');
       }
     } catch (e) {
-      Logger.deleteDuplicateByTaskId error: $e');
+      Logger.error('deleteDuplicateByTaskId error', error: e, tag: 'TaskService');
       rethrow;
     }
   }
@@ -600,14 +600,14 @@ class TaskService {
     
     try {
       final collectionPath = await _collectionPath;
-      Logger.cleanupDuplicates: Starting cleanup');
+      Logger.info('cleanupDuplicates: Starting cleanup', tag: 'TaskService');
       
       // Get all documents directly
       final snapshot = await _firestore
           .collection(collectionPath)
           .get(GetOptions(source: Source.server));
       
-      Logger.cleanupDuplicates: Found ${snapshot.docs.length} documents');
+      Logger.debug('cleanupDuplicates: Found ${snapshot.docs.length} documents', tag: 'TaskService');
       
       // Group by logical ID (from 'id' field in data)
       final logicalIdToDocs = <String, List<DocumentSnapshot>>{};
@@ -624,7 +624,7 @@ class TaskService {
         final docs = entry.value;
         
         if (docs.length > 1) {
-          Logger.cleanupDuplicates: Found ${docs.length} duplicates for logical ID $logicalId');
+          Logger.debug('cleanupDuplicates: Found ${docs.length} duplicates for logical ID $logicalId', tag: 'TaskService');
           
           // Find the preferred document (where doc ID matches logical ID)
           DocumentSnapshot? preferredDoc;
@@ -638,12 +638,12 @@ class TaskService {
           // If no preferred doc found, use the first one
           preferredDoc ??= docs.first;
           
-          Logger.cleanupDuplicates: Preferred document: ${preferredDoc.id}');
+          Logger.debug('cleanupDuplicates: Preferred document: ${preferredDoc.id}', tag: 'TaskService');
           
           // Delete all other documents
           for (var doc in docs) {
             if (doc.id != preferredDoc!.id) {
-              Logger.cleanupDuplicates: Deleting duplicate document ${doc.id}');
+              Logger.debug('cleanupDuplicates: Deleting duplicate document ${doc.id}', tag: 'TaskService');
               await doc.reference.delete();
               duplicatesToDelete.add(doc.id);
             }
@@ -652,9 +652,9 @@ class TaskService {
       }
       
       if (duplicatesToDelete.isEmpty) {
-        Logger.cleanupDuplicates: No duplicates found');
+        Logger.info('cleanupDuplicates: No duplicates found', tag: 'TaskService');
       } else {
-        Logger.cleanupDuplicates: Deleted ${duplicatesToDelete.length} duplicate document(s)');
+        Logger.info('cleanupDuplicates: Deleted ${duplicatesToDelete.length} duplicate document(s)', tag: 'TaskService');
       }
     } catch (e) {
       Logger.cleanupDuplicates error: $e');
@@ -670,7 +670,7 @@ class TaskService {
     try {
       final collectionPath = await _collectionPath;
       final currentUserId = _auth.currentUser?.uid;
-      if (currentUserId == null) throw Exception('User not authenticated');
+      if (currentUserId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
       
       DocumentReference? docRef;
       
@@ -689,29 +689,29 @@ class TaskService {
             .get(GetOptions(source: Source.server));
         
         if (querySnapshot.docs.isEmpty) {
-          throw Exception('Task not found: $taskId');
+          throw FirestoreException('Task not found: $taskId', code: 'not-found');
         }
         
         docRef = querySnapshot.docs.first.reference;
       }
       
       if (docRef == null) {
-        throw Exception('Could not determine document reference for task: $taskId');
+        throw FirestoreException('Could not determine document reference for task: $taskId', code: 'reference-not-found');
       }
       
       // Check if already claimed
       final doc = await docRef.get(GetOptions(source: Source.server));
       if (!doc.exists) {
-        throw Exception('Task not found');
+        throw FirestoreException('Task not found', code: 'not-found');
       }
       
       final data = doc.data() as Map<String, dynamic>;
       if (data['claimedBy'] != null && data['claimStatus'] == 'approved') {
-        throw Exception('Job is already claimed by another member');
+        throw ValidationException('Job is already claimed by another member', code: 'already-claimed');
       }
       
       if (data['claimedBy'] == currentUserId && data['claimStatus'] == 'pending') {
-        throw Exception('You have already claimed this job (pending approval)');
+        throw ValidationException('You have already claimed this job (pending approval)', code: 'already-claimed');
       }
       
       // Set claim status to pending
@@ -720,7 +720,7 @@ class TaskService {
         'claimStatus': 'pending',
       }, SetOptions(merge: true));
       
-      Logger.claimJob: Job $taskId claimed by $currentUserId');
+      Logger.info('claimJob: Job $taskId claimed by $currentUserId', tag: 'TaskService');
       
       // Send notification to job creator
       final jobTitle = data['title'] as String? ?? 'A job';
@@ -729,7 +729,7 @@ class TaskService {
         _notificationService.notifyJobClaimed(taskId, jobTitle, currentUserId);
       }
     } catch (e) {
-      Logger.claimJob error: $e');
+      Logger.error('claimJob error', error: e, tag: 'TaskService');
       rethrow;
     }
   }
@@ -742,7 +742,7 @@ class TaskService {
     try {
       final collectionPath = await _collectionPath;
       final currentUserId = _auth.currentUser?.uid;
-      if (currentUserId == null) throw Exception('User not authenticated');
+      if (currentUserId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
       
       DocumentReference? docRef;
       
@@ -760,20 +760,20 @@ class TaskService {
             .get(GetOptions(source: Source.server));
         
         if (querySnapshot.docs.isEmpty) {
-          throw Exception('Task not found: $taskId');
+          throw FirestoreException('Task not found: $taskId', code: 'not-found');
         }
         
         docRef = querySnapshot.docs.first.reference;
       }
       
       if (docRef == null) {
-        throw Exception('Could not determine document reference for task: $taskId');
+        throw FirestoreException('Could not determine document reference for task: $taskId', code: 'reference-not-found');
       }
       
       // Verify the current user is the creator
       final doc = await docRef.get(GetOptions(source: Source.server));
       if (!doc.exists) {
-        throw Exception('Task not found');
+        throw FirestoreException('Task not found', code: 'not-found');
       }
       
       final data = doc.data() as Map<String, dynamic>;
@@ -785,7 +785,7 @@ class TaskService {
       final isAdmin = userModel?.isAdmin() ?? false;
       
       if (!isCreator && !isApprover && !isAdmin) {
-        throw Exception('Only the job creator, Approver, or Admin can approve claims');
+        throw PermissionException('Only the job creator, Approver, or Admin can approve claims', code: 'insufficient-permissions');
       }
       
       // Approve the claim
@@ -794,9 +794,9 @@ class TaskService {
         'assignedTo': claimerId,
       }, SetOptions(merge: true));
       
-      Logger.approveClaim: Claim approved for job $taskId by claimer $claimerId');
+      Logger.info('approveClaim: Claim approved for job $taskId by claimer $claimerId', tag: 'TaskService');
     } catch (e) {
-      Logger.approveClaim error: $e');
+      Logger.error('approveClaim error', error: e, tag: 'TaskService');
       rethrow;
     }
   }
@@ -809,7 +809,7 @@ class TaskService {
     try {
       final collectionPath = await _collectionPath;
       final currentUserId = _auth.currentUser?.uid;
-      if (currentUserId == null) throw Exception('User not authenticated');
+      if (currentUserId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
       
       DocumentReference? docRef;
       
@@ -827,20 +827,20 @@ class TaskService {
             .get(GetOptions(source: Source.server));
         
         if (querySnapshot.docs.isEmpty) {
-          throw Exception('Task not found: $taskId');
+          throw FirestoreException('Task not found: $taskId', code: 'not-found');
         }
         
         docRef = querySnapshot.docs.first.reference;
       }
       
       if (docRef == null) {
-        throw Exception('Could not determine document reference for task: $taskId');
+        throw FirestoreException('Could not determine document reference for task: $taskId', code: 'reference-not-found');
       }
       
       // Verify the current user is the creator
       final doc = await docRef.get(GetOptions(source: Source.server));
       if (!doc.exists) {
-        throw Exception('Task not found');
+        throw FirestoreException('Task not found', code: 'not-found');
       }
       
       final data = doc.data() as Map<String, dynamic>;
@@ -852,7 +852,7 @@ class TaskService {
       final isAdmin = userModel?.isAdmin() ?? false;
       
       if (!isCreator && !isApprover && !isAdmin) {
-        throw Exception('Only the job creator, Approver, or Admin can reject claims');
+        throw PermissionException('Only the job creator, Approver, or Admin can reject claims', code: 'insufficient-permissions');
       }
       
       // Reject the claim (clear claimedBy and claimStatus)
@@ -862,9 +862,9 @@ class TaskService {
         'assignedTo': '',
       }, SetOptions(merge: true));
       
-      Logger.rejectClaim: Claim rejected for job $taskId');
+      Logger.info('rejectClaim: Claim rejected for job $taskId', tag: 'TaskService');
     } catch (e) {
-      Logger.rejectClaim error: $e');
+      Logger.error('rejectClaim error', error: e, tag: 'TaskService');
       rethrow;
     }
   }
@@ -877,7 +877,7 @@ class TaskService {
     try {
       final collectionPath = await _collectionPath;
       final currentUserId = _auth.currentUser?.uid;
-      if (currentUserId == null) throw Exception('User not authenticated');
+      if (currentUserId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
       
       DocumentReference? docRef;
       
@@ -895,20 +895,20 @@ class TaskService {
             .get(GetOptions(source: Source.server));
         
         if (querySnapshot.docs.isEmpty) {
-          throw Exception('Task not found: $taskId');
+          throw FirestoreException('Task not found: $taskId', code: 'not-found');
         }
         
         docRef = querySnapshot.docs.first.reference;
       }
       
       if (docRef == null) {
-        throw Exception('Could not determine document reference for task: $taskId');
+        throw FirestoreException('Could not determine document reference for task: $taskId', code: 'reference-not-found');
       }
       
       // Verify the current user is the creator
       final doc = await docRef.get(GetOptions(source: Source.server));
       if (!doc.exists) {
-        throw Exception('Task not found');
+        throw FirestoreException('Task not found', code: 'not-found');
       }
       
       final data = doc.data() as Map<String, dynamic>;
@@ -920,15 +920,15 @@ class TaskService {
       final isAdmin = userModel?.isAdmin() ?? false;
       
       if (!isCreator && !isApprover && !isAdmin) {
-        throw Exception('Only the job creator, Approver, or Admin can approve completion');
+        throw PermissionException('Only the job creator, Approver, or Admin can approve completion', code: 'insufficient-permissions');
       }
       
       if (data['needsApproval'] != true) {
-        throw Exception('This job does not require approval');
+        throw ValidationException('This job does not require approval', code: 'no-approval-needed');
       }
       
       if (data['isCompleted'] != true) {
-        throw Exception('Job must be completed before it can be approved');
+        throw ValidationException('Job must be completed before it can be approved', code: 'not-completed');
       }
       
       // Approve the job
@@ -944,13 +944,13 @@ class TaskService {
         if (completerId != null) {
           // Debit family wallet (money paid out)
           await _familyWalletService.debitFamilyWallet(reward.toDouble());
-          Logger.approveJob: Paid out $reward from family wallet to completer $completerId');
+          Logger.info('approveJob: Paid out $reward from family wallet to completer $completerId', tag: 'TaskService');
         }
       }
       
-      Logger.approveJob: Job $taskId approved by $currentUserId');
+      Logger.info('approveJob: Job $taskId approved by $currentUserId', tag: 'TaskService');
     } catch (e) {
-      Logger.approveJob error: $e');
+      Logger.error('approveJob error', error: e, tag: 'TaskService');
       rethrow;
     }
   }
@@ -969,28 +969,28 @@ class TaskService {
       final doc = await docRef.get(GetOptions(source: Source.server));
 
       if (!doc.exists) {
-        throw Exception('Job not found');
+        throw FirestoreException('Job not found', code: 'not-found');
       }
 
       final data = doc.data() as Map<String, dynamic>;
       
       // Check if job is completed and approved (can only refund paid jobs)
       if (data['isCompleted'] != true) {
-        throw Exception('Can only refund completed jobs');
+        throw ValidationException('Can only refund completed jobs', code: 'not-completed');
       }
       
       if (data['isRefunded'] == true) {
-        throw Exception('This job has already been refunded');
+        throw ValidationException('This job has already been refunded', code: 'already-refunded');
       }
 
       final reward = data['reward'] as num?;
       if (reward == null || reward <= 0) {
-        throw Exception('This job has no reward to refund');
+        throw ValidationException('This job has no reward to refund', code: 'no-reward');
       }
 
       final creatorId = data['createdBy'] as String?;
       if (creatorId == null) {
-        throw Exception('Job creator not found');
+        throw FirestoreException('Job creator not found', code: 'creator-not-found');
       }
 
       // Mark job as refunded
@@ -1003,13 +1003,13 @@ class TaskService {
 
       // Credit family wallet (return the money)
       await _familyWalletService.creditFamilyWallet(reward.toDouble());
-      Logger.refundJob: Credited $reward to family wallet');
+      Logger.info('refundJob: Credited $reward to family wallet', tag: 'TaskService');
 
       // Send notification to creator
       final jobTitle = data['title'] as String? ?? 'A job';
       await _notificationService.notifyJobRefunded(taskId, jobTitle, reason, note);
       
-      Logger.refundJob: Job $taskId refunded by $currentUserId');
+      Logger.info('refundJob: Job $taskId refunded by $currentUserId', tag: 'TaskService');
     } catch (e) {
       Logger.refundJob error: $e');
       rethrow;

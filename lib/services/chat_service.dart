@@ -22,7 +22,7 @@ class ChatService {
 
   Future<String> get _collectionPath async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     return 'families/$familyId/messages';
   }
 
@@ -126,7 +126,7 @@ class ChatService {
 
   Future<void> sendMessage(ChatMessage message) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       await _firestore.collection('families/$familyId/messages').add(message.toJson());
@@ -210,11 +210,11 @@ class ChatService {
   Future<void> sendPrivateMessage(ChatMessage message, String recipientId) async {
     final currentUserId = this.currentUserId;
     if (currentUserId == null) {
-      throw Exception('User not logged in');
+      throw AuthException('User not logged in', code: 'not-authenticated');
     }
     
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     final chatId = _getChatId(currentUserId, recipientId);
     
