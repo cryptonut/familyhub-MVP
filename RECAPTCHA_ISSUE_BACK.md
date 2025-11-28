@@ -1,4 +1,4 @@
-# ⚠️ reCAPTCHA Issue Returned - Immediate Fix Required
+# ⚠️ reCAPTCHA Issue Returned - Proper Setup Recommended
 
 ## Problem Identified
 
@@ -8,11 +8,13 @@ The logcat shows:
 "ERROR [AuthService] === TIMEOUT: Firebase Auth hung ==="
 ```
 
-**Root Cause**: reCAPTCHA is enabled in Firebase Console but token generation is failing, causing authentication to hang and timeout after 30 seconds.
+**Root Cause**: reCAPTCHA is **not set up** in Firebase Console, but Firebase Auth on Android is trying to use it anyway. This causes the "empty reCAPTCHA token" error and authentication timeout.
 
-## Why This Happened
+## Recommended Solution: Set Up reCAPTCHA Properly
 
-This is the same issue from earlier in the project. reCAPTCHA was likely re-enabled in Firebase Console (either manually or automatically by Firebase), causing the authentication flow to hang.
+Instead of disabling reCAPTCHA, we should **set it up properly**. This is the production-ready solution.
+
+**See `SETUP_RECAPTCHA_PROPERLY.md` for complete step-by-step instructions.**
 
 ## Immediate Fix (2 Steps)
 
@@ -47,11 +49,15 @@ This is the same issue from earlier in the project. reCAPTCHA was likely re-enab
 ### Updated MainActivity.kt
 
 I've updated `android/app/src/main/kotlin/com/example/familyhub_mvp/MainActivity.kt` to:
-- Disable app verification in `onCreate()` (immediately and after 500ms delay)
+- Disable app verification in `onCreate()` (immediately and after 500ms, 1500ms, 3000ms delays)
 - Also disable in `onResume()` as a fallback
-- Add better logging to confirm when it's disabled
+- Add comprehensive logging with `Log.i()` and `Log.e()` to track the process
+- Logs will show "✓✓✓ SUCCESS" when app verification is disabled
+- Logs will show "✗✗✗ FAILED" if there are any errors
 
-This provides a programmatic bypass, but **you still need to disable reCAPTCHA in Firebase Console** for the fix to work reliably.
+**Important**: Since reCAPTCHA is **not set up** in Firebase Console (as shown in your screenshot), Firebase Auth on Android is still trying to use it, which causes the "empty reCAPTCHA token" error. The `setAppVerificationDisabledForTesting(true)` call should bypass this requirement.
+
+**Next Steps**: After rebuilding, check the logcat for MainActivity logs to confirm app verification is being disabled successfully.
 
 ## After Making Firebase Console Changes
 
