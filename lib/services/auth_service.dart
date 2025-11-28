@@ -368,23 +368,23 @@ class AuthService {
         String? finalFamilyId;
         bool isJoiningExistingFamily = false;
         
-        debugPrint('=== REGISTRATION START ===');
-        debugPrint('Email: $email');
-        debugPrint('Display Name: $displayName');
-        debugPrint('Invitation Code provided: ${familyId != null && familyId!.isNotEmpty}');
+        Logger.info('=== REGISTRATION START ===', tag: 'AuthService');
+        Logger.debug('Email: $email', tag: 'AuthService');
+        Logger.debug('Display Name: $displayName', tag: 'AuthService');
+        Logger.debug('Invitation Code provided: ${familyId != null && familyId!.isNotEmpty}', tag: 'AuthService');
         if (familyId != null && familyId.isNotEmpty) {
-          debugPrint('Invitation Code: "$familyId"');
+          Logger.debug('Invitation Code: "$familyId"', tag: 'AuthService');
         }
         
         if (familyId != null && familyId.isNotEmpty) {
           // Clean the familyId (remove whitespace, but keep case as UUIDs are case-sensitive)
           final cleanFamilyId = familyId.trim();
           
-          debugPrint('=== REGISTRATION WITH FAMILY ID ===');
-          debugPrint('Provided familyId: "$familyId"');
-          debugPrint('Cleaned familyId: "$cleanFamilyId"');
-          debugPrint('Length: ${cleanFamilyId.length}');
-          debugPrint('Character codes: ${cleanFamilyId.codeUnits}');
+          Logger.debug('=== REGISTRATION WITH FAMILY ID ===', tag: 'AuthService');
+          Logger.debug('Provided familyId: "$familyId"', tag: 'AuthService');
+          Logger.debug('Cleaned familyId: "$cleanFamilyId"', tag: 'AuthService');
+          Logger.debug('Length: ${cleanFamilyId.length}', tag: 'AuthService');
+          Logger.debug('Character codes: ${cleanFamilyId.codeUnits}', tag: 'AuthService');
           
           // Try multiple methods to verify the family exists
           bool familyExists = false;
@@ -392,84 +392,84 @@ class AuthService {
           
           // Method 1: Query by familyId (preferred method)
           try {
-            debugPrint('Method 1: Querying users collection by familyId...');
+            Logger.debug('Method 1: Querying users collection by familyId...', tag: 'AuthService');
             final familyCheck = await _firestore
                 .collection('users')
                 .where('familyId', isEqualTo: cleanFamilyId)
                 .limit(1)
                 .get(GetOptions(source: Source.server));
             
-            debugPrint('Query result: ${familyCheck.docs.length} documents found');
+            Logger.debug('Query result: ${familyCheck.docs.length} documents found', tag: 'AuthService');
             
             if (familyCheck.docs.isNotEmpty) {
               foundUserDoc = familyCheck.docs.first;
               familyExists = true;
-              debugPrint('✓ Family found via query method');
+              Logger.debug('✓ Family found via query method', tag: 'AuthService');
             } else {
-              debugPrint('✗ Query returned no results');
+              Logger.debug('✗ Query returned no results', tag: 'AuthService');
             }
-          } catch (e) {
-            debugPrint('✗ Query method failed: $e');
-            debugPrint('This might indicate a missing Firestore index');
+          } catch (e, st) {
+            Logger.warning('✗ Query method failed', error: e, stackTrace: st, tag: 'AuthService');
+            Logger.debug('This might indicate a missing Firestore index', tag: 'AuthService');
           }
           
           // Method 2: If query failed, try reading all users and checking manually
           if (!familyExists) {
             try {
-              debugPrint('Method 2: Reading all users and checking manually...');
+              Logger.debug('Method 2: Reading all users and checking manually...', tag: 'AuthService');
               final allUsers = await _firestore
                   .collection('users')
-                  .limit(50)
+                  .limit(AppConstants.usersQueryLimit)
                   .get(GetOptions(source: Source.server));
               
-              debugPrint('Total users in database: ${allUsers.docs.length}');
+              Logger.debug('Total users in database: ${allUsers.docs.length}', tag: 'AuthService');
               
               for (var doc in allUsers.docs) {
                 final data = doc.data();
                 final existingFamilyId = data['familyId'] as String?;
                 
-                debugPrint('  Checking user ${doc.id}:');
-                debugPrint('    Email: ${data['email']}');
-                debugPrint('    familyId in DB: "$existingFamilyId"');
-                debugPrint('    familyId length: ${existingFamilyId?.length ?? 0}');
-                debugPrint('    Looking for: "$cleanFamilyId"');
-                debugPrint('    Looking for length: ${cleanFamilyId.length}');
-                debugPrint('    Codes match (==): ${existingFamilyId == cleanFamilyId}');
-                debugPrint('    Codes match (compareTo): ${existingFamilyId?.compareTo(cleanFamilyId) ?? -999}');
+                Logger.debug('  Checking user ${doc.id}:', tag: 'AuthService');
+                Logger.debug('    Email: ${data['email']}', tag: 'AuthService');
+                Logger.debug('    familyId in DB: "$existingFamilyId"', tag: 'AuthService');
+                Logger.debug('    familyId length: ${existingFamilyId?.length ?? 0}', tag: 'AuthService');
+                Logger.debug('    Looking for: "$cleanFamilyId"', tag: 'AuthService');
+                Logger.debug('    Looking for length: ${cleanFamilyId.length}', tag: 'AuthService');
+                Logger.debug('    Codes match (==): ${existingFamilyId == cleanFamilyId}', tag: 'AuthService');
+                Logger.debug('    Codes match (compareTo): ${existingFamilyId?.compareTo(cleanFamilyId) ?? -999}', tag: 'AuthService');
                 
                 // Also check character by character
                 if (existingFamilyId != null && existingFamilyId.length == cleanFamilyId.length) {
                   bool allMatch = true;
                   for (int i = 0; i < existingFamilyId.length; i++) {
                     if (existingFamilyId[i] != cleanFamilyId[i]) {
-                      debugPrint('    Character mismatch at position $i: "${existingFamilyId[i]}" (${existingFamilyId.codeUnitAt(i)}) vs "${cleanFamilyId[i]}" (${cleanFamilyId.codeUnitAt(i)})');
+                      Logger.debug('    Character mismatch at position $i: "${existingFamilyId[i]}" (${existingFamilyId.codeUnitAt(i)}) vs "${cleanFamilyId[i]}" (${cleanFamilyId.codeUnitAt(i)})', tag: 'AuthService');
                       allMatch = false;
                       break;
                     }
                   }
-                  debugPrint('    Character-by-character match: $allMatch');
+                  Logger.debug('    Character-by-character match: $allMatch', tag: 'AuthService');
                 }
                 
                 if (existingFamilyId != null && existingFamilyId == cleanFamilyId) {
                   foundUserDoc = doc;
                   familyExists = true;
-                  debugPrint('✓ Family found via manual check!');
+                  Logger.debug('✓ Family found via manual check!', tag: 'AuthService');
                   break;
                 }
               }
               
               if (!familyExists) {
-                debugPrint('✗ Manual check found no matching familyId');
-                debugPrint('Summary: Searched ${allUsers.docs.length} users, none had familyId matching "$cleanFamilyId"');
+                Logger.warning('✗ Manual check found no matching familyId', tag: 'AuthService');
+                Logger.debug('Summary: Searched ${allUsers.docs.length} users, none had familyId matching "$cleanFamilyId"', tag: 'AuthService');
               }
-            } catch (e) {
-              debugPrint('✗ Manual check method failed: $e');
+            } catch (e, st) {
+              Logger.warning('✗ Manual check method failed', error: e, stackTrace: st, tag: 'AuthService');
             }
           }
           
           // Method 3: If still not found, wait a moment and retry (in case of timing issue)
           if (!familyExists) {
-            debugPrint('Method 3: Waiting 2 seconds and retrying query (timing issue check)...');
+            Logger.debug('Method 3: Waiting 2 seconds and retrying query (timing issue check)...', tag: 'AuthService');
             await Future.delayed(const Duration(seconds: 2));
             
             try {
@@ -479,43 +479,43 @@ class AuthService {
                   .limit(1)
                   .get(GetOptions(source: Source.server));
               
-              debugPrint('Retry query result: ${retryCheck.docs.length} documents found');
+              Logger.debug('Retry query result: ${retryCheck.docs.length} documents found', tag: 'AuthService');
               
               if (retryCheck.docs.isNotEmpty) {
                 foundUserDoc = retryCheck.docs.first;
                 familyExists = true;
-                debugPrint('✓ Family found on retry!');
+                Logger.debug('✓ Family found on retry!', tag: 'AuthService');
               }
-            } catch (e) {
-              debugPrint('✗ Retry query failed: $e');
+            } catch (e, st) {
+              Logger.warning('✗ Retry query failed', error: e, stackTrace: st, tag: 'AuthService');
             }
           }
           
           if (familyExists && foundUserDoc != null) {
             // Valid familyId - user is joining an existing family
             final foundData = foundUserDoc.data() as Map<String, dynamic>;
-            debugPrint('=== FAMILY VERIFIED ===');
-            debugPrint('Found user ID: ${foundUserDoc.id}');
-            debugPrint('Found user email: ${foundData['email']}');
-            debugPrint('Found user familyId: "${foundData['familyId']}"');
-            debugPrint('FamilyId matches: ${foundData['familyId'] == cleanFamilyId}');
+            Logger.info('=== FAMILY VERIFIED ===', tag: 'AuthService');
+            Logger.debug('Found user ID: ${foundUserDoc.id}', tag: 'AuthService');
+            Logger.debug('Found user email: ${foundData['email']}', tag: 'AuthService');
+            Logger.debug('Found user familyId: "${foundData['familyId']}"', tag: 'AuthService');
+            Logger.debug('FamilyId matches: ${foundData['familyId'] == cleanFamilyId}', tag: 'AuthService');
             
             finalFamilyId = cleanFamilyId;
             isJoiningExistingFamily = true;
-            debugPrint('✓ User will join existing family: $finalFamilyId');
-            debugPrint('  Continuing to create user document with this familyId...');
+            Logger.info('✓ User will join existing family: $finalFamilyId', tag: 'AuthService');
+            Logger.debug('  Continuing to create user document with this familyId...', tag: 'AuthService');
           } else {
             // Invalid familyId - throw error instead of creating new family
-            debugPrint('=== ERROR: FAMILY NOT FOUND ===');
-            debugPrint('Invalid family invitation code: "$cleanFamilyId"');
-            debugPrint('No users found with this familyId using any method');
+            Logger.error('=== ERROR: FAMILY NOT FOUND ===', tag: 'AuthService');
+            Logger.warning('Invalid family invitation code: "$cleanFamilyId"', tag: 'AuthService');
+            Logger.warning('No users found with this familyId using any method', tag: 'AuthService');
             
             // Delete the user account that was just created
             try {
               await userCredential.user!.delete();
-              debugPrint('Deleted user account after invalid familyId');
-            } catch (e) {
-              debugPrint('Error deleting user account after invalid familyId: $e');
+              Logger.info('Deleted user account after invalid familyId', tag: 'AuthService');
+            } catch (e, st) {
+              Logger.error('Error deleting user account after invalid familyId', error: e, stackTrace: st, tag: 'AuthService');
             }
             throw ValidationException(
               'Invalid family invitation code. Please check the code and try again.\n\nCode provided: "$cleanFamilyId"\n\nIf you copied the code correctly, this might indicate the family no longer exists or there was an error.',
@@ -525,20 +525,20 @@ class AuthService {
           // No familyId provided, create new one (user is creating a new family)
           finalFamilyId = const Uuid().v4();
           isJoiningExistingFamily = false;
-          debugPrint('User is creating new family: $finalFamilyId');
+          Logger.info('User is creating new family: $finalFamilyId', tag: 'AuthService');
         }
         
         // Check if this is the first user in the family (family creator gets Admin role)
         // Only check this if NOT joining an existing family
-        debugPrint('=== DETERMINING ROLES ===');
-        debugPrint('isJoiningExistingFamily: $isJoiningExistingFamily');
-        debugPrint('finalFamilyId: $finalFamilyId');
+        Logger.debug('=== DETERMINING ROLES ===', tag: 'AuthService');
+        Logger.debug('isJoiningExistingFamily: $isJoiningExistingFamily', tag: 'AuthService');
+        Logger.debug('finalFamilyId: $finalFamilyId', tag: 'AuthService');
         
         final List<String> roles;
         if (isJoiningExistingFamily) {
           // Joining existing family - no roles (not Admin)
           roles = [];
-          debugPrint('✓ User joining existing family - no roles assigned');
+          Logger.debug('✓ User joining existing family - no roles assigned', tag: 'AuthService');
         } else {
           // Creating new family - user is always the creator (gets Admin role)
           // Since we just generated a new UUID, there can't be any existing members
@@ -552,43 +552,43 @@ class AuthService {
                 .get(GetOptions(source: Source.server));
             
             isFamilyCreator = existingFamilyMembers.docs.isEmpty;
-            debugPrint('Checked for existing family members: found ${existingFamilyMembers.docs.length}');
-          } catch (e) {
-            debugPrint('Error checking for existing family members (assuming creator): $e');
+            Logger.debug('Checked for existing family members: found ${existingFamilyMembers.docs.length}', tag: 'AuthService');
+          } catch (e, st) {
+            Logger.warning('Error checking for existing family members (assuming creator)', error: e, stackTrace: st, tag: 'AuthService');
             // If query fails, assume user is creator (safe default for new family)
             isFamilyCreator = true;
           }
           
-          roles = isFamilyCreator ? ['admin'] : [];
-          debugPrint('User creating new family - isFamilyCreator: $isFamilyCreator, roles: $roles');
+          roles = isFamilyCreator ? [AppConstants.roleAdmin] : [];
+          Logger.debug('User creating new family - isFamilyCreator: $isFamilyCreator, roles: $roles', tag: 'AuthService');
         }
         
         // CRITICAL: Check if user document was auto-created by getCurrentUserModel()
         // This can happen if auth state changes trigger getCurrentUserModel() before
         // we finish processing the invitation code
-        debugPrint('=== CHECKING FOR EXISTING DOCUMENT ===');
-        debugPrint('User ID: ${userCredential.user!.uid}');
+        Logger.debug('=== CHECKING FOR EXISTING DOCUMENT ===', tag: 'AuthService');
+        Logger.debug('User ID: ${userCredential.user!.uid}', tag: 'AuthService');
         final existingDoc = await _firestore
             .collection('users')
             .doc(userCredential.user!.uid)
             .get(GetOptions(source: Source.server));
-        debugPrint('Document exists: ${existingDoc.exists}');
+        Logger.debug('Document exists: ${existingDoc.exists}', tag: 'AuthService');
         
         if (existingDoc.exists) {
           final existingData = existingDoc.data();
           final existingFamilyId = existingData?['familyId'] as String?;
-          debugPrint('⚠️ WARNING: User document already exists!');
-          debugPrint('  This suggests getCurrentUserModel() was called before registration completed.');
-          debugPrint('  Existing familyId: "$existingFamilyId"');
-          debugPrint('  Intended familyId: "$finalFamilyId"');
+          Logger.warning('⚠️ WARNING: User document already exists!', tag: 'AuthService');
+          Logger.debug('  This suggests getCurrentUserModel() was called before registration completed.', tag: 'AuthService');
+          Logger.debug('  Existing familyId: "$existingFamilyId"', tag: 'AuthService');
+          Logger.debug('  Intended familyId: "$finalFamilyId"', tag: 'AuthService');
           
           if (existingFamilyId != null && existingFamilyId != finalFamilyId) {
-            debugPrint('  ⚠️ CONFLICT DETECTED: User document has wrong familyId!');
-            debugPrint('  This is the root cause - auto-created document overwrote invitation code.');
-            debugPrint('  Fixing by updating to correct familyId...');
+            Logger.warning('  ⚠️ CONFLICT DETECTED: User document has wrong familyId!', tag: 'AuthService');
+            Logger.debug('  This is the root cause - auto-created document overwrote invitation code.', tag: 'AuthService');
+            Logger.debug('  Fixing by updating to correct familyId...', tag: 'AuthService');
           }
         } else {
-          debugPrint('✓ User document does not exist yet (good - no auto-creation happened)');
+          Logger.debug('✓ User document does not exist yet (good - no auto-creation happened)', tag: 'AuthService');
         }
         
         // Create or update user document in Firestore with CORRECT familyId
@@ -602,7 +602,7 @@ class AuthService {
             try {
               return DateTime.parse(value);
             } catch (e) {
-              debugPrint('Error parsing createdAt string: $e');
+              Logger.warning('Error parsing createdAt string', error: e, tag: 'AuthService');
               return DateTime.now();
             }
           }
@@ -630,11 +630,11 @@ class AuthService {
             .doc(userCredential.user!.uid)
             .set(userModel.toJson(), SetOptions(merge: false));
 
-        debugPrint('=== USER DOCUMENT CREATED/UPDATED ===');
-        debugPrint('User ID: ${userCredential.user!.uid}');
-        debugPrint('Family ID: $finalFamilyId (${isJoiningExistingFamily ? "JOINING EXISTING" : "NEW FAMILY"})');
-        debugPrint('Roles: $roles');
-        debugPrint('Email: $email');
+        Logger.info('=== USER DOCUMENT CREATED/UPDATED ===', tag: 'AuthService');
+        Logger.debug('User ID: ${userCredential.user!.uid}', tag: 'AuthService');
+        Logger.debug('Family ID: $finalFamilyId (${isJoiningExistingFamily ? "JOINING EXISTING" : "NEW FAMILY"})', tag: 'AuthService');
+        Logger.debug('Roles: $roles', tag: 'AuthService');
+        Logger.debug('Email: $email', tag: 'AuthService');
         
         // AGGRESSIVE: Verify and fix multiple times to catch any race conditions
         // Something is overwriting the document immediately after creation
@@ -650,12 +650,12 @@ class AuthService {
           if (verifyDoc.exists) {
             final verifyData = verifyDoc.data();
             final verifyFamilyId = verifyData?['familyId'] as String?;
-            debugPrint('✓ Verification attempt $attempt: Document familyId = "$verifyFamilyId"');
+            Logger.debug('✓ Verification attempt $attempt: Document familyId = "$verifyFamilyId"', tag: 'AuthService');
             if (verifyFamilyId != finalFamilyId) {
-              debugPrint('  ⚠️ VERIFICATION FAILED on attempt $attempt: Document was overwritten!');
-              debugPrint('  Expected: "$finalFamilyId"');
-              debugPrint('  Found: "$verifyFamilyId"');
-              debugPrint('  Something is overwriting the document - fixing again...');
+              Logger.warning('⚠️ VERIFICATION FAILED on attempt $attempt: Document was overwritten!', tag: 'AuthService');
+              Logger.debug('  Expected: "$finalFamilyId"', tag: 'AuthService');
+              Logger.debug('  Found: "$verifyFamilyId"', tag: 'AuthService');
+              Logger.debug('  Something is overwriting the document - fixing again...', tag: 'AuthService');
               
               // Use set() with merge: false to completely overwrite
               await _firestore.collection('users').doc(userCredential.user!.uid).set({
@@ -667,15 +667,15 @@ class AuthService {
                 'roles': roles,
               }, SetOptions(merge: false));
               
-              debugPrint('  ✓ Fixed on attempt $attempt (using set with merge: false)');
+              Logger.debug('  ✓ Fixed on attempt $attempt (using set with merge: false)', tag: 'AuthService');
               
               // If this is the last attempt, log a warning
               if (attempt == maxAttempts) {
-                debugPrint('  ⚠️ WARNING: Document keeps getting overwritten after $maxAttempts attempts!');
-                debugPrint('  This suggests getCurrentUserModel() is being called repeatedly.');
+                Logger.warning('⚠️ WARNING: Document keeps getting overwritten after $maxAttempts attempts!', tag: 'AuthService');
+                Logger.debug('  This suggests getCurrentUserModel() is being called repeatedly.', tag: 'AuthService');
               }
             } else {
-              debugPrint('  ✓ Verification passed on attempt $attempt: familyId is correct');
+              Logger.debug('  ✓ Verification passed on attempt $attempt: familyId is correct', tag: 'AuthService');
               verified = true;
               break; // Success, no need to retry
             }
@@ -683,9 +683,9 @@ class AuthService {
         }
         
         if (!verified) {
-          debugPrint('⚠️⚠️⚠️ CRITICAL: Could not verify correct familyId after $maxAttempts attempts!');
-          debugPrint('  The document keeps getting overwritten by something.');
-          debugPrint('  This is a race condition that needs to be fixed.');
+          Logger.error('⚠️⚠️⚠️ CRITICAL: Could not verify correct familyId after $maxAttempts attempts!', tag: 'AuthService');
+          Logger.warning('  The document keeps getting overwritten by something.', tag: 'AuthService');
+          Logger.warning('  This is a race condition that needs to be fixed.', tag: 'AuthService');
         }
 
         // Update display name
@@ -702,14 +702,14 @@ class AuthService {
           final finalData = finalCheck.data();
           final foundFamilyId = finalData?['familyId'] as String?;
           if (foundFamilyId != finalFamilyId) {
-            debugPrint('⚠️ FINAL CHECK: Document was overwritten! Fixing...');
-            debugPrint('  Expected: "$finalFamilyId"');
-            debugPrint('  Found: "$foundFamilyId"');
+            Logger.warning('⚠️ FINAL CHECK: Document was overwritten! Fixing...', tag: 'AuthService');
+            Logger.debug('  Expected: "$finalFamilyId"', tag: 'AuthService');
+            Logger.debug('  Found: "$foundFamilyId"', tag: 'AuthService');
             await _firestore.collection('users').doc(userCredential.user!.uid).update({
               'familyId': finalFamilyId,
               'roles': roles,
             });
-            debugPrint('✓ Fixed overwritten document');
+            Logger.info('✓ Fixed overwritten document', tag: 'AuthService');
             
             // Verify the fix worked
             await Future.delayed(const Duration(milliseconds: 200));
@@ -719,19 +719,19 @@ class AuthService {
                 .get(GetOptions(source: Source.server));
             final verifyFamilyId = verifyFix.data()?['familyId'] as String?;
             if (verifyFamilyId == finalFamilyId) {
-              debugPrint('✓✓ Fix verified: familyId is now correct');
+              Logger.debug('✓✓ Fix verified: familyId is now correct', tag: 'AuthService');
             } else {
-              debugPrint('⚠️ Fix verification failed: still "$verifyFamilyId"');
+              Logger.warning('⚠️ Fix verification failed: still "$verifyFamilyId"', tag: 'AuthService');
             }
           } else {
-            debugPrint('✓ Final check passed: familyId is correct');
+            Logger.debug('✓ Final check passed: familyId is correct', tag: 'AuthService');
           }
         }
         
         // CRITICAL: Keep the registration flag active for a bit longer
         // This prevents getCurrentUserModel() from being called immediately after
         // and potentially overwriting the document
-        debugPrint('🔒 Keeping registration flag active for 2 more seconds to prevent overwrites...');
+        Logger.debug('🔒 Keeping registration flag active for 2 more seconds to prevent overwrites...', tag: 'AuthService');
         await Future.delayed(const Duration(seconds: 2));
         
         // Final verification before removing flag
@@ -743,10 +743,10 @@ class AuthService {
           final preRemoveData = preRemoveCheck.data();
           final preRemoveFamilyId = preRemoveData?['familyId'] as String?;
           if (preRemoveFamilyId != finalFamilyId) {
-            debugPrint('⚠️ PRE-REMOVE CHECK: Document still has wrong familyId!');
-            debugPrint('  Expected: "$finalFamilyId"');
-            debugPrint('  Found: "$preRemoveFamilyId"');
-            debugPrint('  Fixing one more time...');
+            Logger.warning('⚠️ PRE-REMOVE CHECK: Document still has wrong familyId!', tag: 'AuthService');
+            Logger.debug('  Expected: "$finalFamilyId"', tag: 'AuthService');
+            Logger.debug('  Found: "$preRemoveFamilyId"', tag: 'AuthService');
+            Logger.debug('  Fixing one more time...', tag: 'AuthService');
             await _firestore.collection('users').doc(userCredential.user!.uid).set({
               'uid': userCredential.user!.uid,
               'email': email,
@@ -755,15 +755,15 @@ class AuthService {
               'familyId': finalFamilyId,
               'roles': roles,
             }, SetOptions(merge: false));
-            debugPrint('  ✓ Fixed before removing registration flag');
+            Logger.debug('  ✓ Fixed before removing registration flag', tag: 'AuthService');
           } else {
-            debugPrint('✓ Pre-remove check passed: familyId is correct');
+            Logger.debug('✓ Pre-remove check passed: familyId is correct', tag: 'AuthService');
           }
         }
         
         // Now remove from registering set - registration is complete
         _registeringUserIds.remove(userId);
-        debugPrint('🔓 Removed user $userId from registering set');
+        Logger.debug('🔓 Removed user $userId from registering set', tag: 'AuthService');
 
         return userModel;
       }
@@ -772,7 +772,7 @@ class AuthService {
       // Remove from registering set on error
       if (userId != null) {
         _registeringUserIds.remove(userId);
-        debugPrint('🔓 Removed user $userId from registering set (error occurred)');
+        Logger.debug('🔓 Removed user $userId from registering set (error occurred)', tag: 'AuthService');
       }
       // If it's already our custom exception, rethrow it
       if (e.toString().contains('Invalid family invitation code')) {
@@ -785,13 +785,13 @@ class AuthService {
   // Sign out - ensure complete cleanup
   Future<void> signOut() async {
     try {
-      debugPrint('AuthService: Signing out user');
+      Logger.info('Signing out user', tag: 'AuthService');
       await _auth.signOut();
-      debugPrint('AuthService: Sign out complete');
+      Logger.info('Sign out complete', tag: 'AuthService');
       // Give Firebase a moment to update auth state
       await Future.delayed(const Duration(milliseconds: 100));
-    } catch (e) {
-      debugPrint('AuthService: Error during sign out: $e');
+    } catch (e, st) {
+      Logger.error('Error during sign out', error: e, stackTrace: st, tag: 'AuthService');
       // Force sign out even if there's an error
       try {
         await _auth.signOut();
@@ -819,14 +819,14 @@ class AuthService {
     final cleanFamilyId = familyId.trim();
     
     if (cleanFamilyId.isEmpty) {
-      throw Exception('Family ID cannot be empty');
+      throw ValidationException('Family ID cannot be empty');
     }
 
     // Verify the family exists (check if at least one user has this familyId)
     // Note: Firestore queries are case-sensitive, so we need exact match
     try {
-      debugPrint('Attempting to join family with code: $cleanFamilyId');
-      debugPrint('User ID: ${user.uid}');
+      Logger.info('Attempting to join family with code: $cleanFamilyId', tag: 'AuthService');
+      Logger.debug('User ID: ${user.uid}', tag: 'AuthService');
       
       final familyCheck = await _firestore
           .collection('users')
@@ -834,18 +834,18 @@ class AuthService {
           .limit(1)
           .get();
       
-      debugPrint('Query result: ${familyCheck.docs.length} documents found');
+      Logger.debug('Query result: ${familyCheck.docs.length} documents found', tag: 'AuthService');
       
       if (familyCheck.docs.isNotEmpty) {
         final foundUser = familyCheck.docs.first;
-        debugPrint('Found user with this familyId: ${foundUser.id}');
-        debugPrint('User data: ${foundUser.data()}');
+        Logger.debug('Found user with this familyId: ${foundUser.id}', tag: 'AuthService');
+        Logger.debug('User data: ${foundUser.data()}', tag: 'AuthService');
       }
       
       if (familyCheck.docs.isEmpty) {
         // Debug: Let's check what familyIds actually exist
-        debugPrint('No exact match found for familyId: $cleanFamilyId');
-        debugPrint('Checking all users to see what familyIds exist...');
+        Logger.warning('No exact match found for familyId: $cleanFamilyId', tag: 'AuthService');
+        Logger.debug('Checking all users to see what familyIds exist...', tag: 'AuthService');
         
         try {
           final allUsers = await _firestore
@@ -853,14 +853,14 @@ class AuthService {
               .limit(10)
               .get();
           
-          debugPrint('Total users checked: ${allUsers.docs.length}');
+          Logger.debug('Total users checked: ${allUsers.docs.length}', tag: 'AuthService');
           for (var doc in allUsers.docs) {
             final data = doc.data();
             final familyId = data['familyId'] as String?;
-            debugPrint('User ${doc.id}: familyId = $familyId');
+            Logger.debug('User ${doc.id}: familyId = $familyId', tag: 'AuthService');
           }
-        } catch (e) {
-          debugPrint('Error checking all users: $e');
+        } catch (e, st) {
+          Logger.warning('Error checking all users', error: e, stackTrace: st, tag: 'AuthService');
         }
         
         // Get current user's familyId to see the format
@@ -868,9 +868,9 @@ class AuthService {
         if (currentUserDoc.exists) {
           final currentData = currentUserDoc.data();
           final currentFamilyId = currentData?['familyId'] as String?;
-          debugPrint('Current user familyId: $currentFamilyId');
+          Logger.debug('Current user familyId: $currentFamilyId', tag: 'AuthService');
         } else {
-          debugPrint('Current user document does not exist');
+          Logger.warning('Current user document does not exist', tag: 'AuthService');
         }
         
         throw ValidationException('Invalid family invitation code. Please check the code and try again.\n\nCode provided: $cleanFamilyId');
@@ -887,7 +887,7 @@ class AuthService {
         
         // User is in a different family - allow them to switch
         if (currentFamilyId != null && currentFamilyId.isNotEmpty) {
-          debugPrint('User is switching from family $currentFamilyId to $cleanFamilyId');
+          Logger.info('User is switching from family $currentFamilyId to $cleanFamilyId', tag: 'AuthService');
         }
       }
 
@@ -896,13 +896,13 @@ class AuthService {
         'familyId': cleanFamilyId,
       });
       
-      debugPrint('Successfully joined family: $cleanFamilyId');
+      Logger.info('Successfully joined family: $cleanFamilyId', tag: 'AuthService');
     } catch (e) {
       if (e.toString().contains('Invalid family invitation code') || 
           e.toString().contains('already a member')) {
         rethrow;
       }
-      debugPrint('Error joining family: $e');
+      Logger.error('Error joining family', error: e, tag: 'AuthService');
       throw AuthException('Error joining family: $e', originalError: e);
     }
   }
@@ -920,23 +920,23 @@ class AuthService {
     }
     
     // Verify the familyId from Firestore directly (not from cache)
-    debugPrint('=== GETTING FAMILY INVITATION CODE ===');
-    debugPrint('User ID: ${user.uid}');
-    debugPrint('UserModel familyId: ${currentUserModel.familyId}');
+    Logger.debug('=== GETTING FAMILY INVITATION CODE ===', tag: 'AuthService');
+    Logger.debug('User ID: ${user.uid}', tag: 'AuthService');
+    Logger.debug('UserModel familyId: ${currentUserModel.familyId}', tag: 'AuthService');
     
     // Read directly from Firestore to ensure we have the latest value
     final userDoc = await _firestore.collection('users').doc(user.uid).get(GetOptions(source: Source.server));
     if (userDoc.exists) {
       final docData = userDoc.data();
       final docFamilyId = docData?['familyId'] as String?;
-      debugPrint('Firestore document familyId: "$docFamilyId"');
-      debugPrint('FamilyId from model matches document: ${currentUserModel.familyId == docFamilyId}');
+      Logger.debug('Firestore document familyId: "$docFamilyId"', tag: 'AuthService');
+      Logger.debug('FamilyId from model matches document: ${currentUserModel.familyId == docFamilyId}', tag: 'AuthService');
       
       if (docFamilyId != null && docFamilyId.isNotEmpty) {
         return docFamilyId;
       }
     } else {
-      debugPrint('WARNING: User document does not exist in Firestore!');
+      Logger.warning('WARNING: User document does not exist in Firestore!', tag: 'AuthService');
     }
     
     // If user already has a familyId, return it
@@ -985,7 +985,7 @@ class AuthService {
             .get();
       
       final isFamilyCreator = existingFamilyMembers.docs.isEmpty;
-      final List<String> roles = isFamilyCreator ? ['admin'] : [];
+      final List<String> roles = isFamilyCreator ? [AppConstants.roleAdmin] : [];
       
       final userModel = UserModel(
         uid: user.uid,
@@ -1002,7 +1002,7 @@ class AuthService {
     // Document exists, check if it has familyId
     final data = doc.data();
     if (data == null) {
-      throw Exception('User document exists but has no data');
+      throw AuthException('User document exists but has no data', code: 'invalid-document');
     }
     
     final currentFamilyId = data['familyId'] as String?;
@@ -1057,12 +1057,12 @@ class AuthService {
   // Join family by invitation code (alias for joinFamily for clarity)
   Future<void> joinFamilyByInvitationCode(String invitationCode) async {
     if (invitationCode.isEmpty) {
-      throw Exception('Invitation code cannot be empty');
+      throw ValidationException('Invitation code cannot be empty');
     }
     // Remove any whitespace - keep original case since UUIDs are case-sensitive
     final cleanCode = invitationCode.trim();
     if (cleanCode.isEmpty) {
-      throw Exception('Invalid invitation code');
+      throw ValidationException('Invalid invitation code');
     }
     await joinFamily(cleanCode);
   }
@@ -1076,17 +1076,17 @@ class AuthService {
 
     final cleanFamilyId = familyId.trim();
     if (cleanFamilyId.isEmpty) {
-      throw Exception('Family ID cannot be empty');
+      throw ValidationException('Family ID cannot be empty');
     }
 
-    debugPrint('updateFamilyIdDirectly: Updating familyId for user ${user.uid}');
-    debugPrint('  New familyId: "$cleanFamilyId"');
+    Logger.info('updateFamilyIdDirectly: Updating familyId for user ${user.uid}', tag: 'AuthService');
+    Logger.debug('  New familyId: "$cleanFamilyId"', tag: 'AuthService');
     
     // Get current familyId for logging
     final currentDoc = await _firestore.collection('users').doc(user.uid).get();
     final currentData = currentDoc.data();
     final currentFamilyId = currentData?['familyId'] as String?;
-    debugPrint('  Current familyId: "$currentFamilyId"');
+    Logger.debug('  Current familyId: "$currentFamilyId"', tag: 'AuthService');
 
     // Verify the target family exists (at least one user has this familyId)
     final familyCheck = await _firestore
@@ -1096,12 +1096,12 @@ class AuthService {
         .get(GetOptions(source: Source.server));
 
     if (familyCheck.docs.isEmpty) {
-      debugPrint('  ⚠️ WARNING: No users found with familyId "$cleanFamilyId"');
-      debugPrint('  This family may not exist. Proceeding anyway as requested...');
+      Logger.warning('⚠️ WARNING: No users found with familyId "$cleanFamilyId"', tag: 'AuthService');
+      Logger.debug('  This family may not exist. Proceeding anyway as requested...', tag: 'AuthService');
     } else {
       final foundUser = familyCheck.docs.first;
       final foundData = foundUser.data();
-      debugPrint('  ✓ Found family with user: ${foundData['email'] ?? foundUser.id}');
+      Logger.debug('  ✓ Found family with user: ${foundData['email'] ?? foundUser.id}', tag: 'AuthService');
     }
 
     // Update the familyId
@@ -1109,7 +1109,7 @@ class AuthService {
       'familyId': cleanFamilyId,
     });
 
-    debugPrint('  ✓ FamilyId updated successfully');
+    Logger.info('  ✓ FamilyId updated successfully', tag: 'AuthService');
     
     // Verify the update
     final verifyDoc = await _firestore
@@ -1119,10 +1119,10 @@ class AuthService {
     final verifyFamilyId = verifyDoc.data()?['familyId'] as String?;
     
     if (verifyFamilyId == cleanFamilyId) {
-      debugPrint('  ✓✓ Verification passed: familyId is now "$verifyFamilyId"');
+      Logger.debug('  ✓✓ Verification passed: familyId is now "$verifyFamilyId"', tag: 'AuthService');
     } else {
-      debugPrint('  ⚠️ Verification failed: expected "$cleanFamilyId", got "$verifyFamilyId"');
-      throw Exception('FamilyId update verification failed');
+      Logger.warning('  ⚠️ Verification failed: expected "$cleanFamilyId", got "$verifyFamilyId"', tag: 'AuthService');
+      throw AuthException('FamilyId update verification failed', code: 'verification-failed');
     }
   }
 
@@ -1130,7 +1130,7 @@ class AuthService {
   /// Returns null if user not found
   Future<String?> getFamilyIdByEmail(String email) async {
     try {
-      debugPrint('getFamilyIdByEmail: Looking for user with email: $email');
+      Logger.debug('getFamilyIdByEmail: Looking for user with email: $email', tag: 'AuthService');
       
       // Query users by email
       final query = await _firestore
@@ -1140,7 +1140,7 @@ class AuthService {
           .get(GetOptions(source: Source.server));
 
       if (query.docs.isEmpty) {
-        debugPrint('  No user found with email: $email');
+        Logger.debug('  No user found with email: $email', tag: 'AuthService');
         return null;
       }
 
@@ -1149,12 +1149,12 @@ class AuthService {
       final familyId = data['familyId'] as String?;
       final displayName = data['displayName'] as String?;
       
-      debugPrint('  Found user: ${displayName ?? userDoc.id}');
-      debugPrint('  FamilyId: "$familyId"');
+      Logger.debug('  Found user: ${displayName ?? userDoc.id}', tag: 'AuthService');
+      Logger.debug('  FamilyId: "$familyId"', tag: 'AuthService');
       
       return familyId;
-    } catch (e) {
-      debugPrint('getFamilyIdByEmail: Error: $e');
+    } catch (e, st) {
+      Logger.warning('getFamilyIdByEmail: Error', error: e, stackTrace: st, tag: 'AuthService');
       return null;
     }
   }
@@ -1166,7 +1166,7 @@ class AuthService {
       if (!doc.exists) return null;
       return UserModel.fromJson(doc.data()!);
     } catch (e) {
-      debugPrint('Error getting user model: $e');
+      Logger.error('Error getting user model', error: e, tag: 'AuthService');
       return null;
     }
   }
@@ -1176,13 +1176,13 @@ class AuthService {
     try {
       final currentUserModel = await getCurrentUserModel();
       if (currentUserModel == null || currentUserModel.familyId == null) {
-        debugPrint('getFamilyMembers: No current user model or familyId');
+        Logger.warning('getFamilyMembers: No current user model or familyId', tag: 'AuthService');
         return [];
       }
 
-      debugPrint('getFamilyMembers: Querying for familyId: "${currentUserModel.familyId}"');
-      debugPrint('getFamilyMembers: Current user ID: ${currentUserModel.uid}');
-      debugPrint('getFamilyMembers: Current user email: ${currentUserModel.email}');
+      Logger.debug('getFamilyMembers: Querying for familyId: "${currentUserModel.familyId}"', tag: 'AuthService');
+      Logger.debug('getFamilyMembers: Current user ID: ${currentUserModel.uid}', tag: 'AuthService');
+      Logger.debug('getFamilyMembers: Current user email: ${currentUserModel.email}', tag: 'AuthService');
       
       QuerySnapshot snapshot;
       try {
@@ -1190,53 +1190,52 @@ class AuthService {
             .collection('users')
             .where('familyId', isEqualTo: currentUserModel.familyId)
             .get(GetOptions(source: Source.server));
-      } catch (e) {
-        debugPrint('getFamilyMembers: Query failed with error: $e');
-        debugPrint('getFamilyMembers: This might be a permission issue or missing index');
+      } catch (e, st) {
+        Logger.warning('getFamilyMembers: Query failed with error', error: e, stackTrace: st, tag: 'AuthService');
+        Logger.debug('getFamilyMembers: This might be a permission issue or missing index', tag: 'AuthService');
         
         // Fallback: Try to get all users and filter manually (less efficient but works)
-        debugPrint('getFamilyMembers: Attempting fallback method (get all users and filter)...');
+        Logger.debug('getFamilyMembers: Attempting fallback method (get all users and filter)...', tag: 'AuthService');
         try {
           final allUsersSnapshot = await _firestore
               .collection('users')
               .limit(100)
               .get(GetOptions(source: Source.server));
           
-          debugPrint('getFamilyMembers: Retrieved ${allUsersSnapshot.docs.length} total users');
+          Logger.debug('getFamilyMembers: Retrieved ${allUsersSnapshot.docs.length} total users', tag: 'AuthService');
           
           final matchingUsers = allUsersSnapshot.docs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
             final docFamilyId = data['familyId'] as String?;
             final matches = docFamilyId == currentUserModel.familyId;
             if (matches) {
-              debugPrint('  Found match: ${data['displayName']} (${doc.id}), familyId: "$docFamilyId"');
+              Logger.debug('  Found match: ${data['displayName']} (${doc.id}), familyId: "$docFamilyId"', tag: 'AuthService');
             }
             return matches;
           }).toList();
           
-          debugPrint('getFamilyMembers: Fallback found ${matchingUsers.length} matching members');
+          Logger.debug('getFamilyMembers: Fallback found ${matchingUsers.length} matching members', tag: 'AuthService');
           
           return matchingUsers
               .map((doc) => UserModel.fromJson(doc.data() as Map<String, dynamic>))
               .toList();
-        } catch (fallbackError) {
-          debugPrint('getFamilyMembers: Fallback method also failed: $fallbackError');
+        } catch (fallbackError, fallbackSt) {
+          Logger.error('getFamilyMembers: Fallback method also failed', error: fallbackError, stackTrace: fallbackSt, tag: 'AuthService');
           return [];
         }
       }
 
-      debugPrint('getFamilyMembers: Found ${snapshot.docs.length} members');
+      Logger.debug('getFamilyMembers: Found ${snapshot.docs.length} members', tag: 'AuthService');
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
-        debugPrint('  - ${data['displayName']} (${doc.id}), familyId: "${data['familyId']}"');
+        Logger.debug('  - ${data['displayName']} (${doc.id}), familyId: "${data['familyId']}"', tag: 'AuthService');
       }
 
       return snapshot.docs
           .map((doc) => UserModel.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e, stackTrace) {
-      debugPrint('getFamilyMembers: Unexpected error: $e');
-      debugPrint('getFamilyMembers: Stack trace: $stackTrace');
+      Logger.error('getFamilyMembers: Unexpected error', error: e, stackTrace: stackTrace, tag: 'AuthService');
       return [];
     }
   }
@@ -1263,7 +1262,7 @@ class AuthService {
       }
     } catch (e) {
       // If index doesn't exist, fall back to fetching all and sorting in memory
-      debugPrint('getFamilyCreator: Index error, falling back to in-memory sort: $e');
+      Logger.warning('getFamilyCreator: Index error, falling back to in-memory sort', error: e, tag: 'AuthService');
       
       final snapshot = await _firestore
           .collection('users')
@@ -1293,12 +1292,12 @@ class AuthService {
   /// Automatically sets reciprocal relationships where applicable
   Future<void> updateRelationship(String userId, String? relationship) async {
     final currentUser = _auth.currentUser;
-    if (currentUser == null) throw Exception('User not logged in');
+    if (currentUser == null) throw AuthException('User not logged in', code: 'not-authenticated');
     
     // Check if current user is Admin or family creator
     final currentUserModel = await getCurrentUserModel();
     if (currentUserModel == null) {
-      throw Exception('User not found');
+      throw AuthException('User not found', code: 'user-not-found');
     }
     
     final familyCreator = await getFamilyCreator();
@@ -1306,23 +1305,23 @@ class AuthService {
     final isAdmin = currentUserModel.isAdmin();
     
     if (!isCreator && !isAdmin) {
-      throw Exception('Only the family creator or Admins can update relationships');
+      throw PermissionException('Only the family creator or Admins can update relationships', code: 'insufficient-permissions');
     }
     
     // Verify target user is in the same family
     final targetUserDoc = await _firestore.collection('users').doc(userId).get();
     if (!targetUserDoc.exists) {
-      throw Exception('User not found');
+      throw AuthException('User not found', code: 'user-not-found');
     }
     
     final targetUserData = targetUserDoc.data();
     if (targetUserData == null) {
-      throw Exception('User data not found');
+      throw AuthException('User data not found', code: 'invalid-document');
     }
     
     final targetFamilyId = targetUserData['familyId'] as String?;
     if (targetFamilyId != currentUserModel.familyId) {
-      throw Exception('Cannot update relationships for users outside your family');
+      throw PermissionException('Cannot update relationships for users outside your family', code: 'family-mismatch');
     }
     
     // Update relationship
@@ -1352,7 +1351,7 @@ class AuthService {
         await _firestore.collection('users').doc(currentUser.uid).update({
           'relationship': requiredRelationship,
         });
-        debugPrint('Automatically set reciprocal relationship: ${currentUserModel.displayName} -> $requiredRelationship');
+        Logger.debug('Automatically set reciprocal relationship: ${currentUserModel.displayName} -> $requiredRelationship', tag: 'AuthService');
       }
     }
   }
@@ -1362,28 +1361,28 @@ class AuthService {
   /// Assign roles to a user (Admin only)
   Future<void> assignRoles(String userId, List<String> roles) async {
     final currentUser = _auth.currentUser;
-    if (currentUser == null) throw Exception('User not logged in');
+    if (currentUser == null) throw AuthException('User not logged in', code: 'not-authenticated');
     
     // Check if current user is Admin
     final currentUserModel = await getCurrentUserModel();
     if (currentUserModel == null || !currentUserModel.isAdmin()) {
-      throw Exception('Only Admins can assign roles');
+      throw PermissionException('Only Admins can assign roles', code: 'insufficient-permissions');
     }
     
     // Verify target user is in the same family
     final targetUserDoc = await _firestore.collection('users').doc(userId).get();
     if (!targetUserDoc.exists) {
-      throw Exception('User not found');
+      throw AuthException('User not found', code: 'user-not-found');
     }
     
     final targetUserData = targetUserDoc.data();
     if (targetUserData == null) {
-      throw Exception('User data not found');
+      throw AuthException('User data not found', code: 'invalid-document');
     }
     
     final targetFamilyId = targetUserData['familyId'] as String?;
     if (targetFamilyId != currentUserModel.familyId) {
-      throw Exception('Cannot assign roles to users outside your family');
+      throw PermissionException('Cannot assign roles to users outside your family', code: 'family-mismatch');
     }
     
     // Update roles
@@ -1403,8 +1402,8 @@ class AuthService {
     // Get displayName from Firebase Auth
     String displayName = user.displayName ?? '';
     
-    debugPrint('AuthService.updateDisplayNameFromAuth: Firebase Auth displayName: $displayName');
-    debugPrint('AuthService.updateDisplayNameFromAuth: Firebase Auth email: ${user.email}');
+    Logger.debug('updateDisplayNameFromAuth: Firebase Auth displayName: $displayName', tag: 'AuthService');
+    Logger.debug('updateDisplayNameFromAuth: Firebase Auth email: ${user.email}', tag: 'AuthService');
     
     // If Firebase Auth doesn't have displayName, try to get it from Firestore first
     if (displayName.isEmpty) {
@@ -1417,11 +1416,11 @@ class AuthService {
               firestoreDisplayName.isNotEmpty && 
               firestoreDisplayName != 'User') {
             displayName = firestoreDisplayName;
-            debugPrint('AuthService.updateDisplayNameFromAuth: Using Firestore displayName: $displayName');
+            Logger.debug('updateDisplayNameFromAuth: Using Firestore displayName: $displayName', tag: 'AuthService');
           }
         }
-      } catch (e) {
-        debugPrint('AuthService.updateDisplayNameFromAuth: Error reading Firestore: $e');
+      } catch (e, st) {
+        Logger.warning('updateDisplayNameFromAuth: Error reading Firestore', error: e, stackTrace: st, tag: 'AuthService');
       }
     }
     
@@ -1441,12 +1440,12 @@ class AuthService {
           }
         }
       }
-      debugPrint('AuthService.updateDisplayNameFromAuth: Using email-derived name: $displayName');
+      Logger.debug('updateDisplayNameFromAuth: Using email-derived name: $displayName', tag: 'AuthService');
     }
     
     // If still empty, use a default
     if (displayName.isEmpty) {
-      throw Exception('No displayName available. Please set it manually.');
+      throw ValidationException('No displayName available. Please set it manually.');
     }
     
     // Update both Firestore and Firebase Auth
@@ -1454,14 +1453,14 @@ class AuthService {
       'displayName': displayName,
     });
     
-    debugPrint('AuthService.updateDisplayNameFromAuth: Updated Firestore displayName to $displayName');
+    Logger.info('updateDisplayNameFromAuth: Updated Firestore displayName to $displayName', tag: 'AuthService');
     
     // Always update Firebase Auth (even if it's already set, to ensure sync)
     try {
       await user.updateDisplayName(displayName);
-      debugPrint('AuthService.updateDisplayNameFromAuth: Updated Firebase Auth displayName to $displayName');
-    } catch (e) {
-      debugPrint('Error updating Firebase Auth displayName: $e');
+      Logger.info('updateDisplayNameFromAuth: Updated Firebase Auth displayName to $displayName', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.warning('Error updating Firebase Auth displayName', error: e, stackTrace: st, tag: 'AuthService');
       // Continue even if this fails - Firestore is updated
     }
   }
@@ -1470,17 +1469,17 @@ class AuthService {
   /// This bypasses the admin check to allow the first user to become admin
   Future<void> selfAssignAdminRole() async {
     final currentUser = _auth.currentUser;
-    if (currentUser == null) throw Exception('User not logged in');
+    if (currentUser == null) throw AuthException('User not logged in', code: 'not-authenticated');
     
     // Get current user document
     final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
     if (!userDoc.exists) {
-      throw Exception('User document not found. Please use "Fix User Document" first.');
+      throw AuthException('User document not found. Please use "Fix User Document" first.', code: 'user-not-found');
     }
     
     final userData = userDoc.data();
     if (userData == null) {
-      throw Exception('User data not found');
+      throw AuthException('User data not found', code: 'invalid-document');
     }
     
     // Get current roles
@@ -1492,13 +1491,13 @@ class AuthService {
     }
     
     // Add admin role if not already present
-    if (!currentRoles.contains('admin')) {
-      currentRoles.add('admin');
+    if (!currentRoles.contains(AppConstants.roleAdmin)) {
+      currentRoles.add(AppConstants.roleAdmin);
       await _firestore.collection('users').doc(currentUser.uid).update({
         'roles': currentRoles,
       });
     } else {
-      throw Exception('You already have the Admin role');
+      throw ValidationException('You already have the Admin role');
     }
   }
 
@@ -1506,8 +1505,8 @@ class AuthService {
   /// Required before sensitive operations like account deletion
   Future<void> reauthenticateUser(String password) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('No user logged in');
-    if (user.email == null) throw Exception('User email is missing');
+    if (user == null) throw AuthException('No user logged in', code: 'not-authenticated');
+    if (user.email == null) throw AuthException('User email is missing', code: 'missing-email');
 
     try {
       // Create credential with email and password
@@ -1518,23 +1517,11 @@ class AuthService {
       
       // Re-authenticate
       await user.reauthenticateWithCredential(credential);
-      debugPrint('User re-authenticated successfully');
-    } catch (e) {
-      debugPrint('Error re-authenticating user: $e');
+      Logger.info('User re-authenticated successfully', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.error('Error re-authenticating user', error: e, stackTrace: st, tag: 'AuthService');
       if (e is FirebaseAuthException) {
-        if (e.code == 'wrong-password') {
-          throw Exception('Incorrect password');
-        } else if (e.code == 'user-mismatch') {
-          throw Exception('User mismatch');
-        } else if (e.code == 'user-not-found') {
-          throw Exception('User not found');
-        } else if (e.code == 'invalid-credential') {
-          throw Exception('Invalid credentials');
-        } else if (e.code == 'invalid-email') {
-          throw Exception('Invalid email');
-        } else if (e.code == 'too-many-requests') {
-          throw Exception('Too many requests. Please try again later.');
-        }
+        throw AuthException.fromFirebaseCode(e.code);
       }
       rethrow;
     }
@@ -1546,7 +1533,7 @@ class AuthService {
   /// If skipFirestoreDeletion is true, only deletes the Auth account (useful if Firestore data was already deleted)
   Future<void> deleteCurrentUserAccount({String? password, bool skipFirestoreDeletion = false}) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('No user logged in');
+    if (user == null) throw AuthException('No user logged in', code: 'not-authenticated');
 
     // If password is provided, re-authenticate first
     if (password != null && password.isNotEmpty) {
@@ -1563,7 +1550,7 @@ class AuthService {
       try {
         await deleteUserData(userId, familyId);
       } catch (e) {
-        debugPrint('AuthService.deleteCurrentUserAccount: Some Firestore deletions failed: $e');
+        Logger.warning('deleteCurrentUserAccount: Some Firestore deletions failed', error: e, tag: 'AuthService');
         // Continue to delete Auth account even if Firestore deletions fail
       }
     }
@@ -1571,11 +1558,11 @@ class AuthService {
     // Always delete the Firebase Auth account, even if Firestore deletions failed
     try {
       await user.delete();
-      debugPrint('AuthService.deleteCurrentUserAccount: User ${user.uid} deleted from Auth');
-    } catch (e) {
-      debugPrint('AuthService.deleteCurrentUserAccount: Error deleting Auth account: $e');
+      Logger.info('deleteCurrentUserAccount: User ${user.uid} deleted from Auth', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.error('deleteCurrentUserAccount: Error deleting Auth account', error: e, stackTrace: st, tag: 'AuthService');
       if (e is FirebaseAuthException && e.code == 'requires-recent-login') {
-        throw Exception('This operation requires recent authentication. Please re-enter your password.');
+        throw AuthException('This operation requires recent authentication. Please re-enter your password.', code: 'requires-recent-login');
       }
       rethrow; // This is critical, so rethrow
     }
@@ -1586,9 +1573,9 @@ class AuthService {
     // Delete user document
     try {
       await _firestore.collection('users').doc(userId).delete();
-      debugPrint('AuthService.deleteUserData: Deleted user document for $userId');
-    } catch (e) {
-      debugPrint('AuthService.deleteUserData: Error deleting user document: $e');
+      Logger.info('deleteUserData: Deleted user document for $userId', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.warning('deleteUserData: Error deleting user document', error: e, stackTrace: st, tag: 'AuthService');
       // Continue even if this fails - we'll still delete the auth account
     }
 
@@ -1596,8 +1583,8 @@ class AuthService {
     if (familyId != null) {
       try {
         await deleteFamilyData(familyId);
-      } catch (e) {
-        debugPrint('AuthService.deleteUserData: Error deleting family data: $e');
+      } catch (e, st) {
+        Logger.warning('deleteUserData: Error deleting family data', error: e, stackTrace: st, tag: 'AuthService');
         // Continue even if this fails
       }
     }
@@ -1606,9 +1593,9 @@ class AuthService {
     try {
       final oldPath = 'families/$userId';
       await deleteCollectionRecursive(oldPath);
-      debugPrint('AuthService.deleteUserData: Deleted old user path $oldPath');
-    } catch (e) {
-      debugPrint('AuthService.deleteUserData: Error deleting old user path: $e');
+      Logger.info('deleteUserData: Deleted old user path $oldPath', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.warning('deleteUserData: Error deleting old user path', error: e, stackTrace: st, tag: 'AuthService');
       // Continue even if this fails
     }
   }
@@ -1618,18 +1605,18 @@ class AuthService {
     try {
       final familyPath = 'families/$familyId';
       await deleteCollectionRecursive(familyPath);
-      debugPrint('AuthService.deleteFamilyData: Deleted family data for $familyId');
-    } catch (e) {
-      debugPrint('AuthService.deleteFamilyData: Error deleting family collections: $e');
+      Logger.info('deleteFamilyData: Deleted family data for $familyId', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.warning('deleteFamilyData: Error deleting family collections', error: e, stackTrace: st, tag: 'AuthService');
       // Continue to try deleting wallet document
     }
 
     // Delete family wallet document if it exists
     try {
       await _firestore.collection('families').doc(familyId).delete();
-      debugPrint('AuthService.deleteFamilyData: Deleted family wallet document');
-    } catch (e) {
-      debugPrint('AuthService.deleteFamilyData: Could not delete family wallet document: $e');
+      Logger.info('deleteFamilyData: Deleted family wallet document', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.warning('deleteFamilyData: Could not delete family wallet document', error: e, stackTrace: st, tag: 'AuthService');
       // This is okay - document might not exist or permissions might not allow it
     }
   }
@@ -1666,10 +1653,10 @@ class AuthService {
                   }
                   await batch.commit();
                 }
-                debugPrint('AuthService.deleteCollectionRecursive: Deleted $subcollectionPath (${subSnapshot.docs.length} docs)');
+                Logger.info('deleteCollectionRecursive: Deleted $subcollectionPath (${subSnapshot.docs.length} docs)', tag: 'AuthService');
               }
-            } catch (e) {
-              debugPrint('AuthService.deleteCollectionRecursive: Error deleting $subcollection: $e');
+            } catch (e, st) {
+              Logger.warning('deleteCollectionRecursive: Error deleting $subcollection', error: e, stackTrace: st, tag: 'AuthService');
               // Continue with other subcollections
             }
           }
@@ -1695,10 +1682,10 @@ class AuthService {
           }
           await batch.commit();
         }
-        debugPrint('AuthService.deleteCollectionRecursive: Deleted $collectionPath (${snapshot.docs.length} docs)');
+        Logger.info('deleteCollectionRecursive: Deleted $collectionPath (${snapshot.docs.length} docs)', tag: 'AuthService');
       }
-    } catch (e) {
-      debugPrint('AuthService.deleteCollectionRecursive: Error deleting $collectionPath: $e');
+    } catch (e, st) {
+      Logger.error('deleteCollectionRecursive: Error deleting $collectionPath', error: e, stackTrace: st, tag: 'AuthService');
       rethrow; // Let caller handle the error
     }
   }
@@ -1715,12 +1702,12 @@ class AuthService {
           .get();
 
       if (notificationsSnapshot.docs.isEmpty) {
-        debugPrint('AuthService.deleteUserNotifications: No notifications to delete');
+        Logger.debug('deleteUserNotifications: No notifications to delete', tag: 'AuthService');
         return;
       }
 
       // Firestore batch limit is 500 operations
-      final batchSize = 500;
+      final batchSize = AppConstants.firestoreBatchSize;
       for (int i = 0; i < notificationsSnapshot.docs.length; i += batchSize) {
         final batch = _firestore.batch();
         final end = (i + batchSize < notificationsSnapshot.docs.length) 
@@ -1732,9 +1719,9 @@ class AuthService {
         }
         await batch.commit();
       }
-      debugPrint('AuthService.deleteUserNotifications: Deleted ${notificationsSnapshot.docs.length} notifications');
-    } catch (e) {
-      debugPrint('AuthService.deleteUserNotifications: Error deleting notifications: $e');
+      Logger.info('deleteUserNotifications: Deleted ${notificationsSnapshot.docs.length} notifications', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.warning('deleteUserNotifications: Error deleting notifications', error: e, stackTrace: st, tag: 'AuthService');
       // Continue even if this fails - notifications are not critical
     }
   }
@@ -1743,7 +1730,7 @@ class AuthService {
   /// WARNING: This will sign out the user and delete everything!
   Future<void> resetDatabaseForCurrentUser() async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('No user logged in');
+    if (user == null) throw AuthException('No user logged in', code: 'not-authenticated');
 
     final userModel = await getCurrentUserModel();
     final familyId = userModel?.familyId;
@@ -1758,7 +1745,7 @@ class AuthService {
     // Delete the Firebase Auth account
     await user.delete();
     
-    debugPrint('AuthService.resetDatabaseForCurrentUser: Complete reset completed for $userId');
+    Logger.info('resetDatabaseForCurrentUser: Complete reset completed for $userId', tag: 'AuthService');
   }
 
   Exception _handleAuthError(dynamic error) {
@@ -1792,13 +1779,17 @@ class AuthService {
         default:
           message = error.message ?? 'An error occurred: ${error.code}';
       }
-      return Exception(message);
+      return AuthException(message, code: error.code, originalError: error);
     }
-    // If it's already an Exception, return it
-    if (error is Exception) {
+    // If it's already an AppException, return it
+    if (error is AppException) {
       return error;
     }
-    return Exception(error.toString());
+    // If it's already an Exception, wrap it
+    if (error is Exception) {
+      return AuthException(error.toString(), originalError: error);
+    }
+    return AuthException(error.toString(), originalError: error);
   }
 }
 

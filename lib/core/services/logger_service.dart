@@ -31,8 +31,17 @@ class Logger {
   }
 
   /// Warning level logs
-  static void warning(String message, {String? tag}) {
-    _log(LogLevel.warning, message, tag: tag);
+  /// 
+  /// [error] - The error object (optional)
+  /// [stackTrace] - Stack trace (optional)
+  /// [tag] - Tag for categorizing logs
+  static void warning(
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+    String? tag,
+  }) {
+    _log(LogLevel.warning, message, tag: tag, error: error, stackTrace: stackTrace);
   }
 
   /// Error level logs

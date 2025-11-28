@@ -10,6 +10,11 @@ abstract class AppConstants {
   static const Duration backgroundTaskTimeout = Duration(seconds: 5);
   static const Duration networkRequestTimeout = Duration(seconds: 15);
   static const Duration gRPCChannelInitDelay = Duration(milliseconds: 1000);
+  
+  // Legacy aliases for backward compatibility
+  static const Duration authOperation = authOperationTimeout;
+  static const Duration firestoreQuery = firestoreQueryTimeout;
+  static const Duration backgroundTask = backgroundTaskTimeout;
 
   // ============================================
   // Limits
