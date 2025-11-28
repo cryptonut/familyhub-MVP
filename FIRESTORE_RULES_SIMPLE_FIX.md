@@ -156,6 +156,19 @@ service cloud.firestore {
           allow update, delete: if canAccessFamilyData(familyId) && 
             resource.data.senderId == request.auth.uid;
         }
+        // Read status subcollection - users can write their own read status
+        match /readStatus/{userId} {
+          allow read: if canAccessFamilyData(familyId);
+          allow write: if canAccessFamilyData(familyId) && 
+            request.auth.uid == userId;
+        }
+      }
+      
+      // Family members location subcollection
+      match /members/{memberId} {
+        allow read: if canAccessFamilyData(familyId);
+        allow write: if canAccessFamilyData(familyId) && 
+          request.auth.uid == memberId;
       }
       
       // Payout requests subcollection

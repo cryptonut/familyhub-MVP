@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../models/family_member.dart';
 import '../../services/location_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
@@ -30,19 +35,130 @@ class _LocationScreenState extends State<LocationScreen> {
   }
 
   Future<void> _updateMyLocation() async {
-    // In a real app, you would use geolocator to get current location
-    // For now, we'll show a dialog explaining this
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      _showErrorDialog('Please sign in to update your location');
+      return;
+    }
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      // Check and request location permissions
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        Navigator.pop(context); // Close loading dialog
+        _showErrorDialog(
+          'Location services are disabled. Please enable location services in your device settings.',
+        );
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          Navigator.pop(context); // Close loading dialog
+          _showErrorDialog(
+            'Location permissions are denied. Please enable location permissions in app settings.',
+          );
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        Navigator.pop(context); // Close loading dialog
+        _showErrorDialog(
+          'Location permissions are permanently denied. Please enable them in app settings.',
+        );
+        return;
+      }
+
+      // Get current location with longer timeout and fallback to lower accuracy
+      Position position;
+      try {
+        // Try high accuracy first with 20 second timeout
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 20),
+        );
+      } catch (e) {
+        // If high accuracy times out, try with lower accuracy (faster)
+        debugPrint('High accuracy location failed, trying with lower accuracy: $e');
+        try {
+          position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.medium,
+            timeLimit: const Duration(seconds: 30),
+          );
+        } catch (e2) {
+          // If medium also fails, try with low accuracy (fastest, uses network)
+          debugPrint('Medium accuracy location failed, trying with low accuracy: $e2');
+          position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.low,
+            timeLimit: const Duration(seconds: 30),
+          );
+        }
+      }
+
+      // Update location in Firestore
+      await _locationService.updateMemberLocation(
+        currentUser.uid,
+        position.latitude,
+        position.longitude,
+      );
+
+      Navigator.pop(context); // Close loading dialog
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Location updated: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Refresh family members list
+      _loadFamilyMembers();
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      
+      // Provide more helpful error messages
+      String errorMessage;
+      if (e.toString().contains('TimeoutException')) {
+        errorMessage = 'Location request timed out. Please ensure:\n'
+            '• You are outdoors or near a window\n'
+            '• GPS is enabled on your device\n'
+            '• Location services are working\n\n'
+            'Try again in a moment.';
+      } else if (e.toString().contains('permission-denied')) {
+        errorMessage = 'Permission denied. Please check Firestore security rules are deployed.';
+      } else {
+        errorMessage = 'Failed to update location: ${e.toString()}';
+      }
+      
+      _showErrorDialog(errorMessage);
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Update Location'),
-        content: const Text(
-          'To enable location sharing, you need to:\n\n'
-          '1. Add location permissions to your app\n'
-          '2. Use geolocator package to get current location\n'
-          '3. Call _locationService.updateMemberLocation()\n\n'
-          'For now, this is a demo with sample locations.',
-        ),
+        title: const Text('Error'),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -86,32 +202,18 @@ class _LocationScreenState extends State<LocationScreen> {
                 ),
                 Container(
                   padding: const EdgeInsets.all(16),
-                  color: Colors.blue[50],
-                  child: Column(
+                  color: Colors.green[50],
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.blue[700]),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Map integration requires Google Maps API key',
-                              style: TextStyle(
-                                color: Colors.blue[900],
-                                fontSize: 12,
-                              ),
-                            ),
+                      Icon(Icons.check_circle, color: Colors.green[700]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Tap the map icon next to a family member to view their location on a map',
+                          style: TextStyle(
+                            color: Colors.green[900],
+                            fontSize: 12,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'To enable map view, add your Google Maps API key in '
-                        'android/app/src/main/AndroidManifest.xml and configure '
-                        'google_maps_flutter package.',
-                        style: TextStyle(
-                          color: Colors.blue[800],
-                          fontSize: 11,
                         ),
                       ),
                     ],
@@ -180,53 +282,95 @@ class _LocationScreenState extends State<LocationScreen> {
   }
 
   void _showLocationDetails(FamilyMember member) {
+    if (member.latitude == null || member.longitude == null) {
+      return;
+    }
+
+    final LatLng location = LatLng(member.latitude!, member.longitude!);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${member.name}\'s Location'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Latitude: ${member.latitude!.toStringAsFixed(6)}'),
-            Text('Longitude: ${member.longitude!.toStringAsFixed(6)}'),
-            if (member.lastSeen != null) ...[
+      builder: (context) => Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.7,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${member.name}\'s Location',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               Text(
-                'Last updated: ${app_date_utils.AppDateUtils.formatDateTime(member.lastSeen!)}',
+                'Latitude: ${member.latitude!.toStringAsFixed(6)}',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
-            ],
-            const SizedBox(height: 16),
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(8),
+              Text(
+                'Longitude: ${member.longitude!.toStringAsFixed(6)}',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.map, size: 48, color: Colors.grey[400]),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Map view requires\nGoogle Maps API key',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey[600]),
+              if (member.lastSeen != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Last updated: ${app_date_utils.AppDateUtils.formatDateTime(member.lastSeen!)}',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: location,
+                      zoom: 15.0,
                     ),
-                  ],
+                    markers: {
+                      Marker(
+                        markerId: MarkerId(member.id),
+                        position: location,
+                        infoWindow: InfoWindow(
+                          title: member.name,
+                          snippet: member.email ?? 'No email',
+                        ),
+                      ),
+                    },
+                    mapType: MapType.normal,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: true,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

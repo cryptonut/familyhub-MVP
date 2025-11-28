@@ -8,18 +8,27 @@ class LocationService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final AuthService _authService = AuthService();
 
-  String? get _familyId => _auth.currentUser?.uid;
+  Future<String?> get _familyId async {
+    final userModel = await _authService.getCurrentUserModel();
+    return userModel?.familyId;
+  }
 
-  String get _collectionPath => 'families/$_familyId/members';
+  Future<String> get _collectionPath async {
+    final familyId = await _familyId;
+    if (familyId == null) throw Exception('User not part of a family');
+    return 'families/$familyId/members';
+  }
 
   Future<List<FamilyMember>> getFamilyMembers() async {
-    if (_familyId == null) return [];
+    final familyId = await _familyId;
+    if (familyId == null) return [];
     
     // Get family members from users collection
     final familyMembers = await _authService.getFamilyMembers();
     
     // Also get location data from members collection
-    final snapshot = await _firestore.collection(_collectionPath).get();
+    final collectionPath = await _collectionPath;
+    final snapshot = await _firestore.collection(collectionPath).get();
     final locationMap = <String, Map<String, dynamic>>{};
     
     for (var doc in snapshot.docs) {
@@ -41,11 +50,16 @@ class LocationService {
     }).toList();
   }
 
-  Stream<List<FamilyMember>> getFamilyMembersStream() {
-    if (_familyId == null) return Stream.value([]);
+  Stream<List<FamilyMember>> getFamilyMembersStream() async* {
+    final familyId = await _familyId;
+    if (familyId == null) {
+      yield [];
+      return;
+    }
     
-    return _firestore
-        .collection(_collectionPath)
+    final collectionPath = await _collectionPath;
+    yield* _firestore
+        .collection(collectionPath)
         .snapshots()
         .asyncMap((snapshot) async {
       final familyMembers = await _authService.getFamilyMembers();
@@ -76,9 +90,11 @@ class LocationService {
     double latitude,
     double longitude,
   ) async {
-    if (_familyId == null) throw Exception('User not authenticated');
+    final familyId = await _familyId;
+    if (familyId == null) throw Exception('User not part of a family');
     
-    await _firestore.collection(_collectionPath).doc(memberId).set({
+    final collectionPath = await _collectionPath;
+    await _firestore.collection(collectionPath).doc(memberId).set({
       'latitude': latitude,
       'longitude': longitude,
       'lastSeen': DateTime.now().toIso8601String(),
@@ -86,9 +102,11 @@ class LocationService {
   }
 
   Future<void> addMember(FamilyMember member) async {
-    if (_familyId == null) throw Exception('User not authenticated');
+    final familyId = await _familyId;
+    if (familyId == null) throw Exception('User not part of a family');
     
-    await _firestore.collection(_collectionPath).doc(member.id).set({
+    final collectionPath = await _collectionPath;
+    await _firestore.collection(collectionPath).doc(member.id).set({
       'latitude': member.latitude,
       'longitude': member.longitude,
       'lastSeen': member.lastSeen?.toIso8601String(),
