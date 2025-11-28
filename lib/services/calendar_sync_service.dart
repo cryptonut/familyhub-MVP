@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import 'package:timezone/timezone.dart' as tz;
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/calendar_event.dart';
 import 'auth_service.dart';
 import 'calendar_service.dart';
@@ -27,10 +29,11 @@ class CalendarSyncService {
   Future<bool> requestPermissions() async {
     // device_calendar has limited web support
     if (kIsWeb) {
-      debugPrint('Calendar permissions on web are not fully supported by device_calendar');
-      throw Exception(
+      Logger.warning('Calendar permissions on web are not fully supported by device_calendar', tag: 'CalendarSyncService');
+      throw PermissionException(
         'Calendar sync is not available on web platform. '
-        'Please use the mobile app (Android/iOS) to enable calendar sync.'
+        'Please use the mobile app (Android/iOS) to enable calendar sync.',
+        code: 'web-not-supported',
       );
     }
 
@@ -38,12 +41,12 @@ class CalendarSyncService {
       final result = await _deviceCalendar.requestPermissions();
       if (!result.isSuccess) {
         final errorMsg = result.errors.map((e) => e.toString()).join(', ');
-        debugPrint('Permission request failed: $errorMsg');
-        throw Exception('Failed to request calendar permissions: $errorMsg');
+        Logger.warning('Permission request failed: $errorMsg', tag: 'CalendarSyncService');
+        throw PermissionException('Failed to request calendar permissions: $errorMsg', code: 'permission-denied');
       }
       return result.data ?? false;
-    } catch (e) {
-      debugPrint('Error requesting calendar permissions: $e');
+    } catch (e, st) {
+      Logger.error('Error requesting calendar permissions', error: e, stackTrace: st, tag: 'CalendarSyncService');
       rethrow;
     }
   }
@@ -62,7 +65,7 @@ class CalendarSyncService {
       }
       return result.data ?? false;
     } catch (e) {
-      debugPrint('Error checking calendar permissions: $e');
+      Logger.warning('Error checking calendar permissions', error: e, tag: 'CalendarSyncService');
       return false;
     }
   }
@@ -71,10 +74,11 @@ class CalendarSyncService {
   Future<List<Calendar>> getDeviceCalendars() async {
     // device_calendar has limited web support
     if (kIsWeb) {
-      debugPrint('Calendar access on web is not fully supported by device_calendar');
-      throw Exception(
+      Logger.warning('Calendar access on web is not fully supported by device_calendar', tag: 'CalendarSyncService');
+      throw PermissionException(
         'Calendar sync is not available on web platform. '
-        'Please use the mobile app (Android/iOS) to access calendars.'
+        'Please use the mobile app (Android/iOS) to access calendars.',
+        code: 'web-not-supported',
       );
     }
 
@@ -98,7 +102,7 @@ class CalendarSyncService {
       
       return [];
     } catch (e) {
-      debugPrint('Error getting device calendars: $e');
+      Logger.error('Error getting device calendars', error: e, tag: 'CalendarSyncService');
       rethrow;
     }
   }
@@ -140,7 +144,7 @@ class CalendarSyncService {
       }
       return null;
     } catch (e) {
-      debugPrint('Error creating FamilyHub calendar: $e');
+      Logger.error('Error creating FamilyHub calendar', error: e, tag: 'CalendarSyncService');
       return null;
     }
   }
@@ -271,7 +275,7 @@ class CalendarSyncService {
 
       return event;
     } catch (e) {
-      debugPrint('Error converting device event to FamilyHub: $e');
+      Logger.warning('Error converting device event to FamilyHub', error: e, tag: 'CalendarSyncService');
       return null;
     }
   }
@@ -328,9 +332,9 @@ class CalendarSyncService {
         final result = await _deviceCalendar.createOrUpdateEvent(deviceEvent);
         if (result != null && !result.isSuccess) {
           final errorMessages = result.errors.map((e) => e.toString()).join(', ');
-          debugPrint('Failed to sync event ${fhEvent.id} to device: $errorMessages');
+          Logger.warning('Failed to sync event ${fhEvent.id} to device: $errorMessages', tag: 'CalendarSyncService');
         } else if (result == null) {
-          debugPrint('Failed to sync event ${fhEvent.id} to device: Result is null');
+          Logger.warning('Failed to sync event ${fhEvent.id} to device: Result is null', tag: 'CalendarSyncService');
         }
       }
 
@@ -346,9 +350,9 @@ class CalendarSyncService {
       }
 
       await updateLastSyncedAt();
-      debugPrint('Successfully synced ${allInstances.length} events to device calendar');
-    } catch (e) {
-      debugPrint('Error syncing to device: $e');
+      Logger.info('Successfully synced ${allInstances.length} events to device calendar', tag: 'CalendarSyncService');
+    } catch (e, st) {
+      Logger.error('Error syncing to device', error: e, stackTrace: st, tag: 'CalendarSyncService');
       rethrow;
     }
   }
@@ -375,7 +379,7 @@ class CalendarSyncService {
       );
 
       if (!deviceEventsResult.isSuccess || deviceEventsResult.data == null) {
-        debugPrint('Failed to retrieve device events');
+        Logger.warning('Failed to retrieve device events', tag: 'CalendarSyncService');
         return;
       }
 
@@ -423,12 +427,12 @@ class CalendarSyncService {
 
       if (importedCount > 0) {
         await batch.commit();
-        debugPrint('Imported $importedCount events from device calendar');
+        Logger.info('Imported $importedCount events from device calendar', tag: 'CalendarSyncService');
       }
 
       await updateLastSyncedAt();
     } catch (e) {
-      debugPrint('Error syncing from device: $e');
+      Logger.error('Error syncing from device', error: e, tag: 'CalendarSyncService');
       rethrow;
     }
   }
@@ -438,18 +442,18 @@ class CalendarSyncService {
     try {
       final userModel = await _authService.getCurrentUserModel();
       if (userModel == null || !userModel.calendarSyncEnabled) {
-        debugPrint('Calendar sync is disabled');
+        Logger.debug('Calendar sync is disabled', tag: 'CalendarSyncService');
         return;
       }
 
       final calendarId = userModel.localCalendarId;
       if (calendarId == null || calendarId.isEmpty) {
-        debugPrint('No calendar selected for sync');
+        Logger.debug('No calendar selected for sync', tag: 'CalendarSyncService');
         return;
       }
 
       if (!await hasPermissions()) {
-        debugPrint('Calendar permissions not granted');
+        Logger.warning('Calendar permissions not granted', tag: 'CalendarSyncService');
         return;
       }
 
@@ -461,9 +465,9 @@ class CalendarSyncService {
       // This will create/update all FamilyHub events in device calendar
       await syncToDevice(calendarId);
 
-      debugPrint('Calendar sync completed successfully');
-    } catch (e) {
-      debugPrint('Error performing calendar sync: $e');
+      Logger.info('Calendar sync completed successfully', tag: 'CalendarSyncService');
+    } catch (e, st) {
+      Logger.error('Error performing calendar sync', error: e, stackTrace: st, tag: 'CalendarSyncService');
       // Don't rethrow - sync failures shouldn't crash the app
     }
   }
@@ -490,7 +494,7 @@ class CalendarSyncService {
         (event) => _extractFhEventId(event.description) == fhEventId,
       );
     } catch (e) {
-      debugPrint('Error checking if event exists in device: $e');
+      Logger.warning('Error checking if event exists in device', error: e, tag: 'CalendarSyncService');
       return false;
     }
   }
