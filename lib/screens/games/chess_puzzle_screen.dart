@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
 import 'package:chess/chess.dart' as chess_lib;
+import '../../core/services/logger_service.dart';
 import '../../services/games_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/chess_puzzle_service.dart';
@@ -101,7 +102,7 @@ class _ChessPuzzleScreenState extends State<ChessPuzzleScreen> {
         );
       }
     } catch (e) {
-      debugPrint('Error recording win: $e');
+      Logger.error('Error recording win', error: e, tag: 'ChessPuzzleScreen');
     }
   }
 

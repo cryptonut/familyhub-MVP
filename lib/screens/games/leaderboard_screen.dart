@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/games_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/game_stats.dart';
@@ -33,7 +34,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         _leaderboard = leaderboard;
       });
     } catch (e) {
-      debugPrint('Error loading leaderboard: $e');
+      Logger.error('Error loading leaderboard', error: e, tag: 'LeaderboardScreen');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

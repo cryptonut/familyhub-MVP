@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -86,9 +87,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // Navigation will be handled by auth state listener
       }
     } catch (e, stackTrace) {
-      debugPrint('=== REGISTRATION ERROR ===');
-      debugPrint('Error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      Logger.error('=== REGISTRATION ERROR ===', tag: 'RegisterScreen');
+      Logger.error('Error: $e', error: e, stackTrace: stackTrace, tag: 'RegisterScreen');
       
       if (mounted) {
         String errorMessage = e.toString();

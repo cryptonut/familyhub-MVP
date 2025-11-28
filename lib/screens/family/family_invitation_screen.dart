@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/auth_service.dart';
 
 class FamilyInvitationScreen extends StatefulWidget {
@@ -35,7 +36,7 @@ class _FamilyInvitationScreenState extends State<FamilyInvitationScreen> {
           code = await authService.getFamilyInvitationCode();
         } catch (e) {
           // If initialize fails, try force initialize
-          debugPrint('Initialize failed, trying force initialize: $e');
+          Logger.warning('Initialize failed, trying force initialize', error: e, tag: 'FamilyInvitationScreen');
           code = await authService.forceInitializeFamilyId();
         }
       }
@@ -93,7 +94,7 @@ class _FamilyInvitationScreenState extends State<FamilyInvitationScreen> {
         );
       }
     } catch (e) {
-      debugPrint('Error in _loadInvitationCode: $e');
+      Logger.error('Error in _loadInvitationCode', error: e, tag: 'FamilyInvitationScreen');
       setState(() {
         _isLoading = false;
       });

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/task_service.dart';
 import '../../services/wallet_service.dart';
 import '../../services/payout_service.dart';
@@ -14,7 +16,6 @@ import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
 import 'request_payout_dialog.dart';
 import 'recurring_payments_screen.dart';
-import 'package:intl/intl.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -103,13 +104,13 @@ class _WalletScreenState extends State<WalletScreen> {
                                  'Unknown User';
           }
         } catch (e) {
-          debugPrint('Error fetching user name for $userId: $e');
+          Logger.warning('Error fetching user name for $userId', error: e, tag: 'WalletScreen');
           _userNames[userId] = 'Unknown User';
         }
       }
       
     } catch (e) {
-      debugPrint('Error loading transaction history: $e');
+      Logger.error('Error loading transaction history', error: e, tag: 'WalletScreen');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

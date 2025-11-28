@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/task_service.dart';
 import '../../services/calendar_service.dart';
@@ -27,7 +28,7 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
         _logs.add('${DateTime.now().toIso8601String()} - $message');
       });
     }
-    debugPrint('DatabaseReset: $message');
+    Logger.info('DatabaseReset: $message', tag: 'DatabaseResetScreen');
   }
 
   Future<void> _resetDatabase() async {

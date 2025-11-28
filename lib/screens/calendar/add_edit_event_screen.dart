@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/services/logger_service.dart';
 import '../../models/calendar_event.dart';
 import '../../models/user_model.dart';
 import '../../services/calendar_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/calendar_sync_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
-import 'package:uuid/uuid.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class AddEditEventScreen extends StatefulWidget {
   final CalendarEvent? event;
@@ -183,7 +184,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
         try {
           await _syncService.performSync();
         } catch (e) {
-          debugPrint('Error syncing event to device calendar: $e');
+          Logger.warning('Error syncing event to device calendar', error: e, tag: 'AddEditEventScreen');
           // Don't block the user if sync fails
         }
       }

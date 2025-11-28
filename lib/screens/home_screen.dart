@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/services/logger_service.dart';
 import '../services/app_state.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
@@ -523,7 +524,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             userModel = await authService.getCurrentUserModel();
                           } catch (e) {
                             // If getCurrentUserModel fails (orphaned account), userModel will be null
-                            debugPrint('getCurrentUserModel failed (likely orphaned account): $e');
+                            Logger.warning('getCurrentUserModel failed (likely orphaned account)', error: e, tag: 'HomeScreen');
                           }
                           if (context.mounted) {
                             await showDialog(

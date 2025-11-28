@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/services/logger_service.dart';
+import '../../core/errors/app_exceptions.dart';
 import '../../models/task.dart';
 import '../../services/task_service.dart';
 import '../../services/auth_service.dart';
@@ -83,7 +84,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
       // Ensure we have a valid ID - if editing, use the existing task's ID
       final taskId = widget.task?.id;
       if (taskId == null && widget.task != null) {
-        throw Exception('Cannot update: Task ID is missing');
+        throw ValidationException('Cannot update: Task ID is missing', code: 'missing-task-id');
       }
       
       // Parse reward
@@ -102,7 +103,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
           final canCreate = await _familyWalletService.canCreateJobWithReward(rewardValue, _cachedTasks!);
           
           if (!canCreate['canCreate'] as bool) {
-            throw Exception(canCreate['reason'] as String);
+            throw ValidationException(canCreate['reason'] as String, code: 'validation-failed');
           }
           
           // Show info if Banker will go negative
@@ -150,14 +151,14 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
         approvedAt: widget.task?.approvedAt,
       );
 
-      debugPrint('AddEditTaskScreen._saveTask: widget.task is ${widget.task != null ? "not null" : "null"}');
-      debugPrint('AddEditTaskScreen._saveTask: Task ID is ${task.id}');
+      Logger.debug('_saveTask: widget.task is ${widget.task != null ? "not null" : "null"}', tag: 'AddEditTaskScreen');
+      Logger.debug('_saveTask: Task ID is ${task.id}', tag: 'AddEditTaskScreen');
       
       if (widget.task != null) {
-        debugPrint('AddEditTaskScreen._saveTask: Calling updateTask');
+        Logger.debug('_saveTask: Calling updateTask', tag: 'AddEditTaskScreen');
         await _taskService.updateTask(task);
       } else {
-        debugPrint('AddEditTaskScreen._saveTask: Calling addTask');
+        Logger.debug('_saveTask: Calling addTask', tag: 'AddEditTaskScreen');
         await _taskService.addTask(task);
       }
 

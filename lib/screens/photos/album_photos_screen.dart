@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/services/logger_service.dart';
 import '../../models/photo_album.dart';
 import '../../models/family_photo.dart';
 import '../../services/photo_service.dart';
@@ -42,7 +43,7 @@ class _AlbumPhotosScreenState extends State<AlbumPhotosScreen> {
         _photos = photos;
       });
     } catch (e) {
-      debugPrint('Error loading album photos: $e');
+      Logger.error('Error loading album photos', error: e, tag: 'AlbumPhotosScreen');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

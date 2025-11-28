@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/games_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/game_stats.dart';
@@ -41,7 +42,7 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
       }
       _leaderboard = await _gamesService.getLeaderboard();
     } catch (e) {
-      debugPrint('Error loading games data: $e');
+      Logger.error('Error loading games data', error: e, tag: 'GamesHomeScreen');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

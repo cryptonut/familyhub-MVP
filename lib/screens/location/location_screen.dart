@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../core/services/logger_service.dart';
 import '../../models/family_member.dart';
 import '../../services/location_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
@@ -91,7 +91,7 @@ class _LocationScreenState extends State<LocationScreen> {
         );
       } catch (e) {
         // If high accuracy times out, try with lower accuracy (faster)
-        debugPrint('High accuracy location failed, trying with lower accuracy: $e');
+        Logger.warning('High accuracy location failed, trying with lower accuracy', error: e, tag: 'LocationScreen');
         try {
           position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.medium,
@@ -99,7 +99,7 @@ class _LocationScreenState extends State<LocationScreen> {
           );
         } catch (e2) {
           // If medium also fails, try with low accuracy (fastest, uses network)
-          debugPrint('Medium accuracy location failed, trying with low accuracy: $e2');
+          Logger.warning('Medium accuracy location failed, trying with low accuracy', error: e2, tag: 'LocationScreen');
           position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.low,
             timeLimit: const Duration(seconds: 30),

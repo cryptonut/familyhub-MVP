@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/recurring_payment_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/recurring_payment.dart';
 import '../../models/user_model.dart';
-import 'package:intl/intl.dart';
 
 class RecurringPaymentsScreen extends StatefulWidget {
   const RecurringPaymentsScreen({super.key});
@@ -42,7 +43,7 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
             : member.email;
       }
     } catch (e) {
-      debugPrint('Error loading recurring payments: $e');
+      Logger.error('Error loading recurring payments', error: e, tag: 'RecurringPaymentsScreen');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

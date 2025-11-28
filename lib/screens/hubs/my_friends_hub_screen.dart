@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/logger_service.dart';
 import '../../models/hub.dart';
 import '../../models/user_model.dart';
 import '../../models/calendar_event.dart';
@@ -58,7 +59,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
             members.add(userModel);
           }
         } catch (e) {
-          debugPrint('Error loading member $memberId: $e');
+          Logger.warning('Error loading member $memberId', error: e, tag: 'MyFriendsHubScreen');
         }
       }
       
@@ -85,7 +86,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading hub data: $e');
+      Logger.error('Error loading hub data', error: e, tag: 'MyFriendsHubScreen');
       setState(() => _isLoading = false);
     }
   }

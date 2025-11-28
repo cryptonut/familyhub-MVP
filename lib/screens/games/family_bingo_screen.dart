@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
 import 'dart:math';
+import '../../core/services/logger_service.dart';
 import '../../services/games_service.dart';
 
 class FamilyBingoScreen extends StatefulWidget {
@@ -136,7 +137,7 @@ class _FamilyBingoScreenState extends State<FamilyBingoScreen> {
         );
       }
     } catch (e) {
-      debugPrint('Error recording win: $e');
+      Logger.error('Error recording win', error: e, tag: 'FamilyBingoScreen');
     }
   }
 

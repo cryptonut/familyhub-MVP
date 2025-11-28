@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/photo_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/family_photo.dart';
@@ -11,8 +14,6 @@ import 'upload_photo_dialog.dart';
 import 'create_album_dialog.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:intl/intl.dart';
 
 class PhotosHomeScreen extends StatefulWidget {
   const PhotosHomeScreen({super.key});
@@ -55,7 +56,7 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
         _allPhotos = await _photoService.getPhotos(_familyId!);
       }
     } catch (e) {
-      debugPrint('Error loading photos data: $e');
+      Logger.error('Error loading photos data', error: e, tag: 'PhotosHomeScreen');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../../core/services/logger_service.dart';
 import '../../models/chat_message.dart';
 import '../../services/chat_service.dart';
 import '../../services/voice_recording_service.dart';
@@ -7,7 +9,6 @@ import '../../utils/date_utils.dart' as app_date_utils;
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
 import '../../widgets/voice_player_widget.dart';
-import 'package:uuid/uuid.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -54,7 +55,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       } catch (e) {
         // Ignore scroll errors
-        debugPrint('Scroll error: $e');
+        Logger.warning('Scroll error', error: e, tag: 'ChatScreen');
       }
     });
   }

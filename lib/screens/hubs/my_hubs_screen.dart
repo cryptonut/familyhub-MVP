@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/hub_service.dart';
 import '../../models/hub.dart';
 import '../../utils/app_theme.dart';
@@ -37,7 +38,7 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading hubs: $e');
+      Logger.error('Error loading hubs', error: e, tag: 'MyHubsScreen');
       setState(() => _isLoading = false);
     }
   }

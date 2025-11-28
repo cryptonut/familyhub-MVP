@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/video_call_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
@@ -75,7 +76,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
       await _videoCallService.joinCall(widget.hubId, widget.channelName);
     } catch (e) {
-      debugPrint('Error initializing call: $e');
+      Logger.error('Error initializing call', error: e, tag: 'VideoCallScreen');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/services/logger_service.dart';
 import '../../models/hub.dart';
 import '../../models/user_model.dart';
 import '../../services/hub_service.dart';
@@ -73,7 +74,7 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> with TickerPr
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading available members: $e');
+      Logger.error('Error loading available members', error: e, tag: 'InviteMembersDialog');
       setState(() => _isLoading = false);
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/logger_service.dart';
 import 'package:flutter/foundation.dart';
 import '../../models/chat_message.dart';
 import '../../services/chat_service.dart';
@@ -35,7 +36,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     try {
       await _chatService.markMessagesAsRead(widget.recipientId);
     } catch (e) {
-      debugPrint('Error marking messages as read: $e');
+      Logger.warning('Error marking messages as read', error: e, tag: 'PrivateChatScreen');
     }
   }
 
@@ -60,7 +61,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
         }
       } catch (e) {
         // Ignore scroll errors
-        debugPrint('Scroll error: $e');
+        Logger.warning('Scroll error', error: e, tag: 'PrivateChatScreen');
       }
     });
   }

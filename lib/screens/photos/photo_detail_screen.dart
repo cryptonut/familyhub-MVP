@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import '../../core/services/logger_service.dart';
 import '../../models/family_photo.dart';
 import '../../models/photo_comment.dart';
 import '../../services/photo_service.dart';
@@ -49,7 +50,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
         _comments = comments;
       });
     } catch (e) {
-      debugPrint('Error loading comments: $e');
+      Logger.error('Error loading comments', error: e, tag: 'PhotoDetailScreen');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
