@@ -1,7 +1,8 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import 'auth_service.dart';
 
 class NotificationService {
@@ -21,32 +22,32 @@ class NotificationService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      debugPrint('User granted notification permission');
+      Logger.info('User granted notification permission', tag: 'NotificationService');
     } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
-      debugPrint('User granted provisional notification permission');
+      Logger.info('User granted provisional notification permission', tag: 'NotificationService');
     } else {
-      debugPrint('User declined or has not accepted notification permission');
+      Logger.warning('User declined or has not accepted notification permission', tag: 'NotificationService');
     }
 
     // Get FCM token and save it to user document
     String? token = await _messaging.getToken();
     if (token != null) {
       await _saveTokenToUser(token);
-      debugPrint('FCM Token: $token');
+      Logger.debug('FCM Token obtained', tag: 'NotificationService');
     }
 
     // Listen for token refresh
     _messaging.onTokenRefresh.listen((newToken) {
       _saveTokenToUser(newToken);
-      debugPrint('FCM Token refreshed: $newToken');
+      Logger.info('FCM Token refreshed', tag: 'NotificationService');
     });
 
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('Got a message whilst in the foreground!');
-      debugPrint('Message data: ${message.data}');
+      Logger.info('Got a message whilst in the foreground!', tag: 'NotificationService');
+      Logger.debug('Message data: ${message.data}', tag: 'NotificationService');
       if (message.notification != null) {
-        debugPrint('Message also contained a notification: ${message.notification}');
+        Logger.debug('Message also contained a notification: ${message.notification}', tag: 'NotificationService');
       }
     });
 
@@ -64,9 +65,9 @@ class NotificationService {
         'fcmToken': token,
         'fcmTokenUpdatedAt': DateTime.now().toIso8601String(),
       });
-      debugPrint('FCM token saved to user document');
-    } catch (e) {
-      debugPrint('Error saving FCM token: $e');
+      Logger.debug('FCM token saved to user document', tag: 'NotificationService');
+    } catch (e, st) {
+      Logger.warning('Error saving FCM token', error: e, stackTrace: st, tag: 'NotificationService');
     }
   }
 
@@ -91,7 +92,7 @@ class NotificationService {
       }
 
       if (jobDoc == null || !jobDoc.exists) {
-        debugPrint('Job not found for notification: $jobId');
+        Logger.warning('Job not found for notification: $jobId', tag: 'NotificationService');
         return;
       }
 
@@ -106,7 +107,7 @@ class NotificationService {
       final creatorData = creatorDoc.data();
       final fcmToken = creatorData?['fcmToken'] as String?;
       if (fcmToken == null) {
-        debugPrint('Creator has no FCM token');
+        Logger.warning('Creator has no FCM token', tag: 'NotificationService');
         return;
       }
 
@@ -128,9 +129,9 @@ class NotificationService {
         'createdAt': DateTime.now().toIso8601String(),
       });
 
-      debugPrint('Notification created for job claim: $jobId');
-    } catch (e) {
-      debugPrint('Error sending job claim notification: $e');
+      Logger.info('Notification created for job claim: $jobId', tag: 'NotificationService');
+    } catch (e, st) {
+      Logger.error('Error sending job claim notification', error: e, stackTrace: st, tag: 'NotificationService');
     }
   }
 
@@ -155,7 +156,7 @@ class NotificationService {
       }
 
       if (jobDoc == null || !jobDoc.exists) {
-        debugPrint('Job not found for notification: $jobId');
+        Logger.warning('Job not found for notification: $jobId', tag: 'NotificationService');
         return;
       }
 
@@ -172,7 +173,7 @@ class NotificationService {
       final creatorData = creatorDoc.data();
       final fcmToken = creatorData?['fcmToken'] as String?;
       if (fcmToken == null) {
-        debugPrint('Creator has no FCM token');
+        Logger.warning('Creator has no FCM token', tag: 'NotificationService');
         return;
       }
 
@@ -193,9 +194,9 @@ class NotificationService {
         'createdAt': DateTime.now().toIso8601String(),
       });
 
-      debugPrint('Notification created for job completion: $jobId');
-    } catch (e) {
-      debugPrint('Error sending job completion notification: $e');
+      Logger.info('Notification created for job completion: $jobId', tag: 'NotificationService');
+    } catch (e, st) {
+      Logger.error('Error sending job completion notification', error: e, stackTrace: st, tag: 'NotificationService');
     }
   }
 
@@ -220,7 +221,7 @@ class NotificationService {
       }
 
       if (jobDoc == null || !jobDoc.exists) {
-        debugPrint('Job not found for refund notification: $jobId');
+        Logger.warning('Job not found for refund notification: $jobId', tag: 'NotificationService');
         return;
       }
 
@@ -252,9 +253,9 @@ class NotificationService {
 
       await _firestore.collection('notifications').add(notificationData);
 
-      debugPrint('Notification created for job refund: $jobId');
-    } catch (e) {
-      debugPrint('Error sending job refund notification: $e');
+      Logger.info('Notification created for job refund: $jobId', tag: 'NotificationService');
+    } catch (e, st) {
+      Logger.error('Error sending job refund notification', error: e, stackTrace: st, tag: 'NotificationService');
     }
   }
 
@@ -292,9 +293,9 @@ class NotificationService {
       }
 
       await batch.commit();
-      debugPrint('Birthday reminder notifications created for ${recipients.length} family members');
-    } catch (e) {
-      debugPrint('Error sending birthday reminder notifications: $e');
+      Logger.info('Birthday reminder notifications created for ${recipients.length} family members', tag: 'NotificationService');
+    } catch (e, st) {
+      Logger.error('Error sending birthday reminder notifications', error: e, stackTrace: st, tag: 'NotificationService');
     }
   }
 
@@ -324,9 +325,9 @@ class NotificationService {
       }
       
       await batch.commit();
-      debugPrint('Calendar sync trigger notifications created');
-    } catch (e) {
-      debugPrint('Error sending calendar sync trigger: $e');
+      Logger.info('Calendar sync trigger notifications created', tag: 'NotificationService');
+    } catch (e, st) {
+      Logger.error('Error sending calendar sync trigger', error: e, stackTrace: st, tag: 'NotificationService');
     }
   }
 
@@ -346,9 +347,9 @@ class NotificationService {
         'read': false,
         'createdAt': DateTime.now().toIso8601String(),
       });
-      debugPrint('Notification sent to user $userId');
-    } catch (e) {
-      debugPrint('Error sending notification: $e');
+      Logger.info('Notification sent to user $userId', tag: 'NotificationService');
+    } catch (e, st) {
+      Logger.error('Error sending notification', error: e, stackTrace: st, tag: 'NotificationService');
     }
   }
 }
@@ -356,7 +357,7 @@ class NotificationService {
 // Background message handler (must be top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('Handling a background message: ${message.messageId}');
-  debugPrint('Message data: ${message.data}');
+  Logger.info('Handling a background message: ${message.messageId}', tag: 'NotificationService');
+  Logger.debug('Message data: ${message.data}', tag: 'NotificationService');
 }
 
