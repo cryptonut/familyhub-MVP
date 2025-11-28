@@ -5,7 +5,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
 import 'firebase_options.dart';
+import 'core/services/logger_service.dart';
+import 'core/constants/app_constants.dart';
 import 'services/app_state.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
@@ -13,17 +16,17 @@ import 'services/background_sync_service.dart';
 import 'widgets/auth_wrapper.dart';
 import 'widgets/error_handler.dart';
 import 'utils/app_theme.dart';
-import 'package:timezone/data/latest_all.dart' as tz;
 
 void main() async {
   // Set up global error handling
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-    if (kDebugMode) {
-      debugPrint('=== FLUTTER ERROR ===');
-      debugPrint('Error: ${details.exception}');
-      debugPrint('Stack: ${details.stack}');
-    }
+    Logger.error(
+      '=== FLUTTER ERROR ===',
+      error: details.exception,
+      stackTrace: details.stack,
+      tag: 'FlutterError',
+    );
   };
 
   // Set up error widget builder for better error display
@@ -59,11 +62,12 @@ void main() async {
   // CRITICAL FIX: Return false to let errors propagate properly
   // Returning true swallows errors and can prevent Firebase Auth errors from being handled correctly
   PlatformDispatcher.instance.onError = (error, stack) {
-    if (kDebugMode) {
-      debugPrint('=== ASYNC ERROR ===');
-      debugPrint('Error: $error');
-      debugPrint('Stack: $stack');
-    }
+    Logger.error(
+      '=== ASYNC ERROR ===',
+      error: error,
+      stackTrace: stack,
+      tag: 'PlatformDispatcher',
+    );
     // Return false to let errors propagate - don't swallow Firebase Auth errors
     return false;
   };
@@ -73,8 +77,8 @@ void main() async {
   // Initialize timezone data for device_calendar
   try {
     tz.initializeTimeZones();
-  } catch (e) {
-    debugPrint('Timezone initialization error: $e');
+  } catch (e, st) {
+    Logger.warning('Timezone initialization error', error: e, stackTrace: st, tag: 'main');
     // Continue - timezone errors shouldn't block app startup
   }
   
@@ -90,18 +94,18 @@ void main() async {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         ).timeout(
-          const Duration(seconds: 15),
+          AppConstants.networkRequestTimeout,
           onTimeout: () {
             throw TimeoutException('Firebase initialization timed out (web)');
           },
         );
         firebaseInitialized = true;
-        debugPrint('✓ Firebase initialized for web platform');
-      } catch (e) {
+        Logger.info('✓ Firebase initialized for web platform', tag: 'main');
+      } catch (e, st) {
         if (e.toString().contains('UnsupportedError') || 
             e.toString().contains('web')) {
           firebaseInitError = 'Firebase web configuration error: $e';
-          debugPrint('Firebase web configuration error: $e');
+          Logger.warning('Firebase web configuration error', error: e, stackTrace: st, tag: 'main');
         } else {
           firebaseInitError = 'Firebase initialization failed: $e';
           rethrow;
@@ -111,70 +115,66 @@ void main() async {
       // For Android/iOS, try with options first, fallback to auto-detection
       // Increased timeout for Android to account for potential google-services.json processing
       try {
-        debugPrint('Initializing Firebase for Android/iOS...');
+        Logger.info('Initializing Firebase for Android/iOS...', tag: 'main');
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         ).timeout(
-          const Duration(seconds: 15),
+          AppConstants.networkRequestTimeout,
           onTimeout: () {
             throw TimeoutException('Firebase initialization timed out (Android/iOS)');
           },
         );
         firebaseInitialized = true;
-        debugPrint('✓ Firebase initialized for Android/iOS platform');
+        Logger.info('✓ Firebase initialized for Android/iOS platform', tag: 'main');
         
         // Verify Firebase Auth is accessible
         try {
           final auth = FirebaseAuth.instance;
-          debugPrint('✓ Firebase Auth instance accessible');
-          debugPrint('  - App: ${auth.app.name}');
-          debugPrint('  - Project ID: ${auth.app.options.projectId}');
+          Logger.debug('✓ Firebase Auth instance accessible', tag: 'main');
+          Logger.debug('  - App: ${auth.app.name}', tag: 'main');
+          Logger.debug('  - Project ID: ${auth.app.options.projectId}', tag: 'main');
           final apiKey = auth.app.options.apiKey;
           if (apiKey != null && apiKey.isNotEmpty) {
-            // SECURITY: Never log full API keys in production
-            if (kDebugMode) {
-              debugPrint('  - API Key: ${apiKey.substring(0, 10)}...');
-            }
+            // SECURITY: Use Logger.logApiKey for safe API key logging
+            Logger.logApiKey(apiKey, tag: 'main', displayLength: AppConstants.apiKeyDisplayLength);
           } else {
-            debugPrint('  - ⚠️ API Key: NULL (critical issue!)');
+            Logger.warning('  - ⚠️ API Key: NULL (critical issue!)', tag: 'main');
           }
-        } catch (e) {
-          debugPrint('⚠ Could not verify Firebase Auth instance: $e');
+        } catch (e, st) {
+          Logger.warning('⚠ Could not verify Firebase Auth instance', error: e, stackTrace: st, tag: 'main');
         }
-      } catch (e) {
-        debugPrint('Firebase initialization with options failed: $e');
-        debugPrint('Attempting fallback initialization...');
+      } catch (e, st) {
+        Logger.warning('Firebase initialization with options failed', error: e, stackTrace: st, tag: 'main');
+        Logger.info('Attempting fallback initialization...', tag: 'main');
         try {
           await Firebase.initializeApp().timeout(
-            const Duration(seconds: 15),
+            AppConstants.networkRequestTimeout,
             onTimeout: () {
               throw TimeoutException('Firebase fallback initialization timed out');
             },
           );
           firebaseInitialized = true;
-          debugPrint('✓ Firebase initialized via fallback');
-        } catch (fallbackError) {
+          Logger.info('✓ Firebase initialized via fallback', tag: 'main');
+        } catch (fallbackError, fallbackSt) {
           firebaseInitError = 'Firebase initialization failed with options and fallback: $e (fallback: $fallbackError)';
-          debugPrint('Firebase fallback initialization also failed: $fallbackError');
+          Logger.error('Firebase fallback initialization also failed', error: fallbackError, stackTrace: fallbackSt, tag: 'main');
           // Don't continue - Firebase is required for the app to function
         }
       }
     }
   } catch (e, stackTrace) {
     firebaseInitError = 'Firebase initialization error: $e';
-    debugPrint('=== FIREBASE INITIALIZATION ERROR ===');
-    debugPrint('Error: $e');
-    debugPrint('Stack: $stackTrace');
-    debugPrint('Common causes:');
-    debugPrint('  - Missing google-services.json in android/app/');
-    debugPrint('  - DEVELOPER_ERROR - OAuth client or SHA-1 fingerprint mismatch');
-    debugPrint('  - Incorrect API key restrictions in Google Cloud Console');
-    debugPrint('  - Missing or invalid firebase_options.dart');
-    debugPrint('  - Network connectivity issues');
+    Logger.error('=== FIREBASE INITIALIZATION ERROR ===', error: e, stackTrace: stackTrace, tag: 'main');
+    Logger.error('Common causes:', tag: 'main');
+    Logger.error('  - Missing google-services.json in android/app/', tag: 'main');
+    Logger.error('  - DEVELOPER_ERROR - OAuth client or SHA-1 fingerprint mismatch', tag: 'main');
+    Logger.error('  - Incorrect API key restrictions in Google Cloud Console', tag: 'main');
+    Logger.error('  - Missing or invalid firebase_options.dart', tag: 'main');
+    Logger.error('  - Network connectivity issues', tag: 'main');
   }
 
   if (firebaseInitialized) {
-    debugPrint('✓ Firebase initialized successfully');
+    Logger.info('✓ Firebase initialized successfully', tag: 'main');
     
     // Configure Firestore settings for Android
     // CRITICAL FIX: Remove custom settings to prevent gRPC channel reset loops
@@ -185,21 +185,19 @@ void main() async {
         final firestore = FirebaseFirestore.instance;
         // Don't configure settings immediately - let Firestore initialize naturally
         // This prevents the "Channel shutdownNow invoked" -> "unavailable" error cycle
-        debugPrint('✓ Firestore instance available');
-        debugPrint('  - App: ${firestore.app.name}');
-        debugPrint('  - Project ID: ${firestore.app.options.projectId}');
+        Logger.debug('✓ Firestore instance available', tag: 'main');
+        Logger.debug('  - App: ${firestore.app.name}', tag: 'main');
+        Logger.debug('  - Project ID: ${firestore.app.options.projectId}', tag: 'main');
         final apiKey = firestore.app.options.apiKey;
         if (apiKey != null) {
-          // SECURITY: Never log full API keys in production
-          if (kDebugMode) {
-            debugPrint('  - API Key: ${apiKey.substring(0, 10)}... (Android key)');
-          }
+          // SECURITY: Use Logger.logApiKey for safe API key logging
+          Logger.logApiKey(apiKey, tag: 'main', displayLength: AppConstants.apiKeyDisplayLength);
         } else {
-          debugPrint('  - ⚠️ API Key: NULL (critical issue!)');
+          Logger.warning('  - ⚠️ API Key: NULL (critical issue!)', tag: 'main');
         }
-        debugPrint('  - Using default Firestore settings to prevent gRPC channel issues');
-      } catch (e) {
-        debugPrint('⚠ Firestore instance error: $e');
+        Logger.debug('  - Using default Firestore settings to prevent gRPC channel issues', tag: 'main');
+      } catch (e, st) {
+        Logger.warning('⚠ Firestore instance error', error: e, stackTrace: st, tag: 'main');
       }
     }
     
@@ -207,7 +205,7 @@ void main() async {
     // App Check enforcement can block requests if not properly configured
     // This is a platform-agnostic decision, not a Chrome workaround
     // TODO: Re-enable App Check once properly registered in Firebase Console
-    debugPrint('⚠ App Check disabled to prevent authentication timeouts');
+    Logger.warning('⚠ App Check disabled to prevent authentication timeouts', tag: 'main');
     /*
     try {
       if (kIsWeb) {
@@ -236,14 +234,14 @@ void main() async {
   } else {
     // FAIL FAST: Don't proceed if Firebase initialization failed
     // This prevents "FirebaseException: [core/no-app]" errors during login
-    debugPrint('=== CRITICAL: Firebase initialization failed ===');
-    debugPrint('Error: $firebaseInitError');
-    debugPrint('The app cannot function without Firebase.');
-    debugPrint('Please check:');
-    debugPrint('  1. google-services.json exists and is valid (Android)');
-    debugPrint('  2. API key restrictions in Google Cloud Console');
-    debugPrint('  3. Network connectivity');
-    debugPrint('  4. firebase_options.dart configuration');
+    Logger.error('=== CRITICAL: Firebase initialization failed ===', tag: 'main');
+    Logger.error('Error: $firebaseInitError', tag: 'main');
+    Logger.error('The app cannot function without Firebase.', tag: 'main');
+    Logger.error('Please check:', tag: 'main');
+    Logger.error('  1. google-services.json exists and is valid (Android)', tag: 'main');
+    Logger.error('  2. API key restrictions in Google Cloud Console', tag: 'main');
+    Logger.error('  3. Network connectivity', tag: 'main');
+    Logger.error('  4. firebase_options.dart configuration', tag: 'main');
     
     // Run app with error screen instead of proceeding to broken login flow
     runApp(FirebaseInitErrorApp(error: firebaseInitError ?? 'Unknown error'));
@@ -265,14 +263,14 @@ void _initializeNotificationService() {
     try {
       final notificationService = NotificationService();
       await notificationService.initialize().timeout(
-        const Duration(seconds: 5),
+        AppConstants.backgroundTaskTimeout,
         onTimeout: () {
           throw TimeoutException('Notification service initialization timed out');
         },
       );
-      debugPrint('✓ Notification service initialized');
-    } catch (e) {
-      debugPrint('⚠ Notification service initialization error: $e');
+      Logger.info('✓ Notification service initialized', tag: 'main');
+    } catch (e, st) {
+      Logger.warning('⚠ Notification service initialization error', error: e, stackTrace: st, tag: 'main');
       // Don't fail app startup if notifications fail
     }
   });
@@ -283,14 +281,14 @@ void _initializeBackgroundSync() {
   Future.microtask(() async {
     try {
       await BackgroundSyncService.initialize().timeout(
-        const Duration(seconds: 5),
+        AppConstants.backgroundTaskTimeout,
         onTimeout: () {
           throw TimeoutException('Background sync initialization timed out');
         },
       );
-      debugPrint('✓ Background sync service initialized');
-    } catch (e) {
-      debugPrint('⚠ Background sync service initialization error: $e');
+      Logger.info('✓ Background sync service initialized', tag: 'main');
+    } catch (e, st) {
+      Logger.warning('⚠ Background sync service initialization error', error: e, stackTrace: st, tag: 'main');
       // Don't fail app startup if background sync fails
     }
   });
