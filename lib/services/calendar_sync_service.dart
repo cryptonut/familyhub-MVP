@@ -86,7 +86,7 @@ class CalendarSyncService {
       if (!await hasPermissions()) {
         final granted = await requestPermissions();
         if (!granted) {
-          throw Exception('Calendar permissions not granted');
+          throw PermissionException('Calendar permissions not granted', code: 'permission-denied');
         }
       }
 
@@ -97,7 +97,7 @@ class CalendarSyncService {
       
       if (!calendarsResult.isSuccess) {
         final errorMsg = calendarsResult.errors.map((e) => e.toString()).join(', ');
-        throw Exception('Failed to retrieve calendars: $errorMsg');
+        throw PermissionException('Failed to retrieve calendars: $errorMsg', code: 'retrieve-failed');
       }
       
       return [];
@@ -113,13 +113,13 @@ class CalendarSyncService {
       if (!await hasPermissions()) {
         final granted = await requestPermissions();
         if (!granted) {
-          throw Exception('Calendar permissions not granted');
+          throw PermissionException('Calendar permissions not granted', code: 'permission-denied');
         }
       }
 
       final calendarsResult = await _deviceCalendar.retrieveCalendars();
       if (!calendarsResult.isSuccess || calendarsResult.data == null) {
-        throw Exception('Failed to retrieve calendars');
+        throw PermissionException('Failed to retrieve calendars', code: 'retrieve-failed');
       }
 
       // Check if FamilyHub calendar already exists
@@ -156,7 +156,7 @@ class CalendarSyncService {
     String? googleCalendarId,
   }) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('User not logged in');
+    if (user == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
     final updateData = <String, dynamic>{
       'calendarSyncEnabled': enabled,
@@ -285,7 +285,7 @@ class CalendarSyncService {
     try {
       final userModel = await _authService.getCurrentUserModel();
       final familyId = userModel?.familyId;
-      if (familyId == null) throw Exception('User not part of a family');
+      if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
       // Get all FamilyHub events
       final fhEvents = await _calendarService.getEvents();
@@ -363,7 +363,7 @@ class CalendarSyncService {
       final userModel = await _authService.getCurrentUserModel();
       final familyId = userModel?.familyId;
       if (userModel == null || familyId == null) {
-        throw Exception('User not part of a family');
+        throw AuthException('User not part of a family', code: 'no-family');
       }
 
       // Get events from device calendar since last sync

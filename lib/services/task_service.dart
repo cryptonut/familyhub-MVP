@@ -961,7 +961,7 @@ class TaskService {
     try {
       final currentUserId = _auth.currentUser?.uid;
       if (currentUserId == null) {
-        throw Exception('User not authenticated');
+        throw AuthException('User not authenticated', code: 'not-authenticated');
       }
 
       final collectionPath = await _collectionPath;

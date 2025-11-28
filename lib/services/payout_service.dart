@@ -199,7 +199,7 @@ class PayoutService {
     if (userModel == null) throw AuthException('User not found', code: 'user-not-found');
 
     if (!userModel.isBanker() && !userModel.isAdmin()) {
-      throw Exception('Only Bankers and Admins can reject payouts');
+      throw PermissionException('Only Bankers and Admins can reject payouts', code: 'insufficient-permissions');
     }
 
     final familyId = userModel.familyId;

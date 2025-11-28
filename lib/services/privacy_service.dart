@@ -84,7 +84,7 @@ class PrivacyService {
   /// Pause a specific share type
   Future<void> pauseShare(String shareType) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
+    if (user == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     await _logActivity('paused', shareType);
     
@@ -116,7 +116,7 @@ class PrivacyService {
   /// Stop all sharing
   Future<void> stopAllSharing() async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
+    if (user == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     await _logActivity('stopped', 'all');
     

@@ -68,10 +68,10 @@ class GamesService {
   /// Record a game win
   Future<void> recordWin(String gameType) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
+    if (user == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel?.familyId == null) throw Exception('User not part of a family');
+    if (userModel?.familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     final stats = await getUserStats(user.uid) ?? GameStats(
       userId: user.uid,

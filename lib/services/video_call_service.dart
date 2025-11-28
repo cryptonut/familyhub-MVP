@@ -50,7 +50,7 @@ class VideoCallService {
   /// Create or join a video call in a hub
   Future<String> createCall(String hubId) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
+    if (user == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     await initialize();
 
@@ -77,7 +77,7 @@ class VideoCallService {
   /// Join an existing call
   Future<void> joinCall(String hubId, String channelName) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
+    if (user == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     await initialize();
 
