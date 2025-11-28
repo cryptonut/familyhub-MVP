@@ -1,10 +1,11 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import 'auth_service.dart';
 
 class VoiceRecordingService {
@@ -30,13 +31,13 @@ class VoiceRecordingService {
   
   Future<String?> startRecording() async {
     if (_isRecording) {
-      debugPrint('VoiceRecordingService: Already recording');
+      Logger.warning('Already recording', tag: 'VoiceRecordingService');
       return null;
     }
     
     final hasPermission = await requestPermissions();
     if (!hasPermission) {
-      debugPrint('VoiceRecordingService: Microphone permission denied');
+      Logger.warning('Microphone permission denied', tag: 'VoiceRecordingService');
       return null;
     }
     
@@ -56,10 +57,10 @@ class VoiceRecordingService {
       
       _isRecording = true;
       _recordingDuration = Duration.zero;
-      debugPrint('VoiceRecordingService: Started recording at $_currentRecordingPath');
+      Logger.info('Started recording at $_currentRecordingPath', tag: 'VoiceRecordingService');
       return _currentRecordingPath;
     } catch (e) {
-      debugPrint('VoiceRecordingService: Error starting recording: $e');
+      Logger.error('Error starting recording', error: e, tag: 'VoiceRecordingService');
       return null;
     }
   }
@@ -72,10 +73,10 @@ class VoiceRecordingService {
     try {
       final path = await _recorder.stop();
       _isRecording = false;
-      debugPrint('VoiceRecordingService: Stopped recording, path: $path');
+      Logger.info('Stopped recording, path: $path', tag: 'VoiceRecordingService');
       return path;
     } catch (e) {
-      debugPrint('VoiceRecordingService: Error stopping recording: $e');
+      Logger.error('Error stopping recording', error: e, tag: 'VoiceRecordingService');
       _isRecording = false;
       return null;
     }
@@ -94,7 +95,7 @@ class VoiceRecordingService {
           await file.delete();
         }
       } catch (e) {
-        debugPrint('VoiceRecordingService: Error deleting recording: $e');
+        Logger.warning('Error deleting recording', error: e, tag: 'VoiceRecordingService');
       }
       _currentRecordingPath = null;
     }
@@ -108,7 +109,7 @@ class VoiceRecordingService {
       final userId = _auth.currentUser?.uid;
       
       if (familyId == null || userId == null) {
-        throw Exception('User not authenticated or not part of a family');
+        throw AuthException('User not authenticated or not part of a family', code: 'not-authenticated');
       }
       
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -121,18 +122,18 @@ class VoiceRecordingService {
       await ref.putFile(file);
       final downloadUrl = await ref.getDownloadURL();
       
-      debugPrint('VoiceRecordingService: Uploaded voice message to $downloadUrl');
+      Logger.info('Uploaded voice message to $downloadUrl', tag: 'VoiceRecordingService');
       
       // Clean up local file
       try {
         await file.delete();
       } catch (e) {
-        debugPrint('VoiceRecordingService: Error deleting local file: $e');
+        Logger.warning('Error deleting local file', error: e, tag: 'VoiceRecordingService');
       }
       
       return downloadUrl;
     } catch (e) {
-      debugPrint('VoiceRecordingService: Error uploading voice message: $e');
+      Logger.error('Error uploading voice message', error: e, tag: 'VoiceRecordingService');
       rethrow;
     }
   }

@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/calendar_event.dart';
 import 'auth_service.dart';
 import 'recurrence_service.dart';
@@ -23,7 +24,7 @@ class CalendarService {
 
   Future<String> get _collectionPath async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     return 'families/$familyId/events';
   }
 
@@ -82,13 +83,13 @@ class CalendarService {
   /// Update RSVP status for an event
   Future<void> updateRsvpStatus(String eventId, String memberId, String status) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     final eventRef = _firestore.collection('families/$familyId/events').doc(eventId);
     final eventDoc = await eventRef.get();
     
     if (!eventDoc.exists) {
-      throw Exception('Event not found');
+      throw FirestoreException('Event not found', code: 'not-found');
     }
     
     final eventData = eventDoc.data() as Map<String, dynamic>;
@@ -100,7 +101,7 @@ class CalendarService {
 
   Future<void> addEvent(CalendarEvent event) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       // Remove 'id' from the data since it's used as the document ID
@@ -118,21 +119,21 @@ class CalendarService {
         final notificationService = NotificationService();
         await notificationService.notifyCalendarSyncTrigger(familyId);
       } catch (e) {
-        debugPrint('Error triggering calendar sync notification: $e');
+        Logger.warning('Error triggering calendar sync notification', error: e, tag: 'CalendarService');
         // Don't fail event creation if notification fails
       }
     } catch (e) {
       // Log the actual error for debugging
-      debugPrint('CalendarService.addEvent error: $e');
-      debugPrint('Family ID: $familyId');
-      debugPrint('Event ID: ${event.id}');
+      Logger.error('addEvent error', error: e, tag: 'CalendarService');
+      Logger.debug('Family ID: $familyId', tag: 'CalendarService');
+      Logger.debug('Event ID: ${event.id}', tag: 'CalendarService');
       rethrow;
     }
   }
 
   Future<void> updateEvent(CalendarEvent event) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       // Remove 'id' from the data since it's used as the document ID
@@ -150,20 +151,20 @@ class CalendarService {
         final notificationService = NotificationService();
         await notificationService.notifyCalendarSyncTrigger(familyId);
       } catch (e) {
-        debugPrint('Error triggering calendar sync notification: $e');
+        Logger.warning('Error triggering calendar sync notification', error: e, tag: 'CalendarService');
         // Don't fail event update if notification fails
       }
     } catch (e) {
-      debugPrint('CalendarService.updateEvent error: $e');
-      debugPrint('Family ID: $familyId');
-      debugPrint('Event ID: ${event.id}');
+      Logger.error('updateEvent error', error: e, tag: 'CalendarService');
+      Logger.debug('Family ID: $familyId', tag: 'CalendarService');
+      Logger.debug('Event ID: ${event.id}', tag: 'CalendarService');
       rethrow;
     }
   }
 
   Future<void> deleteEvent(String eventId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     await _firestore.collection('families/$familyId/events').doc(eventId).delete();
   }

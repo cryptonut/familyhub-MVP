@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:workmanager/workmanager.dart';
+import '../core/services/logger_service.dart';
 import 'calendar_sync_service.dart';
 
 /// Service for background calendar synchronization
@@ -14,9 +15,9 @@ class BackgroundSyncService {
         _callbackDispatcher,
         isInDebugMode: kDebugMode,
       );
-      debugPrint('Background sync service initialized');
-    } catch (e) {
-      debugPrint('Error initializing background sync: $e');
+      Logger.info('Background sync service initialized', tag: 'BackgroundSyncService');
+    } catch (e, st) {
+      Logger.error('Error initializing background sync', error: e, stackTrace: st, tag: 'BackgroundSyncService');
     }
   }
 
@@ -35,9 +36,9 @@ class BackgroundSyncService {
           requiresStorageNotLow: false,
         ),
       );
-      debugPrint('Periodic calendar sync registered');
-    } catch (e) {
-      debugPrint('Error registering periodic sync: $e');
+      Logger.info('Periodic calendar sync registered', tag: 'BackgroundSyncService');
+    } catch (e, st) {
+      Logger.error('Error registering periodic sync', error: e, stackTrace: st, tag: 'BackgroundSyncService');
     }
   }
 
@@ -45,9 +46,9 @@ class BackgroundSyncService {
   static Future<void> cancelPeriodicSync() async {
     try {
       await Workmanager().cancelByUniqueName(_syncTaskName);
-      debugPrint('Periodic calendar sync cancelled');
-    } catch (e) {
-      debugPrint('Error cancelling periodic sync: $e');
+      Logger.info('Periodic calendar sync cancelled', tag: 'BackgroundSyncService');
+    } catch (e, st) {
+      Logger.error('Error cancelling periodic sync', error: e, stackTrace: st, tag: 'BackgroundSyncService');
     }
   }
 
@@ -59,8 +60,8 @@ class BackgroundSyncService {
         _syncTaskName,
         initialDelay: const Duration(seconds: 5),
       );
-    } catch (e) {
-      debugPrint('Error triggering sync: $e');
+    } catch (e, st) {
+      Logger.error('Error triggering sync', error: e, stackTrace: st, tag: 'BackgroundSyncService');
     }
   }
 }
@@ -70,13 +71,13 @@ class BackgroundSyncService {
 void _callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
-      debugPrint('Background calendar sync started');
+      Logger.info('Background calendar sync started', tag: 'BackgroundSyncService');
       final syncService = CalendarSyncService();
       await syncService.performSync();
-      debugPrint('Background calendar sync completed');
+      Logger.info('Background calendar sync completed', tag: 'BackgroundSyncService');
       return true;
-    } catch (e) {
-      debugPrint('Background calendar sync error: $e');
+    } catch (e, st) {
+      Logger.error('Background calendar sync error', error: e, stackTrace: st, tag: 'BackgroundSyncService');
       return false;
     }
   });
