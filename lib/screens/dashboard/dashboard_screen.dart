@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/app_state.dart';
 import '../../services/calendar_service.dart';
@@ -95,12 +96,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Get current user model first - with timeout to detect Firestore issues
       _currentUserModel = await authService.getCurrentUserModel()
           .timeout(const Duration(seconds: 10), onTimeout: () {
-        debugPrint('Dashboard: getCurrentUserModel timeout - Firestore unavailable');
+        Logger.warning('getCurrentUserModel timeout - Firestore unavailable', tag: 'DashboardScreen');
         return null;
       });
       
       if (_currentUserModel == null) {
-        debugPrint('Dashboard: ⚠️ Cannot load user model - Firestore may be unavailable');
+        Logger.warning('⚠️ Cannot load user model - Firestore may be unavailable', tag: 'DashboardScreen');
         // Show error and return early
         if (mounted) {
           setState(() => _isLoading = false);
@@ -118,20 +119,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Get all family members (this includes current user)
       final allFamilyMembers = await authService.getFamilyMembers()
           .timeout(const Duration(seconds: 10), onTimeout: () {
-        debugPrint('Dashboard: getFamilyMembers timeout - Firestore unavailable');
+        Logger.warning('getFamilyMembers timeout - Firestore unavailable', tag: 'DashboardScreen');
         return <UserModel>[];
       });
       
-      debugPrint('=== LOADING FAMILY MEMBERS (PRIORITY) ===');
-      debugPrint('Current User ID: $currentUserId');
-      debugPrint('Current user model: ${_currentUserModel?.displayName} (${_currentUserModel?.uid})');
-      debugPrint('Current user familyId: "${_currentUserModel?.familyId}"');
-      debugPrint('All family members from query: ${allFamilyMembers.length}');
+      Logger.debug('=== LOADING FAMILY MEMBERS (PRIORITY) ===', tag: 'DashboardScreen');
+      Logger.debug('Current User ID: $currentUserId', tag: 'DashboardScreen');
+      Logger.debug('Current user model: ${_currentUserModel?.displayName} (${_currentUserModel?.uid})', tag: 'DashboardScreen');
+      Logger.debug('Current user familyId: "${_currentUserModel?.familyId}"', tag: 'DashboardScreen');
+      Logger.debug('All family members from query: ${allFamilyMembers.length}', tag: 'DashboardScreen');
       
       // Build the family members list immediately
       _familyMembers = [];
       if (allFamilyMembers.isNotEmpty) {
-        debugPrint('✓ Using ${allFamilyMembers.length} members from query');
+        Logger.debug('✓ Using ${allFamilyMembers.length} members from query', tag: 'DashboardScreen');
         // Sort: current user first, then others alphabetically
         final sorted = List<UserModel>.from(allFamilyMembers);
         sorted.sort((a, b) {
@@ -140,33 +141,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
           return a.displayName.compareTo(b.displayName);
         });
         _familyMembers = sorted;
-        debugPrint('✓ Sorted list has ${_familyMembers.length} members');
+        Logger.debug('✓ Sorted list has ${_familyMembers.length} members', tag: 'DashboardScreen');
       } else if (_currentUserModel != null) {
-        debugPrint('⚠️ Query returned empty, adding current user only');
+        Logger.warning('⚠️ Query returned empty, adding current user only', tag: 'DashboardScreen');
         _familyMembers.add(_currentUserModel!);
       }
       
-      debugPrint('=== FAMILY MEMBERS LOADED ===');
-      debugPrint('_familyMembers.length: ${_familyMembers.length}');
+      Logger.debug('=== FAMILY MEMBERS LOADED ===', tag: 'DashboardScreen');
+      Logger.debug('_familyMembers.length: ${_familyMembers.length}', tag: 'DashboardScreen');
       for (var member in _familyMembers) {
-        debugPrint('  - ${member.displayName} (${member.uid}), familyId: "${member.familyId}"');
+        Logger.debug('  - ${member.displayName} (${member.uid}), familyId: "${member.familyId}"', tag: 'DashboardScreen');
       }
       
       // Get family creator (non-critical)
       try {
         _familyCreator = await authService.getFamilyCreator();
-        debugPrint('Family creator: ${_familyCreator?.displayName} (${_familyCreator?.uid})');
+        Logger.debug('Family creator: ${_familyCreator?.displayName} (${_familyCreator?.uid})', tag: 'DashboardScreen');
       } catch (e) {
-        debugPrint('Error getting family creator (non-critical): $e');
+        Logger.warning('Error getting family creator (non-critical)', error: e, tag: 'DashboardScreen');
         _familyCreator = null;
       }
     } catch (e) {
-      debugPrint('Error loading family members: $e');
+      Logger.error('Error loading family members', error: e, tag: 'DashboardScreen');
       final errorStr = e.toString().toLowerCase();
       
       // Check if this is a Firestore unavailable error
       if (errorStr.contains('unavailable') || errorStr.contains('timeout')) {
-        debugPrint('Dashboard: ⚠️ Firestore unavailable - cannot load family data');
+        Logger.warning('⚠️ Firestore unavailable - cannot load family data', tag: 'DashboardScreen');
         // Don't set loading to false yet - we want to show an error state
         if (mounted) {
           setState(() {
@@ -211,7 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       try {
         _upcomingBirthdays = await _birthdayService.getUpcomingBirthdays(days: 30);
       } catch (e) {
-        debugPrint('Error loading upcoming birthdays (non-critical): $e');
+        Logger.warning('Error loading upcoming birthdays (non-critical)', error: e, tag: 'DashboardScreen');
         _upcomingBirthdays = [];
       }
 
@@ -249,7 +250,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       try {
         _walletBalance = await _walletService.calculateWalletBalance(tasks: allTasks);
       } catch (e) {
-        debugPrint('Error calculating wallet balance (non-critical): $e');
+        Logger.warning('Error calculating wallet balance (non-critical)', error: e, tag: 'DashboardScreen');
         _walletBalance = 0.0;
       }
       
@@ -257,7 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       try {
         _familyWalletBalance = await _familyWalletService.getFamilyWalletBalance();
       } catch (e) {
-        debugPrint('Error getting family wallet balance (non-critical): $e');
+        Logger.warning('Error getting family wallet balance (non-critical)', error: e, tag: 'DashboardScreen');
         _familyWalletBalance = 0.0;
       }
       
@@ -275,12 +276,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final hasUnread = await chatService.hasUnreadMessages(member.uid);
             _unreadMessages[member.uid] = hasUnread;
           } catch (e) {
-            debugPrint('Error checking unread for ${member.displayName}: $e');
+            Logger.warning('Error checking unread for ${member.displayName}', error: e, tag: 'DashboardScreen');
             // Continue with other members
           }
         }
       } catch (e) {
-        debugPrint('Error checking unread messages (non-critical): $e');
+        Logger.warning('Error checking unread messages (non-critical)', error: e, tag: 'DashboardScreen');
         // Continue without unread status
       }
 
@@ -335,21 +336,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _pendingPayoutRequests = await _payoutService.getPendingPayoutRequests();
           _pendingPayoutRequestsCount = _pendingPayoutRequests.length;
         } catch (e) {
-          debugPrint('Error loading pending payout requests: $e');
+          Logger.warning('Error loading pending payout requests', error: e, tag: 'DashboardScreen');
         }
       }
 
     } catch (e) {
-      debugPrint('Error loading dashboard data: $e');
-      debugPrint('Error stack trace: ${StackTrace.current}');
+      Logger.error('Error loading dashboard data', error: e, stackTrace: StackTrace.current, tag: 'DashboardScreen');
     } finally {
       if (mounted) {
-        debugPrint('=== CALLING setState TO UPDATE UI ===');
-        debugPrint('_familyMembers.length before setState: ${_familyMembers.length}');
+        Logger.debug('=== CALLING setState TO UPDATE UI ===', tag: 'DashboardScreen');
+        Logger.debug('_familyMembers.length before setState: ${_familyMembers.length}', tag: 'DashboardScreen');
         setState(() {
           _isLoading = false;
         });
-        debugPrint('_familyMembers.length after setState: ${_familyMembers.length}');
+        Logger.debug('_familyMembers.length after setState: ${_familyMembers.length}', tag: 'DashboardScreen');
       }
     }
   }

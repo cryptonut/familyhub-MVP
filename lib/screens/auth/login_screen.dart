@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/logger_service.dart';
 import '../../services/auth_service.dart';
 import 'register_screen.dart';
 
@@ -39,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // Sign-in succeeded - userModel may be null if document doesn't exist
       // That's okay - the app will handle it gracefully
-      debugPrint('Login successful - user: ${_authService.currentUser?.uid}');
+      Logger.info('Login successful - user: ${_authService.currentUser?.uid}', tag: 'LoginScreen');
       
       // Show success message
       if (mounted && context.mounted) {
@@ -53,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } catch (e) {
           // Widget disposed - ignore
-          debugPrint('Could not show success snackbar: $e');
+          Logger.warning('Could not show success snackbar', error: e, tag: 'LoginScreen');
         }
       }
       
@@ -71,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               );
             } catch (e) {
-              debugPrint('Could not show success snackbar: $e');
+              Logger.warning('Could not show success snackbar', error: e, tag: 'LoginScreen');
             }
           }
         } catch (e) {
@@ -85,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               );
             } catch (snackBarError) {
-              debugPrint('Could not show error snackbar: $snackBarError');
+              Logger.warning('Could not show error snackbar', error: snackBarError, tag: 'LoginScreen');
             }
           }
         }
@@ -93,18 +94,16 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // Navigation will be handled by auth state listener in AuthWrapper
     } catch (e, stackTrace) {
-      debugPrint('=== LOGIN SCREEN: ERROR CAUGHT ===');
-      debugPrint('Error type: ${e.runtimeType}');
-      debugPrint('Error: $e');
-      debugPrint('Stack trace: $stackTrace');
+      Logger.error('=== LOGIN SCREEN: ERROR CAUGHT ===', tag: 'LoginScreen');
+      Logger.error('Error type: ${e.runtimeType}', error: e, stackTrace: stackTrace, tag: 'LoginScreen');
       
       // Check if it's a Firebase error
       if (e.toString().contains('FirebaseAuthException')) {
-        debugPrint('This is a Firebase Auth error - check Firebase Console settings');
+        Logger.warning('This is a Firebase Auth error - check Firebase Console settings', tag: 'LoginScreen');
       } else if (e.toString().contains('Timeout')) {
-        debugPrint('This is a timeout - check network or API key restrictions');
+        Logger.warning('This is a timeout - check network or API key restrictions', tag: 'LoginScreen');
       } else {
-        debugPrint('This is an unexpected error type');
+        Logger.warning('This is an unexpected error type', tag: 'LoginScreen');
       }
       
       if (mounted) {
@@ -164,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         } catch (snackBarError) {
           // Widget was disposed before we could show the snackbar - ignore
-          debugPrint('Could not show error snackbar: $snackBarError');
+          Logger.warning('Could not show error snackbar', error: snackBarError, tag: 'LoginScreen');
         }
       }
     } finally {
@@ -185,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
         } catch (e) {
-          debugPrint('Could not show snackbar: $e');
+          Logger.warning('Could not show snackbar', error: e, tag: 'LoginScreen');
         }
       }
       return;
@@ -202,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
         } catch (e) {
-          debugPrint('Could not show success snackbar: $e');
+          Logger.warning('Could not show success snackbar', error: e, tag: 'LoginScreen');
         }
       }
     } catch (e) {
@@ -215,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
         } catch (snackBarError) {
-          debugPrint('Could not show error snackbar: $snackBarError');
+          Logger.warning('Could not show error snackbar', error: snackBarError, tag: 'LoginScreen');
         }
       }
     }
