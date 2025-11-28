@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/services/logger_service.dart';
+import '../../core/errors/app_exceptions.dart';
 import '../../services/auth_service.dart';
 import '../../services/task_service.dart';
 import '../../services/calendar_service.dart';
@@ -232,7 +233,7 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
         _addLog('✓ Re-authentication successful');
       } catch (e) {
         _addLog('❌ Re-authentication failed: $e');
-        throw Exception('Re-authentication failed: $e');
+        throw AuthException('Re-authentication failed: $e', code: 'reauthentication-failed', originalError: e);
       }
 
       // Step 2: Clear service caches

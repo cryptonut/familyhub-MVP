@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import '../../core/services/logger_service.dart';
+import '../../core/errors/app_exceptions.dart';
 import '../../services/video_call_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
@@ -40,7 +41,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       await _videoCallService.initialize();
       final engine = _videoCallService.engine;
       if (engine == null) {
-        throw Exception('Agora engine not initialized');
+        throw ValidationException('Agora engine not initialized', code: 'engine-not-initialized');
       }
 
       // Set up event handlers

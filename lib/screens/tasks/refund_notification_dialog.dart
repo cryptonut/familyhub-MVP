@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/errors/app_exceptions.dart';
 import '../../services/task_service.dart';
 import '../../models/task.dart';
 import 'add_edit_task_screen.dart';
@@ -28,7 +29,7 @@ class _RefundNotificationDialogState extends State<RefundNotificationDialog> {
       final tasks = await _taskService.getTasks();
       _task = tasks.firstWhere(
         (t) => t.id == widget.jobId,
-        orElse: () => throw Exception('Job not found'),
+        orElse: () => throw ValidationException('Job not found', code: 'job-not-found'),
       );
     } catch (e) {
       if (mounted) {
