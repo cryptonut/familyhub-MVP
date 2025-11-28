@@ -32,21 +32,41 @@ bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c
 8. **If missing**, click **Add fingerprint** and add it
 9. Click **Save**
 
-### Step 2: Set Up reCAPTCHA in Firebase Console
+### Step 2: Enable reCAPTCHA Enterprise API in Google Cloud Console
 
-1. In Firebase Console, go to **Authentication** → **Settings** (gear icon)
-2. Scroll to **Fraud prevention** section
-3. Click on **reCAPTCHA**
-4. Click the **"Manage reCAPTCHA"** button (this will open Google Cloud Console)
-5. In Google Cloud Console:
-   - If reCAPTCHA Enterprise API is not enabled, enable it
-   - Create a reCAPTCHA Enterprise key if you don't have one
-   - Configure it for your Android app
-6. Return to Firebase Console
-7. The reCAPTCHA section should now show it's configured
-8. **Enable** reCAPTCHA for email/password authentication (if there's a toggle)
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Select project: **family-hub-71ff0**
+3. Navigate to the **reCAPTCHA Enterprise API** page (you're already there!)
+4. Click the **"Enable"** button
+5. Wait for the API to be enabled (usually takes a few seconds)
 
-### Step 3: Verify API Key Restrictions
+**You're on the right page!** Just click "Enable" to activate the reCAPTCHA Enterprise API for your project.
+
+### Step 3: Create reCAPTCHA Enterprise Key for Android
+
+You'll be prompted to create a reCAPTCHA Enterprise key. Here's what to enter:
+
+1. **Display name**: Enter something like `FamilyHub Android reCAPTCHA Key`
+2. **Application type**: Select **"Android"** (you're already on this tab)
+3. **Android package name**: Enter `com.example.familyhub_mvp`
+   - This is your app's package name from `google-services.json`
+   - Make sure it matches exactly!
+4. Click **"Done"** to add the package
+5. Click **"Create key"** to finish
+
+**Note**: You only need to create a key for **Android** right now. You can add iOS/Web keys later if needed, but for Firebase Auth email/password on Android, the Android key is sufficient.
+
+### Step 4: Complete reCAPTCHA Setup in Firebase Console
+
+1. Go back to [Firebase Console](https://console.firebase.google.com/)
+2. Select project: **family-hub-71ff0**
+3. Navigate to **Authentication** → **Settings** (gear icon)
+4. Scroll to **Fraud prevention** section
+5. Click on **reCAPTCHA**
+6. The reCAPTCHA section should now show it's configured (after creating the key)
+7. **Enable** reCAPTCHA for email/password authentication (if there's a toggle)
+
+### Step 5: Verify API Key Restrictions
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Select project: **family-hub-71ff0**
@@ -63,7 +83,7 @@ bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c
    - SHA-1 fingerprint matches: `BB:7A:6A:5F:57:F1:DD:0D:ED:14:2A:5C:6F:26:14:FD:54:C3:C7:1C`
 8. Click **Save**
 
-### Step 4: Remove App Verification Bypass Code (Optional)
+### Step 6: Remove App Verification Bypass Code (Optional)
 
 Once reCAPTCHA is properly set up, you can remove the workaround code from `MainActivity.kt`:
 
@@ -72,7 +92,7 @@ Once reCAPTCHA is properly set up, you can remove the workaround code from `Main
 
 **However**, you can keep it for now and test first. If reCAPTCHA works properly, then remove it.
 
-### Step 5: Rebuild and Test
+### Step 7: Rebuild and Test
 
 ```bash
 flutter clean
