@@ -4,11 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:uuid/uuid.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/family_photo.dart';
 import '../models/photo_album.dart';
 import '../models/photo_comment.dart';
 import 'auth_service.dart';
-import 'package:uuid/uuid.dart';
 
 /// Service for managing family photos and albums
 class PhotoService {
@@ -29,13 +31,13 @@ class PhotoService {
     List<String>? taggedMemberIds,
   }) async {
     if (kIsWeb) {
-      throw Exception('Use uploadPhotoWeb for web platform');
+      throw ValidationException('Use uploadPhotoWeb for web platform');
     }
     final userId = _currentUserId;
-    if (userId == null) throw Exception('User not authenticated');
+    if (userId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel == null) throw Exception('User model not found');
+    if (userModel == null) throw AuthException('User model not found', code: 'user-not-found');
 
     try {
       // Generate unique file name
@@ -70,7 +72,7 @@ class PhotoService {
         await thumbnailTask;
         thumbnailUrl = await thumbnailRef.getDownloadURL();
       } catch (e) {
-        debugPrint('Error creating thumbnail: $e');
+        Logger.warning('Error creating thumbnail', error: e, tag: 'PhotoService');
         // Continue without thumbnail - will use full image
       }
 
@@ -105,7 +107,7 @@ class PhotoService {
 
       return photo;
     } catch (e) {
-      debugPrint('Error uploading photo: $e');
+      Logger.error('Error uploading photo', error: e, tag: 'PhotoService');
       rethrow;
     }
   }
@@ -120,14 +122,14 @@ class PhotoService {
     List<String>? taggedMemberIds,
   }) async {
     if (!kIsWeb) {
-      throw Exception('Use uploadPhoto for mobile platforms');
+      throw ValidationException('Use uploadPhoto for mobile platforms');
     }
 
     final userId = _currentUserId;
-    if (userId == null) throw Exception('User not authenticated');
+    if (userId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel == null) throw Exception('User model not found');
+    if (userModel == null) throw AuthException('User model not found', code: 'user-not-found');
 
     try {
       // Generate unique file name
@@ -161,7 +163,7 @@ class PhotoService {
         await thumbnailTask;
         thumbnailUrl = await thumbnailRef.getDownloadURL();
       } catch (e) {
-        debugPrint('Error creating thumbnail: $e');
+        Logger.warning('Error creating thumbnail', error: e, tag: 'PhotoService');
         // Continue without thumbnail - will use full image
       }
 
@@ -196,7 +198,7 @@ class PhotoService {
 
       return photo;
     } catch (e) {
-      debugPrint('Error uploading photo: $e');
+      Logger.error('Error uploading photo', error: e, tag: 'PhotoService');
       rethrow;
     }
   }
@@ -222,7 +224,7 @@ class PhotoService {
               }))
           .toList();
     } catch (e) {
-      debugPrint('Error getting photos: $e');
+      Logger.error('Error getting photos', error: e, tag: 'PhotoService');
       return [];
     }
   }
@@ -266,7 +268,7 @@ class PhotoService {
         ...(doc.data()! as Map<String, dynamic>),
       });
     } catch (e) {
-      debugPrint('Error getting photo: $e');
+      Logger.error('Error getting photo', error: e, tag: 'PhotoService');
       return null;
     }
   }
@@ -274,14 +276,14 @@ class PhotoService {
   /// Delete a photo
   Future<void> deletePhoto(String familyId, String photoId, String? albumId) async {
     final userId = _currentUserId;
-    if (userId == null) throw Exception('User not authenticated');
+    if (userId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     try {
       // Get photo to check ownership
       final photo = await getPhoto(familyId, photoId);
-      if (photo == null) throw Exception('Photo not found');
+      if (photo == null) throw FirestoreException('Photo not found', code: 'not-found');
       if (photo.uploadedBy != userId) {
-        throw Exception('Only the uploader can delete this photo');
+        throw PermissionException('Only the uploader can delete this photo', code: 'permission-denied');
       }
 
       // Delete from Storage
@@ -289,7 +291,7 @@ class PhotoService {
         await _storage.ref().child('photos/$familyId/$photoId.jpg').delete();
         await _storage.ref().child('thumbnails/$familyId/$photoId.jpg').delete();
       } catch (e) {
-        debugPrint('Error deleting from storage: $e');
+        Logger.warning('Error deleting from storage', error: e, tag: 'PhotoService');
       }
 
       // Delete from Firestore
@@ -320,7 +322,7 @@ class PhotoService {
         await _updateAlbumPhotoCount(familyId, albumId, -1);
       }
     } catch (e) {
-      debugPrint('Error deleting photo: $e');
+      Logger.error('Error deleting photo', error: e, tag: 'PhotoService');
       rethrow;
     }
   }
@@ -332,10 +334,10 @@ class PhotoService {
     String? description,
   }) async {
     final userId = _currentUserId;
-    if (userId == null) throw Exception('User not authenticated');
+    if (userId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel == null) throw Exception('User model not found');
+    if (userModel == null) throw AuthException('User model not found', code: 'user-not-found');
 
     try {
       final albumId = _uuid.v4();
@@ -361,7 +363,7 @@ class PhotoService {
 
       return album;
     } catch (e) {
-      debugPrint('Error creating album: $e');
+      Logger.error('Error creating album', error: e, tag: 'PhotoService');
       rethrow;
     }
   }
@@ -383,7 +385,7 @@ class PhotoService {
               }))
           .toList();
     } catch (e) {
-      debugPrint('Error getting albums: $e');
+      Logger.error('Error getting albums', error: e, tag: 'PhotoService');
       return [];
     }
   }
@@ -413,10 +415,10 @@ class PhotoService {
     required String content,
   }) async {
     final userId = _currentUserId;
-    if (userId == null) throw Exception('User not authenticated');
+    if (userId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
 
     final userModel = await _authService.getCurrentUserModel();
-    if (userModel == null) throw Exception('User model not found');
+    if (userModel == null) throw AuthException('User model not found', code: 'user-not-found');
 
     try {
       final commentId = _uuid.v4();
@@ -443,7 +445,7 @@ class PhotoService {
 
       return comment;
     } catch (e) {
-      debugPrint('Error adding comment: $e');
+      Logger.error('Error adding comment', error: e, tag: 'PhotoService');
       rethrow;
     }
   }
@@ -467,7 +469,7 @@ class PhotoService {
               }))
           .toList();
     } catch (e) {
-      debugPrint('Error getting comments: $e');
+      Logger.error('Error getting comments', error: e, tag: 'PhotoService');
       return [];
     }
   }
@@ -505,7 +507,7 @@ class PhotoService {
         'lastViewedAt': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      debugPrint('Error recording photo view: $e');
+      Logger.warning('Error recording photo view', error: e, tag: 'PhotoService');
     }
   }
 
@@ -522,7 +524,7 @@ class PhotoService {
         'lastPhotoAddedAt': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      debugPrint('Error updating album photo count: $e');
+      Logger.warning('Error updating album photo count', error: e, tag: 'PhotoService');
     }
   }
 
@@ -538,7 +540,7 @@ class PhotoService {
         'coverPhotoId': photoId,
       });
     } catch (e) {
-      debugPrint('Error updating album cover: $e');
+      Logger.warning('Error updating album cover', error: e, tag: 'PhotoService');
       rethrow;
     }
   }
