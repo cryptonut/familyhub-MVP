@@ -60,3 +60,6 @@ debug logs/
 # Android secrets (API keys, etc.)
 android/secrets.properties
 android/local.properties
+android/key.properties
+*.jks
+*.keystore
