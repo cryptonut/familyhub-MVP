@@ -131,8 +131,10 @@ void main() async {
           debugPrint('  - Project ID: ${auth.app.options.projectId}');
           final apiKey = auth.app.options.apiKey;
           if (apiKey != null && apiKey.isNotEmpty) {
-            debugPrint('  - API Key: ${apiKey.substring(0, 10)}...');
-            debugPrint('  - Full API Key: $apiKey');
+            // SECURITY: Never log full API keys in production
+            if (kDebugMode) {
+              debugPrint('  - API Key: ${apiKey.substring(0, 10)}...');
+            }
           } else {
             debugPrint('  - ⚠️ API Key: NULL (critical issue!)');
           }
@@ -188,7 +190,10 @@ void main() async {
         debugPrint('  - Project ID: ${firestore.app.options.projectId}');
         final apiKey = firestore.app.options.apiKey;
         if (apiKey != null) {
-          debugPrint('  - API Key: ${apiKey.substring(0, 10)}... (Android key)');
+          // SECURITY: Never log full API keys in production
+          if (kDebugMode) {
+            debugPrint('  - API Key: ${apiKey.substring(0, 10)}... (Android key)');
+          }
         } else {
           debugPrint('  - ⚠️ API Key: NULL (critical issue!)');
         }

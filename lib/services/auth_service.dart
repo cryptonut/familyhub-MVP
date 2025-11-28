@@ -190,9 +190,11 @@ class AuthService {
       debugPrint('  - Project ID: ${_auth.app.options.projectId}');
       final apiKey = _auth.app.options.apiKey ?? '';
       if (apiKey.isNotEmpty) {
-        debugPrint('  - API Key: ${apiKey.substring(0, 10)}...');
-        debugPrint('  - Full API Key: $apiKey');
-        debugPrint('  - NOTE: This is the ANDROID API key (different from web key)');
+        // SECURITY: Never log full API keys in production
+        if (kDebugMode) {
+          debugPrint('  - API Key: ${apiKey.substring(0, 10)}...');
+          debugPrint('  - NOTE: This is the ANDROID API key (different from web key)');
+        }
         debugPrint('  - If this times out, check restrictions for THIS key in Google Cloud Console');
       } else {
         debugPrint('  - API Key: NULL (this is a problem!)');
@@ -253,8 +255,10 @@ class AuthService {
           debugPrint('Firebase project ID: ${app.options.projectId}');
           final apiKey = app.options.apiKey;
           if (apiKey != null && apiKey.isNotEmpty) {
-            debugPrint('Firebase API key: ${apiKey.substring(0, 10)}...');
-            debugPrint('Full API key: $apiKey');
+            // SECURITY: Never log full API keys
+            if (kDebugMode) {
+              debugPrint('Firebase API key: ${apiKey.substring(0, 10)}...');
+            }
             debugPrint('⚠️ Also verify this API key in Google Cloud Console:');
             debugPrint('  1. Verify API restrictions include "Identity Toolkit API"');
             debugPrint('  2. Verify application restrictions allow Android app');
