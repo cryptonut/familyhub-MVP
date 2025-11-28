@@ -1,6 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/services/logger_service.dart';
+import '../core/constants/app_constants.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/task.dart';
 import '../models/user_model.dart';
 import 'task_service.dart';
@@ -34,8 +36,8 @@ class WalletService {
     final allTasks = tasks ?? await _taskService.getTasks(forceRefresh: true);
     double balance = 0.0;
     
-    debugPrint('WalletService.calculateWalletBalance: Starting calculation for user ${currentUserId}');
-    debugPrint('WalletService.calculateWalletBalance: User is Banker: ${userModel.isBanker()}, Admin: ${userModel.isAdmin()}');
+    Logger.debug('calculateWalletBalance: Starting calculation for user ${currentUserId}', tag: 'WalletService');
+    Logger.debug('calculateWalletBalance: User is Banker: ${userModel.isBanker()}, Admin: ${userModel.isAdmin()}', tag: 'WalletService');
 
     // Start with earnings from completed jobs
     final completedJobs = allTasks.where((task) => 
@@ -46,14 +48,14 @@ class WalletService {
       (task.claimedBy == currentUserId || task.assignedTo == currentUserId)
     ).toList();
     
-    debugPrint('WalletService.calculateWalletBalance: Found ${completedJobs.length} completed jobs');
-    debugPrint('WalletService.calculateWalletBalance: Total tasks: ${allTasks.length}');
+    Logger.debug('calculateWalletBalance: Found ${completedJobs.length} completed jobs', tag: 'WalletService');
+    Logger.debug('calculateWalletBalance: Total tasks: ${allTasks.length}', tag: 'WalletService');
     
     for (var job in completedJobs) {
       balance += (job.reward ?? 0.0);
     }
     
-    debugPrint('WalletService.calculateWalletBalance: Balance after completed jobs: $balance');
+    Logger.debug('calculateWalletBalance: Balance after completed jobs: $balance', tag: 'WalletService');
 
     // For Bankers: subtract rewards from jobs they created (liability)
     // Uses positive balance first, then goes negative
@@ -64,7 +66,7 @@ class WalletService {
         task.reward! > 0
       ).toList();
       
-      debugPrint('WalletService.calculateWalletBalance: Found ${createdJobs.length} created jobs for Banker/Admin');
+      Logger.debug('calculateWalletBalance: Found ${createdJobs.length} created jobs for Banker/Admin', tag: 'WalletService');
       
       for (var job in createdJobs) {
         // For Bankers: liability persists even after job is paid
@@ -73,12 +75,12 @@ class WalletService {
         final rewardAmount = job.reward ?? 0.0;
         // If job is refunded, don't count it as a liability
         if (job.isRefunded == true) {
-          debugPrint('WalletService.calculateWalletBalance: Skipping refunded job ${job.id}');
+          Logger.debug('calculateWalletBalance: Skipping refunded job ${job.id}', tag: 'WalletService');
           continue;
         }
         // Always subtract the liability (even if completed and approved)
         // This maintains the negative balance to track net minting
-        debugPrint('WalletService.calculateWalletBalance: Subtracting ${rewardAmount} for job ${job.id} (${job.title})');
+        Logger.debug('calculateWalletBalance: Subtracting ${rewardAmount} for job ${job.id} (${job.title})', tag: 'WalletService');
         balance -= rewardAmount;
       }
     } else {
@@ -90,24 +92,24 @@ class WalletService {
         task.reward! > 0
       ).toList();
       
-      debugPrint('WalletService.calculateWalletBalance: Found ${createdJobs.length} created jobs for non-Banker');
+      Logger.debug('calculateWalletBalance: Found ${createdJobs.length} created jobs for non-Banker', tag: 'WalletService');
       
       for (var job in createdJobs) {
         // If job is refunded, don't count it as a liability
         if (job.isRefunded == true) {
-          debugPrint('WalletService.calculateWalletBalance: Skipping refunded job ${job.id}');
+          Logger.debug('calculateWalletBalance: Skipping refunded job ${job.id}', tag: 'WalletService');
           continue;
         }
         // For non-Bankers: subtract reward for all created jobs
         // The money is deducted when the job is completed and approved (paid out)
         // So we always subtract it (whether pending, completed, or approved)
         // This represents the money they've committed/spent
-        debugPrint('WalletService.calculateWalletBalance: Subtracting ${job.reward} for job ${job.id} (${job.title})');
+        Logger.debug('calculateWalletBalance: Subtracting ${job.reward} for job ${job.id} (${job.title})', tag: 'WalletService');
         balance -= (job.reward ?? 0.0);
       }
     }
     
-    debugPrint('WalletService.calculateWalletBalance: Balance after created jobs: $balance');
+    Logger.debug('calculateWalletBalance: Balance after created jobs: $balance', tag: 'WalletService');
 
     // Add pocket money payments (recurring payments received)
     // Wrap in try-catch to handle missing Firestore indexes gracefully
@@ -119,9 +121,9 @@ class WalletService {
           balance += amount.toDouble();
         }
       }
-      debugPrint('WalletService.calculateWalletBalance: Added pocket money payments');
-    } catch (e) {
-      debugPrint('WalletService.calculateWalletBalance: Error loading pocket money payments (non-critical): $e');
+      Logger.debug('calculateWalletBalance: Added pocket money payments', tag: 'WalletService');
+    } catch (e, st) {
+      Logger.warning('calculateWalletBalance: Error loading pocket money payments (non-critical)', error: e, stackTrace: st, tag: 'WalletService');
       // Continue with balance calculation even if this fails
     }
 
@@ -135,13 +137,13 @@ class WalletService {
           balance -= amount.toDouble();
         }
       }
-      debugPrint('WalletService.calculateWalletBalance: Subtracted approved payouts');
-    } catch (e) {
-      debugPrint('WalletService.calculateWalletBalance: Error loading approved payouts (non-critical): $e');
+      Logger.debug('calculateWalletBalance: Subtracted approved payouts', tag: 'WalletService');
+    } catch (e, st) {
+      Logger.warning('calculateWalletBalance: Error loading approved payouts (non-critical)', error: e, stackTrace: st, tag: 'WalletService');
       // Continue with balance calculation even if this fails
     }
 
-    debugPrint('WalletService.calculateWalletBalance: Final balance: $balance');
+    Logger.debug('calculateWalletBalance: Final balance: $balance', tag: 'WalletService');
     return balance;
   }
 
@@ -165,10 +167,10 @@ class WalletService {
       final hasReward = task.reward != null && task.reward! > 0;
       
       if (hasReward) {
-        debugPrint('WalletService.getTransactions: Checking created task ${task.id}');
-        debugPrint('  - createdBy: ${task.createdBy}');
-        debugPrint('  - currentUserId: $currentUserId');
-        debugPrint('  - matchesCreatedBy: $matchesCreatedBy');
+        Logger.debug('getTransactions: Checking created task ${task.id}', tag: 'WalletService');
+        Logger.debug('  - createdBy: ${task.createdBy}', tag: 'WalletService');
+        Logger.debug('  - currentUserId: $currentUserId', tag: 'WalletService');
+        Logger.debug('  - matchesCreatedBy: $matchesCreatedBy', tag: 'WalletService');
       }
       
       return matchesCreatedBy && hasReward;
@@ -192,16 +194,16 @@ class WalletService {
                                (task.assignedTo.isNotEmpty);
       
       if (isCompleted && hasReward) {
-        debugPrint('WalletService.getTransactions: Checking task ${task.id}');
-        debugPrint('  - createdBy: ${task.createdBy}');
-        debugPrint('  - claimedBy: ${task.claimedBy}');
-        debugPrint('  - assignedTo: ${task.assignedTo}');
-        debugPrint('  - currentUserId: $currentUserId');
-        debugPrint('  - matchesClaimedBy: $matchesClaimedBy');
-        debugPrint('  - matchesAssignedTo: $matchesAssignedTo');
-        debugPrint('  - hasCompleterInfo: $hasCompleterInfo');
-        debugPrint('  - isCompleted: $isCompleted');
-        debugPrint('  - hasReward: $hasReward');
+        Logger.debug('getTransactions: Checking task ${task.id}', tag: 'WalletService');
+        Logger.debug('  - createdBy: ${task.createdBy}', tag: 'WalletService');
+        Logger.debug('  - claimedBy: ${task.claimedBy}', tag: 'WalletService');
+        Logger.debug('  - assignedTo: ${task.assignedTo}', tag: 'WalletService');
+        Logger.debug('  - currentUserId: $currentUserId', tag: 'WalletService');
+        Logger.debug('  - matchesClaimedBy: $matchesClaimedBy', tag: 'WalletService');
+        Logger.debug('  - matchesAssignedTo: $matchesAssignedTo', tag: 'WalletService');
+        Logger.debug('  - hasCompleterInfo: $hasCompleterInfo', tag: 'WalletService');
+        Logger.debug('  - isCompleted: $isCompleted', tag: 'WalletService');
+        Logger.debug('  - hasReward: $hasReward', tag: 'WalletService');
       }
       
       return isCompleted && 
@@ -219,12 +221,12 @@ class WalletService {
       return b.createdAt.compareTo(a.createdAt);
     });
 
-    debugPrint('WalletService.getTransactions: Summary for user $currentUserId');
-    debugPrint('  - Total tasks: ${allTasks.length}');
-    debugPrint('  - Created jobs: ${createdJobs.length}');
-    debugPrint('  - Completed jobs: ${completedJobs.length}');
+    Logger.debug('getTransactions: Summary for user $currentUserId', tag: 'WalletService');
+    Logger.debug('  - Total tasks: ${allTasks.length}', tag: 'WalletService');
+    Logger.debug('  - Created jobs: ${createdJobs.length}', tag: 'WalletService');
+    Logger.debug('  - Completed jobs: ${completedJobs.length}', tag: 'WalletService');
     if (completedJobs.isNotEmpty) {
-      debugPrint('  - Completed job IDs: ${completedJobs.map((t) => t.id).join(", ")}');
+      Logger.debug('  - Completed job IDs: ${completedJobs.map((t) => t.id).join(", ")}', tag: 'WalletService');
     }
 
     return {
