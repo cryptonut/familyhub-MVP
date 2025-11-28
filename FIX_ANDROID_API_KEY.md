@@ -4,7 +4,7 @@
 
 You have **TWO different API keys**:
 - **Web API Key**: `AIzaSyC_WWJtrIRRMvRyjMe7WaeYQ0veE9cs-Mw` (works fine)
-- **Android API Key**: `AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk` (blocked by restrictions)
+- **Android API Key**: `YOUR_FIREBASE_API_KEY` (blocked by restrictions)
 
 Chrome works because it uses the web key. Android fails because its key has restrictions.
 
@@ -15,7 +15,7 @@ Chrome works because it uses the web key. Android fails because its key has rest
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Select project: **family-hub-71ff0**
 3. Go to **APIs & Services** > **Credentials**
-4. Find API key: **AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk**
+4. Find API key: **YOUR_FIREBASE_API_KEY**
    - (It might show as truncated: "AIzaSyDLZ3...")
 5. Click on it to open details
 

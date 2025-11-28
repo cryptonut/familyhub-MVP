@@ -41,7 +41,7 @@ If the downloaded file still has empty `oauth_client`:
 
 ### Step 3: Check API Key Restrictions (Again)
 
-Verify the Android API key `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`:
+Verify the Android API key `YOUR_FIREBASE_API_KEY`:
 
 1. Go to [Google Cloud Console > Credentials](https://console.cloud.google.com/apis/credentials?project=family-hub-71ff0)
 2. Click on "Android key (auto created by Firebase)"

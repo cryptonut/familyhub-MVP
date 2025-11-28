@@ -24,7 +24,7 @@ Even with reCAPTCHA disabled, ensure API key allows Identity Toolkit API:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Select project: **family-hub-71ff0**
 3. Go to **APIs & Services** > **Credentials**
-4. Find API Key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` (Android key)
+4. Find API Key: `YOUR_FIREBASE_API_KEY` (Android key)
 5. Click to edit
 6. Under **API restrictions**, ensure **Identity Toolkit API** is enabled
 7. Click **Save**

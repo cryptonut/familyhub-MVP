@@ -14,7 +14,7 @@ Google Cloud Console is where you manage your Firebase project's backend setting
 ## Check API Key Restrictions
 
 1. In Google Cloud Console, go to **"APIs & Services"** > **"Credentials"** (left sidebar)
-2. Find the API key that starts with: **AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk**
+2. Find the API key that starts with: **YOUR_FIREBASE_API_KEY**
 3. Click on it
 4. Check **"API restrictions"**:
    - If it says **"Don't restrict key"** → ✅ Good, no restrictions

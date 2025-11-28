@@ -28,7 +28,7 @@ The app is now running the **rebuilt version** with the OAuth clients from `goog
 The most likely remaining cause is **API key restrictions**:
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Find API key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+2. Find API key: `YOUR_FIREBASE_API_KEY`
 3. Click to edit
 4. Under **API restrictions**:
    - Ensure **Identity Toolkit API** is enabled

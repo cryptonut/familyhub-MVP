@@ -10,10 +10,10 @@
 
 ### Different API Keys
 - **Web API Key**: `AIzaSyC_WWJtrIRRMvRyjMe7WaeYQ0veE9cs-Mw` (works)
-- **Android API Key**: `AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk` (Firestore fails)
+- **Android API Key**: `YOUR_FIREBASE_API_KEY` (Firestore fails)
 
 ### Most Likely Cause
-The **Android API key** (`AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk`) might not have:
+The **Android API key** (`YOUR_FIREBASE_API_KEY`) might not have:
 1. **Cloud Firestore API enabled** in Google Cloud Console
 2. **Cloud Firestore API** in the API restrictions list (even though we added it, it might not be enabled)
 
@@ -28,7 +28,7 @@ The **Android API key** (`AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk`) might not ha
 
 ### Step 2: Verify API Key Has Firestore API
 1. Google Cloud Console → **APIs & Services** > **Credentials**
-2. Find API key: **AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk**
+2. Find API key: **YOUR_FIREBASE_API_KEY**
 3. Click on it
 4. Check **"API restrictions"**:
    - Should include **"Cloud Firestore API"** in the list

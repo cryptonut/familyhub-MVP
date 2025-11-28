@@ -49,7 +49,7 @@ Since auto-generation isn't working, manually create it:
 To test if API restrictions are blocking OAuth client generation:
 
 1. Go to [Google Cloud Console > Credentials](https://console.cloud.google.com/apis/credentials?project=family-hub-71ff0)
-2. Edit Android API key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+2. Edit Android API key: `YOUR_FIREBASE_API_KEY`
 3. Set **API restrictions** to **"Don't restrict key"** (temporarily)
 4. Save
 5. Wait 5 minutes

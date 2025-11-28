@@ -4,9 +4,9 @@
 Firestore is still showing `[cloud_firestore/unavailable]` even with the new `google-services.json` and new API key.
 
 ## New API Key
-**AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4**
+**YOUR_FIREBASE_API_KEY**
 
-This is a DIFFERENT key from the old one (`AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk`).
+This is a DIFFERENT key from the old one (`YOUR_FIREBASE_API_KEY`).
 
 ## Action Required
 
@@ -14,7 +14,7 @@ This is a DIFFERENT key from the old one (`AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFiz
 
 1. Go to: https://console.cloud.google.com/apis/credentials?project=family-hub-71ff0
 
-2. Find the API key: **AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4**
+2. Find the API key: **YOUR_FIREBASE_API_KEY**
    - This is the key from the NEW app registration
    - It's different from the old key you showed me earlier
 

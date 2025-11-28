@@ -10,11 +10,11 @@
 Since database mode is correct, the issue is likely:
 
 ### 1. New API Key Restrictions
-The new API key `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` might have restrictions.
+The new API key `YOUR_FIREBASE_API_KEY` might have restrictions.
 
 **Check:**
 1. Go to: https://console.cloud.google.com/apis/credentials?project=family-hub-71ff0
-2. Find API key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+2. Find API key: `YOUR_FIREBASE_API_KEY`
 3. Verify:
    - **Application restrictions**: Should be "None"
    - **API restrictions**: Should include "Cloud Firestore API" or be "Don't restrict key"

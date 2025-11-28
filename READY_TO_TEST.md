@@ -5,7 +5,7 @@
 Based on your Google Cloud Console and Firebase Console screenshots:
 
 ### ✅ Google Cloud Console
-- API Key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+- API Key: `YOUR_FIREBASE_API_KEY`
 - Application Restrictions: Android apps
 - Package: `com.example.familyhub_mvp` with SHA-1 registered
 - API Restrictions: 24 APIs enabled, including **Identity Toolkit API**

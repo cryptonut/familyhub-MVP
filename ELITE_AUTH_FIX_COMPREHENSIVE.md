@@ -6,7 +6,7 @@
 - 2 OAuth clients found
 - Android client (type 1) with SHA-1: `bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c`
 - Web client (type 3)
-- API Key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+- API Key: `YOUR_FIREBASE_API_KEY`
 
 ❌ **Timeout STILL happening** in new logcat (21:23:43)
 - **CRITICAL**: New logcat has **0 Flutter messages**
@@ -54,7 +54,7 @@ The file should be processed into `values.xml` with OAuth client IDs.
 
 Go to [Google Cloud Console](https://console.cloud.google.com/):
 1. Navigate to **APIs & Services > Credentials**
-2. Find API key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+2. Find API key: `YOUR_FIREBASE_API_KEY`
 3. Click to edit
 4. Under **API restrictions**, ensure:
    - **Identity Toolkit API** is enabled

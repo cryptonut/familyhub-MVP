@@ -14,7 +14,7 @@ Check these in order:
 1. Visit [Google Cloud Console](https://console.cloud.google.com/)
 2. Select project: **family-hub-71ff0**
 3. Navigate to **APIs & Services** → **Credentials**
-4. Find the **Android API key**: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+4. Find the **Android API key**: `YOUR_FIREBASE_API_KEY`
 5. Click to **Edit**
 6. Under **API restrictions**:
    - Must have **"Restrict key"** selected

@@ -39,7 +39,7 @@ The `google-services.json` file was updated, but the app may not have been rebui
 - The old APK might still be installed
 
 ### 2. API Key Restrictions
-The API key `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` might still have restrictions blocking:
+The API key `YOUR_FIREBASE_API_KEY` might still have restrictions blocking:
 - Identity Toolkit API
 - Firebase Authentication API
 - Check Google Cloud Console for this specific key
@@ -71,7 +71,7 @@ Temporary Firebase service outage (less likely)
 
 2. **Check API Key Restrictions**:
    - Go to Google Cloud Console > Credentials
-   - Find API key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+   - Find API key: `YOUR_FIREBASE_API_KEY`
    - Verify "Identity Toolkit API" is allowed
    - Check if restrictions are too strict
 

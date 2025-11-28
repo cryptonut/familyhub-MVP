@@ -24,7 +24,7 @@
 
 ### Step 3: Find Your API Key
 
-Look for API key: **AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk**
+Look for API key: **YOUR_FIREBASE_API_KEY**
 
 (It might show as truncated like "AIzaSyDLZ3...")
 

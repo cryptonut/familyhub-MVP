@@ -17,7 +17,7 @@ This will show you:
 ### 2. What to Look For
 
 In the Credentials tab, you should see:
-- Your Android key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+- Your Android key: `YOUR_FIREBASE_API_KEY`
 - It should show as having access to Cloud Firestore API
 
 If the Android key is **NOT** listed, or shows as restricted, that's the issue!

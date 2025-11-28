@@ -32,7 +32,7 @@ flutter run
 
 Go to [Google Cloud Console](https://console.cloud.google.com/):
 1. **APIs & Services > Credentials**
-2. Find API key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+2. Find API key: `YOUR_FIREBASE_API_KEY`
 3. Click to edit
 4. Under **API restrictions**:
    - Ensure **Identity Toolkit API** is enabled

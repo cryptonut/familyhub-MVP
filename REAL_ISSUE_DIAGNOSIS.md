@@ -21,7 +21,7 @@ The API key has TWO types of restrictions:
 
 **Check this**:
 1. Go to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials?project=family-hub-71ff0)
-2. Find the **Android API key**: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+2. Find the **Android API key**: `YOUR_FIREBASE_API_KEY`
 3. Click to **Edit**
 4. Look for **"Application restrictions"** section (NOT "API restrictions")
 5. If it says **"Android apps"** with restrictions:

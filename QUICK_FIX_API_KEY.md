@@ -20,7 +20,7 @@ Network connectivity is OK, but Firebase Auth times out. This means the API key 
 3. Look for a link that says **"Open in Google Cloud Console"** or similar
 4. Click it
 5. In Google Cloud Console, go to **"APIs & Services"** > **"Credentials"** (left sidebar)
-6. Find API key: **AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk**
+6. Find API key: **YOUR_FIREBASE_API_KEY**
 7. Click on it
 8. Check:
    - **API restrictions**: Should be "Don't restrict key" OR include "Identity Toolkit API"

@@ -38,7 +38,7 @@ The fact that you're automatically logged in tells us:
 ❌ **Firestore is failing** - But user data can't be loaded
 
 This suggests:
-- The Android API key (`AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`) works for **Firebase Auth**
+- The Android API key (`YOUR_FIREBASE_API_KEY`) works for **Firebase Auth**
 - But it's **blocked for Firestore** API calls
 - Or Firestore API is not enabled for this key
 
@@ -60,7 +60,7 @@ Since Auth works but Firestore doesn't:
 
 ### 1. Check API Key Restrictions
 Go to Google Cloud Console > APIs & Services > Credentials
-Find key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+Find key: `YOUR_FIREBASE_API_KEY`
 
 **Under "API restrictions":**
 - Must include "Cloud Firestore API" (not just Identity Toolkit)

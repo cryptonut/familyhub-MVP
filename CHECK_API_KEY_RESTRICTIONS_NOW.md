@@ -12,7 +12,7 @@ The APIs are enabled for the **project**, but the **specific API key** might hav
 
 From the Credentials page you're on:
 
-1. **Click on the Android key** `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+1. **Click on the Android key** `YOUR_FIREBASE_API_KEY`
    - Don't just view it in the modal
    - Actually click to open the full edit page
 

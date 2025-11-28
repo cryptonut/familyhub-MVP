@@ -12,7 +12,7 @@ APIs are enabled for the **project**, but the **API key** might have restriction
 
 ### 1. Open the Android Key for Editing
 - From Credentials page, **click** (don't just view) the Android key
-- Look for: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+- Look for: `YOUR_FIREBASE_API_KEY`
 - Click the **pencil/edit icon** or click the key name
 
 ### 2. Check "API restrictions"

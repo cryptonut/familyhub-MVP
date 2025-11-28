@@ -121,7 +121,7 @@ DateTime parseCreatedAt(dynamic value) {
 
 ### API Key Fix (User Action Required)
 - ✅ User confirmed API key restrictions updated in Google Cloud Console
-- Key `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` should now allow Android package `com.example.familyhub_mvp`
+- Key `YOUR_FIREBASE_API_KEY` should now allow Android package `com.example.familyhub_mvp`
 - Identity Toolkit API should be enabled
 
 ### Expected Results After These Fixes

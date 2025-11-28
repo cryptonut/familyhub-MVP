@@ -4,7 +4,7 @@
 The `google-services.json` file may contain an old/restricted API key reference even though the current API key in GCP Console is unrestricted. This is a known Firebase console bug.
 
 ## Current API Key
-- Key in google-services.json: `AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk`
+- Key in google-services.json: `YOUR_FIREBASE_API_KEY`
 - This key should have no restrictions and Cloud Firestore API enabled
 
 ## Fix Steps (8 steps)

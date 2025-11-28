@@ -2,7 +2,7 @@
 
 ## What We've Fixed
 ✅ Replaced google-services.json with fresh file from new app registration
-✅ Updated firebase_options.dart with new API key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+✅ Updated firebase_options.dart with new API key: `YOUR_FIREBASE_API_KEY`
 ✅ Verified Firestore database is in **Native mode** (not Datastore mode)
 ✅ Verified API key has **no application restrictions**
 ✅ Verified API key has **Cloud Firestore API** enabled in restrictions

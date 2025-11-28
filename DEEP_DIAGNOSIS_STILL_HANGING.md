@@ -77,7 +77,7 @@ If OAuth not in processed file, Gradle didn't pick up the changes.
 Even if you checked, verify again:
 
 1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Find: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+2. Find: `YOUR_FIREBASE_API_KEY`
 3. **API restrictions** must include:
    - ✅ **Identity Toolkit API** (CRITICAL)
    - ✅ **Firebase Authentication API**

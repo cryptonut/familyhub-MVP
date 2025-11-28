@@ -16,7 +16,7 @@ This is the correct Flutter project root containing:
 **Configuration Verified**:
 - ✅ SHA-1 fingerprint: `bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c` (matches Firebase Console)
 - ✅ Package name: `com.example.familyhub_mvp`
-- ✅ API key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+- ✅ API key: `YOUR_FIREBASE_API_KEY`
 - ✅ Project ID: `family-hub-71ff0`
 
 ## Next Steps

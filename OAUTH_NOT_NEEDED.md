@@ -11,7 +11,7 @@ Instead of "Google Auth Platform", go to:
 
 1. **APIs & Services** (in the left sidebar)
 2. **Credentials** (under APIs & Services)
-3. Find your API key: `AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk`
+3. Find your API key: `YOUR_FIREBASE_API_KEY`
 4. Check its restrictions
 
 ## The Confusion

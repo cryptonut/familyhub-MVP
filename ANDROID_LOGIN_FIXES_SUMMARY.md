@@ -86,16 +86,16 @@ This document summarizes the fixes applied to resolve Android login issues ident
 ### 4. ⚠️ Android API Key Documentation Mismatch (MEDIUM PRIORITY)
 
 **Problem:**
-- **Actual key in use:** `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` (in `firebase_options.dart` and `google-services.json`)
-- **Documentation references:** `AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk` (in multiple .md files)
+- **Actual key in use:** `YOUR_FIREBASE_API_KEY` (in `firebase_options.dart` and `google-services.json`)
+- **Documentation references:** `YOUR_FIREBASE_API_KEY` (in multiple .md files)
 - Updating restrictions on the wrong key would leave mobile login blocked forever
 - Chrome works because it uses the web API key (`AIzaSyC_WWJtrIRRMvRyjMe7WaeYQ0veE9cs-Mw`)
 
 **Solution - Manual Action Required:**
-1. **Confirm the key in use:** The key in `google-services.json` (`AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`) is what Android actually uses
+1. **Confirm the key in use:** The key in `google-services.json` (`YOUR_FIREBASE_API_KEY`) is what Android actually uses
 2. **In Google Cloud Console:**
    - Go to APIs & Services > Credentials
-   - Find and edit API key: **AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4**
+   - Find and edit API key: **YOUR_FIREBASE_API_KEY**
    - Check "Application restrictions":
      - For development: Set to "None"
      - For production: Set to "Android apps" and add:

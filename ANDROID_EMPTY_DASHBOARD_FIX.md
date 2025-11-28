@@ -64,7 +64,7 @@ The real issue is Firestore is unavailable on Android. Check:
 
 1. **API Key Restrictions** (Most Likely)
    - Go to Google Cloud Console
-   - Find key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+   - Find key: `YOUR_FIREBASE_API_KEY`
    - Under "API restrictions", ensure **"Cloud Firestore API"** is enabled
    - Not just "Identity Toolkit API" (that's for Auth)
    - Both need to be enabled!
@@ -81,7 +81,7 @@ The real issue is Firestore is unavailable on Android. Check:
 ## Why Chrome Works But Android Doesn't
 
 - **Chrome** uses web API key (`AIzaSyC_WWJtrIRRMvRyjMe7WaeYQ0veE9cs-Mw`) - Firestore API enabled
-- **Android** uses Android API key (`AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`) - Firestore API may not be enabled
+- **Android** uses Android API key (`YOUR_FIREBASE_API_KEY`) - Firestore API may not be enabled
 
 They're different keys with different restrictions!
 

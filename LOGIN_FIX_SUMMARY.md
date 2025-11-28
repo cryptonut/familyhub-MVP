@@ -23,7 +23,7 @@
 1. **Restored google-services.json** to `android/app/google-services.json`
    - Contains correct OAuth client IDs
    - SHA-1 fingerprint: `bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c`
-   - API Key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+   - API Key: `YOUR_FIREBASE_API_KEY`
    - Package name: `com.example.familyhub_mvp`
 
 2. **Improved error messages** in `auth_service.dart`
@@ -64,7 +64,7 @@ flutter build apk --debug
 
 ### 4. Verify API Key Restrictions
 1. In Google Cloud Console, go to **APIs & Services** > **Credentials**
-2. Find API Key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` (Android key)
+2. Find API Key: `YOUR_FIREBASE_API_KEY` (Android key)
 3. Verify restrictions allow:
    - ✅ Identity Toolkit API
    - ✅ Cloud Firestore API

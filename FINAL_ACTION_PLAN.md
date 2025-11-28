@@ -10,7 +10,7 @@
 
 **This is the most likely remaining issue if login still times out.**
 
-### Check API Key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+### Check API Key: `YOUR_FIREBASE_API_KEY`
 
 **Direct Link**: https://console.cloud.google.com/apis/credentials/key/9051bc3a-7e93-4179-8f3f-00e62f7ef924?project=family-hub-71ff0
 

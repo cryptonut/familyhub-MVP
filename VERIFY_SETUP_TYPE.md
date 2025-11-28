@@ -18,11 +18,11 @@ For Android, Firebase reads from **`google-services.json`** (not `firebase_optio
 The `firebase_options.dart` is used as a fallback or for other platforms.
 
 ## The API Key Issue
-- **Android** uses API key from `google-services.json`: `AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk`
+- **Android** uses API key from `google-services.json`: `YOUR_FIREBASE_API_KEY`
 - **Web** uses API key from `firebase_options.dart`: `AIzaSyC_WWJtrIRRMvRyjMe7WaeYQ0veE9cs-Mw`
 
 This is why Chrome works but Android doesn't - they're using different API keys with different restrictions.
 
 ## To Fix Firestore on Android
-Check if **Cloud Firestore API** is enabled for the **Android API key** (`AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk`) in Google Cloud Console.
+Check if **Cloud Firestore API** is enabled for the **Android API key** (`YOUR_FIREBASE_API_KEY`) in Google Cloud Console.
 

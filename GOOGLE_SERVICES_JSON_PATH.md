@@ -50,7 +50,7 @@ android/app/google-services.json
 
 The current `google-services.json` has:
 - ❌ Empty `oauth_client: []` array
-- ✅ Correct API key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+- ✅ Correct API key: `YOUR_FIREBASE_API_KEY`
 - ✅ Correct package name: `com.example.familyhub_mvp`
 
 The empty `oauth_client` is likely causing the authentication timeout.

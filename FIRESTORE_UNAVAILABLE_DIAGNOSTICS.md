@@ -42,7 +42,7 @@ getCurrentUserModel: ⚠ Firestore unavailable error detected
 **Symptoms:** Unavailable errors on Android, Chrome works fine
 **Solution:**
 - Go to Google Cloud Console > APIs & Services > Credentials
-- Find key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` (from google-services.json)
+- Find key: `YOUR_FIREBASE_API_KEY` (from google-services.json)
 - Check "Application restrictions":
   - For dev: Set to "None"
   - For prod: Add Android package `com.example.familyhub_mvp` + SHA-1

@@ -39,7 +39,7 @@ Even though Chrome works, Android might be using a different API key path:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Select project: **family-hub-71ff0**
 3. Go to **"APIs & Services"** > **"Credentials"**
-4. Find API key: **AIzaSyDLZ3mdwyumvm_oXPWBAUtANQBSlbFizyk**
+4. Find API key: **YOUR_FIREBASE_API_KEY**
 5. Click on it
 6. Check **"Application restrictions"**:
    - Should be **"None"** OR
