@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/user_model.dart';
 import '../models/task.dart';
 import 'auth_service.dart';
@@ -33,7 +34,7 @@ class FamilyWalletService {
         return 0.0;
       }
     } catch (e) {
-      debugPrint('Error getting family wallet balance: $e');
+      Logger.error('Error getting family wallet balance', error: e, tag: 'FamilyWalletService');
       return 0.0;
     }
   }
@@ -42,14 +43,14 @@ class FamilyWalletService {
   Future<void> creditFamilyWallet(double amount) async {
     final userModel = await _authService.getCurrentUserModel();
     if (userModel == null || userModel.familyId == null) {
-      throw Exception('User not part of a family');
+      throw AuthException('User not part of a family', code: 'no-family');
     }
 
     try {
       final familyRef = _firestore.collection('families').doc(userModel.familyId);
       
-      debugPrint('FamilyWalletService.creditFamilyWallet: Starting transaction for amount $amount');
-      debugPrint('FamilyWalletService.creditFamilyWallet: Family ID: ${userModel.familyId}');
+      Logger.debug('creditFamilyWallet: Starting transaction for amount $amount', tag: 'FamilyWalletService');
+      Logger.debug('creditFamilyWallet: Family ID: ${userModel.familyId}', tag: 'FamilyWalletService');
       
       // Use transaction to ensure atomic update
       await _firestore.runTransaction((transaction) async {
@@ -57,7 +58,7 @@ class FamilyWalletService {
         final currentBalance = (familyDoc.data()?['walletBalance'] as num?)?.toDouble() ?? 0.0;
         final newBalance = currentBalance + amount;
         
-        debugPrint('FamilyWalletService.creditFamilyWallet: Current balance: $currentBalance, New balance: $newBalance');
+        Logger.debug('creditFamilyWallet: Current balance: $currentBalance, New balance: $newBalance', tag: 'FamilyWalletService');
         
         transaction.set(familyRef, {
           'walletBalance': newBalance,
@@ -67,15 +68,15 @@ class FamilyWalletService {
       // Verify the credit was applied
       final verifyDoc = await familyRef.get();
       final verifyBalance = (verifyDoc.data()?['walletBalance'] as num?)?.toDouble() ?? 0.0;
-      debugPrint('FamilyWalletService.creditFamilyWallet: Verified balance after credit: $verifyBalance');
+      Logger.debug('creditFamilyWallet: Verified balance after credit: $verifyBalance', tag: 'FamilyWalletService');
       
       if (verifyBalance < amount) {
-        throw Exception('Wallet credit verification failed: Expected at least $amount, but balance is $verifyBalance');
+        throw ValidationException('Wallet credit verification failed: Expected at least $amount, but balance is $verifyBalance', code: 'verification-failed');
       }
       
-      debugPrint('FamilyWalletService.creditFamilyWallet: Successfully credited $amount to family wallet. New balance: $verifyBalance');
+      Logger.info('creditFamilyWallet: Successfully credited $amount to family wallet. New balance: $verifyBalance', tag: 'FamilyWalletService');
     } catch (e) {
-      debugPrint('FamilyWalletService.creditFamilyWallet: Error crediting family wallet: $e');
+      Logger.error('creditFamilyWallet: Error crediting family wallet', error: e, tag: 'FamilyWalletService');
       rethrow;
     }
   }
@@ -84,7 +85,7 @@ class FamilyWalletService {
   Future<void> debitFamilyWallet(double amount) async {
     final userModel = await _authService.getCurrentUserModel();
     if (userModel == null || userModel.familyId == null) {
-      throw Exception('User not part of a family');
+      throw AuthException('User not part of a family', code: 'no-family');
     }
 
     try {
@@ -96,7 +97,7 @@ class FamilyWalletService {
         final currentBalance = (familyDoc.data()?['walletBalance'] as num?)?.toDouble() ?? 0.0;
         
         if (currentBalance < amount) {
-          throw Exception('Insufficient family wallet balance');
+          throw ValidationException('Insufficient family wallet balance', code: 'insufficient-balance');
         }
         
         transaction.set(familyRef, {
@@ -104,9 +105,9 @@ class FamilyWalletService {
         }, SetOptions(merge: true));
       });
       
-      debugPrint('FamilyWalletService: Debited $amount from family wallet');
+      Logger.info('Debited $amount from family wallet', tag: 'FamilyWalletService');
     } catch (e) {
-      debugPrint('Error debiting family wallet: $e');
+      Logger.error('Error debiting family wallet', error: e, tag: 'FamilyWalletService');
       rethrow;
     }
   }
@@ -118,7 +119,7 @@ class FamilyWalletService {
     await debitFamilyWallet(amount);
     
     // Note: Creator's personal balance update is handled in WalletService
-    debugPrint('FamilyWalletService: Returning $amount to creator $creatorId');
+    Logger.info('Returning $amount to creator $creatorId', tag: 'FamilyWalletService');
   }
 
   /// Check if user can create a job with the given reward amount

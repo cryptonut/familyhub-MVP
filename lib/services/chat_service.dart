@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/chat_message.dart';
 import 'auth_service.dart';
 
@@ -61,7 +62,7 @@ class ChatService {
                       messageData['senderName'] = 'Unknown User';
                     }
                   } catch (e) {
-                    debugPrint('Error fetching sender name: $e');
+                    Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
                     messageData['senderName'] = 'Unknown User';
                   }
                 } else {
@@ -110,7 +111,7 @@ class ChatService {
               messageData['senderName'] = 'Unknown User';
             }
           } catch (e) {
-            debugPrint('Error fetching sender name: $e');
+            Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
             messageData['senderName'] = 'Unknown User';
           }
         } else {
@@ -130,8 +131,8 @@ class ChatService {
     try {
       await _firestore.collection('families/$familyId/messages').add(message.toJson());
     } catch (e) {
-      debugPrint('ChatService.sendMessage error: $e');
-      debugPrint('Family ID: $familyId');
+      Logger.error('sendMessage error', error: e, tag: 'ChatService');
+      Logger.debug('Family ID: $familyId', tag: 'ChatService');
       rethrow;
     }
   }
@@ -190,7 +191,7 @@ class ChatService {
                       messageData['senderName'] = 'Unknown User';
                     }
                   } catch (e) {
-                    debugPrint('Error fetching sender name: $e');
+                    Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
                     messageData['senderName'] = 'Unknown User';
                   }
                 } else {
@@ -236,8 +237,8 @@ class ChatService {
           .collection('messages')
           .add(privateMessage.toJson());
     } catch (e) {
-      debugPrint('ChatService.sendPrivateMessage error: $e');
-      debugPrint('Family ID: $familyId, Chat ID: $chatId');
+      Logger.error('sendPrivateMessage error', error: e, tag: 'ChatService');
+      Logger.debug('Family ID: $familyId, Chat ID: $chatId', tag: 'ChatService');
       rethrow;
     }
   }
@@ -270,7 +271,7 @@ class ChatService {
       
       return DateTime.parse(timestampStr);
     } catch (e) {
-      debugPrint('Error getting latest message timestamp: $e');
+      Logger.warning('Error getting latest message timestamp', error: e, tag: 'ChatService');
       return null;
     }
   }
@@ -324,7 +325,7 @@ class ChatService {
       
       return false;
     } catch (e) {
-      debugPrint('Error checking unread messages: $e');
+      Logger.warning('Error checking unread messages', error: e, tag: 'ChatService');
       return false;
     }
   }
@@ -353,9 +354,9 @@ class ChatService {
         'updatedAt': now,
       }, SetOptions(merge: true));
       
-      debugPrint('Marked messages as read for chat $chatId by user $currentUserId');
+      Logger.debug('Marked messages as read for chat $chatId by user $currentUserId', tag: 'ChatService');
     } catch (e) {
-      debugPrint('Error marking messages as read: $e');
+      Logger.error('Error marking messages as read', error: e, tag: 'ChatService');
     }
   }
   
@@ -385,7 +386,7 @@ class ChatService {
       
       return DateTime.parse(lastReadStr);
     } catch (e) {
-      debugPrint('Error getting last read timestamp: $e');
+      Logger.warning('Error getting last read timestamp', error: e, tag: 'ChatService');
       return null;
     }
   }

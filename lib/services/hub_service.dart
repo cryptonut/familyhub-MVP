@@ -1,7 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
+import '../core/services/logger_service.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/hub.dart';
 import '../models/hub_invite.dart';
 import 'auth_service.dart';
@@ -51,7 +52,7 @@ class HubService {
       return allHubs.values.toList()
         ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
     } catch (e) {
-      debugPrint('Error getting user hubs: $e');
+      Logger.error('Error getting user hubs', error: e, tag: 'HubService');
       return [];
     }
   }
@@ -63,7 +64,7 @@ class HubService {
       if (!doc.exists) return null;
       return Hub.fromJson({'id': doc.id, ...doc.data()!});
     } catch (e) {
-      debugPrint('Error getting hub: $e');
+      Logger.error('Error getting hub', error: e, tag: 'HubService');
       return null;
     }
   }
@@ -93,7 +94,7 @@ class HubService {
       await _firestore.collection('hubs').doc(hub.id).set(data);
       return hub;
     } catch (e) {
-      debugPrint('Error creating hub: $e');
+      Logger.error('Error creating hub', error: e, tag: 'HubService');
       rethrow;
     }
   }
@@ -142,7 +143,7 @@ class HubService {
         'memberIds': FieldValue.arrayUnion([userId]),
       });
     } catch (e) {
-      debugPrint('Error adding member to hub: $e');
+      Logger.error('Error adding member to hub', error: e, tag: 'HubService');
       rethrow;
     }
   }
@@ -154,7 +155,7 @@ class HubService {
         'memberIds': FieldValue.arrayRemove([userId]),
       });
     } catch (e) {
-      debugPrint('Error removing member from hub: $e');
+      Logger.error('Error removing member from hub', error: e, tag: 'HubService');
       rethrow;
     }
   }
@@ -173,7 +174,7 @@ class HubService {
     try {
       await _firestore.collection('hubs').doc(hubId).update(updates);
     } catch (e) {
-      debugPrint('Error updating hub: $e');
+      Logger.error('Error updating hub', error: e, tag: 'HubService');
       rethrow;
     }
   }
@@ -192,7 +193,7 @@ class HubService {
     try {
       await _firestore.collection('hubs').doc(hubId).delete();
     } catch (e) {
-      debugPrint('Error deleting hub: $e');
+      Logger.error('Error deleting hub', error: e, tag: 'HubService');
       rethrow;
     }
   }
@@ -239,7 +240,7 @@ class HubService {
       await _firestore.collection('hubInvites').doc(invite.id).set(data);
       return invite;
     } catch (e) {
-      debugPrint('Error creating invite: $e');
+      Logger.error('Error creating invite', error: e, tag: 'HubService');
       rethrow;
     }
   }
@@ -251,7 +252,7 @@ class HubService {
       if (!doc.exists) return null;
       return HubInvite.fromJson({'id': doc.id, ...doc.data()!});
     } catch (e) {
-      debugPrint('Error getting invite: $e');
+      Logger.error('Error getting invite', error: e, tag: 'HubService');
       return null;
     }
   }
@@ -285,7 +286,7 @@ class HubService {
         'userId': userId, // Store the user who accepted
       });
     } catch (e) {
-      debugPrint('Error accepting invite: $e');
+      Logger.error('Error accepting invite', error: e, tag: 'HubService');
       rethrow;
     }
   }
@@ -336,7 +337,7 @@ class HubService {
       return invites.values.toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
-      debugPrint('Error getting pending invites: $e');
+      Logger.error('Error getting pending invites', error: e, tag: 'HubService');
       return [];
     }
   }
