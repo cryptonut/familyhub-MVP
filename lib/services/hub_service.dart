@@ -166,7 +166,7 @@ class HubService {
     if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
     final hub = await getHub(hubId);
-    if (hub == null) throw Exception('Hub not found');
+    if (hub == null) throw FirestoreException('Hub not found', code: 'not-found');
     if (hub.creatorId != userId) {
       throw PermissionException('Only the hub creator can update the hub', code: 'insufficient-permissions');
     }
@@ -185,7 +185,7 @@ class HubService {
     if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
     final hub = await getHub(hubId);
-    if (hub == null) throw Exception('Hub not found');
+    if (hub == null) throw FirestoreException('Hub not found', code: 'not-found');
     if (hub.creatorId != userId) {
       throw PermissionException('Only the hub creator can delete the hub', code: 'insufficient-permissions');
     }
@@ -213,7 +213,7 @@ class HubService {
     }
 
     final hub = await getHub(hubId);
-    if (hub == null) throw Exception('Hub not found');
+    if (hub == null) throw FirestoreException('Hub not found', code: 'not-found');
     if (hub.creatorId != currentUserId) {
       throw PermissionException('Only the hub creator can invite members', code: 'insufficient-permissions');
     }
