@@ -1,6 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/services/logger_service.dart';
+import '../core/constants/app_constants.dart';
+import '../core/errors/app_exceptions.dart';
 import '../models/task.dart';
 import 'auth_service.dart';
 import 'notification_service.dart';
@@ -23,7 +25,7 @@ class TaskService {
     
     // Update cache if it changed
     if (_cachedFamilyId != freshFamilyId) {
-      debugPrint('TaskService._familyId: FamilyId changed from $_cachedFamilyId to $freshFamilyId');
+      Logger.debug('_familyId: FamilyId changed from $_cachedFamilyId to $freshFamilyId', tag: 'TaskService');
       _cachedFamilyId = freshFamilyId;
     }
     
@@ -32,26 +34,26 @@ class TaskService {
   
   /// Clear the cached familyId (useful when familyId might have changed)
   void clearFamilyIdCache() {
-    debugPrint('TaskService.clearFamilyIdCache: Clearing cached familyId');
+    Logger.debug('clearFamilyIdCache: Clearing cached familyId', tag: 'TaskService');
     _cachedFamilyId = null;
   }
 
   Future<String> get _collectionPath async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     return 'families/$familyId/tasks';
   }
 
   Future<List<Task>> getTasks({bool forceRefresh = false}) async {
     final familyId = await _familyId;
     if (familyId == null) {
-      debugPrint('TaskService.getTasks: User not part of a family');
+      Logger.warning('getTasks: User not part of a family', tag: 'TaskService');
       return [];
     }
     
     try {
       final collectionPath = 'families/$familyId/tasks';
-      debugPrint('TaskService.getTasks: Loading tasks from $collectionPath');
+      Logger.debug('getTasks: Loading tasks from $collectionPath', tag: 'TaskService');
       
       QuerySnapshot snapshot;
       try {
@@ -59,8 +61,8 @@ class TaskService {
             .collection(collectionPath)
             .orderBy('createdAt', descending: true)
             .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
-      } catch (e) {
-        debugPrint('TaskService.getTasks: orderBy failed, trying without orderBy: $e');
+      } catch (e, st) {
+        Logger.warning('getTasks: orderBy failed, trying without orderBy', error: e, stackTrace: st, tag: 'TaskService');
         snapshot = await _firestore
             .collection(collectionPath)
             .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
@@ -73,8 +75,8 @@ class TaskService {
             'id': doc.id,
             ...data,
           });
-        } catch (e) {
-          debugPrint('TaskService.getTasks: Error parsing task ${doc.id}: $e');
+        } catch (e, st) {
+          Logger.warning('getTasks: Error parsing task ${doc.id}', error: e, stackTrace: st, tag: 'TaskService');
           return null;
         }
       }).whereType<Task>().toList();
@@ -84,11 +86,10 @@ class TaskService {
         tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       }
       
-      debugPrint('TaskService.getTasks: Successfully loaded ${tasks.length} tasks');
+      Logger.debug('getTasks: Successfully loaded ${tasks.length} tasks', tag: 'TaskService');
       return tasks;
     } catch (e, stackTrace) {
-      debugPrint('TaskService.getTasks error: $e');
-      debugPrint('  Stack trace: $stackTrace');
+      Logger.error('getTasks error', error: e, stackTrace: stackTrace, tag: 'TaskService');
       return [];
     }
   }
@@ -116,10 +117,10 @@ class TaskService {
     try {
       final allTasks = await getTasks(forceRefresh: forceRefresh);
       final active = allTasks.where((task) => !task.isCompleted).toList();
-      debugPrint('TaskService.getActiveTasks: Found ${active.length} active tasks out of ${allTasks.length} total');
+      Logger.debug('getActiveTasks: Found ${active.length} active tasks out of ${allTasks.length} total', tag: 'TaskService');
       return active;
-    } catch (e) {
-      debugPrint('TaskService.getActiveTasks error: $e');
+    } catch (e, st) {
+      Logger.error('getActiveTasks error', error: e, stackTrace: st, tag: 'TaskService');
       return [];
     }
   }
@@ -128,17 +129,17 @@ class TaskService {
     try {
       final allTasks = await getTasks(forceRefresh: forceRefresh);
       final completed = allTasks.where((task) => task.isCompleted).toList();
-      debugPrint('TaskService.getCompletedTasks: Found ${completed.length} completed tasks out of ${allTasks.length} total');
+      Logger.debug('getCompletedTasks: Found ${completed.length} completed tasks out of ${allTasks.length} total', tag: 'TaskService');
       return completed;
-    } catch (e) {
-      debugPrint('TaskService.getCompletedTasks error: $e');
+    } catch (e, st) {
+      Logger.error('getCompletedTasks error', error: e, stackTrace: st, tag: 'TaskService');
       return [];
     }
   }
 
   Future<void> addTask(Task task) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     // Track if wallet was credited in case we need to rollback
     bool walletCredited = false;
@@ -149,7 +150,7 @@ class TaskService {
       if (task.reward != null && task.reward! > 0) {
         final rewardAmount = task.reward!;
         final userModel = await _authService.getCurrentUserModel();
-        if (userModel == null) throw Exception('User not authenticated');
+        if (userModel == null) throw AuthException('User not authenticated', code: 'not-authenticated');
         
         // Get all tasks to pass to canCreateJobWithReward (to avoid circular dependency)
         final allTasks = await getTasks();
@@ -158,18 +159,18 @@ class TaskService {
         final canCreate = await _familyWalletService.canCreateJobWithReward(rewardAmount, allTasks);
         
         if (!canCreate['canCreate'] as bool) {
-          throw Exception(canCreate['reason'] as String);
+          throw ValidationException(canCreate['reason'] as String);
         }
         
         // Credit family wallet with the full reward amount
         await _familyWalletService.creditFamilyWallet(rewardAmount);
         walletCredited = true;
         creditedAmount = rewardAmount;
-        debugPrint('TaskService.addTask: Credited $rewardAmount to family wallet');
+        Logger.info('addTask: Credited $rewardAmount to family wallet', tag: 'TaskService');
       }
       
       final collectionPath = 'families/$familyId/tasks';
-      debugPrint('TaskService.addTask: Adding task ${task.id} to $collectionPath');
+      Logger.debug('addTask: Adding task ${task.id} to $collectionPath', tag: 'TaskService');
       
       // Remove 'id' from the data since it's used as the document ID
       final data = task.toJson();
@@ -179,26 +180,26 @@ class TaskService {
       final docRef = _firestore.collection(collectionPath).doc(task.id);
       await docRef.set(data);
       
-      debugPrint('TaskService.addTask: Task ${task.id} written to Firestore successfully');
+      Logger.info('addTask: Task ${task.id} written to Firestore successfully', tag: 'TaskService');
       
       // Verify the task was actually written
       final verifyDoc = await docRef.get();
       if (!verifyDoc.exists) {
-        throw Exception('Task was not saved to Firestore - verification failed');
+        throw FirestoreException('Task was not saved to Firestore - verification failed', code: 'verification-failed');
       }
       
-      debugPrint('TaskService.addTask: Task ${task.id} verified in Firestore');
-    } catch (e) {
-      debugPrint('TaskService.addTask error: $e');
+      Logger.debug('addTask: Task ${task.id} verified in Firestore', tag: 'TaskService');
+    } catch (e, st) {
+      Logger.error('addTask error', error: e, stackTrace: st, tag: 'TaskService');
       
       // If wallet was credited but task save failed, try to rollback
       if (walletCredited && creditedAmount != null) {
         try {
-          debugPrint('TaskService.addTask: Attempting to rollback wallet credit of $creditedAmount');
+          Logger.warning('addTask: Attempting to rollback wallet credit of $creditedAmount', tag: 'TaskService');
           await _familyWalletService.debitFamilyWallet(creditedAmount!);
-          debugPrint('TaskService.addTask: Wallet credit rolled back successfully');
-        } catch (rollbackError) {
-          debugPrint('TaskService.addTask: Failed to rollback wallet credit: $rollbackError');
+          Logger.info('addTask: Wallet credit rolled back successfully', tag: 'TaskService');
+        } catch (rollbackError, rollbackSt) {
+          Logger.error('addTask: Failed to rollback wallet credit', error: rollbackError, stackTrace: rollbackSt, tag: 'TaskService');
           // Don't throw here - the original error is more important
         }
       }
@@ -209,14 +210,14 @@ class TaskService {
 
   Future<void> updateTask(Task task) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final docRef = _firestore.collection('families/$familyId/tasks').doc(task.id);
       final doc = await docRef.get();
       
       if (!doc.exists) {
-        throw Exception('Task not found. Cannot update a task that does not exist.');
+        throw FirestoreException('Task not found. Cannot update a task that does not exist.', code: 'not-found');
       }
       
       // Remove 'id' from the data since it's used as the document ID
@@ -226,22 +227,22 @@ class TaskService {
       // Use update() since we've confirmed the document exists
       await docRef.update(data);
       
-      debugPrint('TaskService.updateTask: Successfully updated task ${task.id}');
-    } catch (e) {
-      debugPrint('TaskService.updateTask error: $e');
+      Logger.info('updateTask: Successfully updated task ${task.id}', tag: 'TaskService');
+    } catch (e, st) {
+      Logger.error('updateTask error', error: e, stackTrace: st, tag: 'TaskService');
       rethrow;
     }
   }
 
   Future<void> deleteTask(String taskId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     final docRef = _firestore.collection('families/$familyId/tasks').doc(taskId);
     final taskDoc = await docRef.get();
     
     if (!taskDoc.exists) {
-      throw Exception('Task not found');
+      throw FirestoreException('Task not found', code: 'not-found');
     }
     
     // Get task data before deleting
@@ -257,7 +258,7 @@ class TaskService {
     if (reward != null && reward > 0 && !isCompleted && !isAwaitingApproval) {
       if (createdBy != null) {
         await _familyWalletService.returnFundsToCreator(createdBy, reward.toDouble());
-        debugPrint('TaskService.deleteTask: Returning $reward to creator $createdBy');
+        Logger.info('deleteTask: Returning $reward to creator $createdBy', tag: 'TaskService');
       }
     }
     
@@ -266,7 +267,7 @@ class TaskService {
 
   Future<void> toggleTaskCompletion(String taskId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
@@ -274,7 +275,7 @@ class TaskService {
       final doc = await docRef.get();
       
       if (!doc.exists) {
-        debugPrint('TaskService.toggleTaskCompletion: Document not found: $taskId');
+        Logger.warning('toggleTaskCompletion: Document not found: $taskId', tag: 'TaskService');
         return;
       }
 
@@ -287,10 +288,10 @@ class TaskService {
         'completedAt': newCompletedState ? DateTime.now().toIso8601String() : null,
       });
       
-      debugPrint('TaskService.toggleTaskCompletion: Task $taskId set to completed=$newCompletedState');
-    } catch (e) {
-      debugPrint('TaskService.toggleTaskCompletion error: $e');
-      debugPrint('Task ID: $taskId');
+      Logger.debug('toggleTaskCompletion: Task $taskId set to completed=$newCompletedState', tag: 'TaskService');
+    } catch (e, st) {
+      Logger.error('toggleTaskCompletion error', error: e, stackTrace: st, tag: 'TaskService');
+      Logger.debug('Task ID: $taskId', tag: 'TaskService');
       rethrow;
     }
   }
@@ -299,23 +300,23 @@ class TaskService {
   Future<void> completeTask(String taskId) async {
     final familyId = await _familyId;
     final userId = _auth.currentUser?.uid;
-    if (familyId == null) throw Exception('User not part of a family');
-    if (userId == null) throw Exception('User not authenticated');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
+    if (userId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
     
     try {
       final docRef = _firestore.collection('families/$familyId/tasks').doc(taskId);
       final doc = await docRef.get(GetOptions(source: Source.server));
       
       if (!doc.exists) {
-        throw Exception('Task not found: $taskId');
+        throw FirestoreException('Task not found: $taskId', code: 'not-found');
       }
       
       final currentData = doc.data() as Map<String, dynamic>?;
-      debugPrint('TaskService.completeTask: Current task data for $taskId:');
-      debugPrint('  - Document ID: ${doc.id}');
-      debugPrint('  - isCompleted: ${currentData?['isCompleted']}');
-      debugPrint('  - title: ${currentData?['title']}');
-      debugPrint('  - All fields: ${currentData?.keys.toList()}');
+      Logger.debug('completeTask: Current task data for $taskId:', tag: 'TaskService');
+      Logger.debug('  - Document ID: ${doc.id}', tag: 'TaskService');
+      Logger.debug('  - isCompleted: ${currentData?['isCompleted']}', tag: 'TaskService');
+      Logger.debug('  - title: ${currentData?['title']}', tag: 'TaskService');
+      Logger.debug('  - All fields: ${currentData?.keys.toList()}', tag: 'TaskService');
 
       // Always set to completed (since Job Done! button only appears on active tasks)
       // Ensure assignedTo is set to the current user if not already set
@@ -347,7 +348,7 @@ class TaskService {
       
       await docRef.set(updateData, SetOptions(merge: true));
       
-      debugPrint('TaskService.completeTask: Update sent for $taskId (document ID: ${doc.id})');
+      Logger.debug('completeTask: Update sent for $taskId (document ID: ${doc.id})', tag: 'TaskService');
       
       // Send notification to job creator if job needs approval (fire and forget - don't wait)
       final needsApproval = currentData?['needsApproval'] == true;
@@ -355,32 +356,32 @@ class TaskService {
       final creatorId = currentData?['createdBy'] as String?;
       final completerId = _auth.currentUser?.uid;
       if (needsApproval && creatorId != null && completerId != null && creatorId != completerId) {
-        _notificationService.notifyJobCompleted(taskId, jobTitle, completerId).catchError((e) {
-          debugPrint('Error sending completion notification: $e');
+        _notificationService.notifyJobCompleted(taskId, jobTitle, completerId).catchError((e, st) {
+          Logger.warning('Error sending completion notification', error: e, stackTrace: st, tag: 'TaskService');
         });
       }
       
       // Verify the update succeeded by reading the document again
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < AppConstants.maxRetries; i++) {
         await Future.delayed(const Duration(milliseconds: 200));
         final updatedDoc = await docRef.get(GetOptions(source: Source.server));
         if (updatedDoc.exists) {
           final updatedData = updatedDoc.data() as Map<String, dynamic>?;
           final isCompleted = updatedData?['isCompleted'] as bool? ?? false;
-          debugPrint('TaskService.completeTask: Verification attempt ${i + 1} for $taskId: isCompleted=$isCompleted');
+          Logger.debug('completeTask: Verification attempt ${i + 1} for $taskId: isCompleted=$isCompleted', tag: 'TaskService');
           
           if (isCompleted) {
-            debugPrint('TaskService.completeTask: Task $taskId successfully marked as completed');
+            Logger.info('completeTask: Task $taskId successfully marked as completed', tag: 'TaskService');
             return;
           }
         }
       }
       
       // If verification failed, throw an error
-      throw Exception('Update verification failed: task is still not marked as completed after 3 attempts');
-    } catch (e) {
-      debugPrint('TaskService.completeTask error: $e');
-      debugPrint('Task ID: $taskId');
+      throw FirestoreException('Update verification failed: task is still not marked as completed after ${AppConstants.maxRetries} attempts', code: 'verification-failed');
+    } catch (e, st) {
+      Logger.error('completeTask error', error: e, stackTrace: st, tag: 'TaskService');
+      Logger.debug('Task ID: $taskId', tag: 'TaskService');
       rethrow;
     }
   }
@@ -388,7 +389,7 @@ class TaskService {
   /// Force complete a task by ID (for fixing stuck tasks)
   Future<void> forceCompleteTask(String taskId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
@@ -397,14 +398,14 @@ class TaskService {
       // First, get the current document to see what we're working with
       final currentDoc = await docRef.get(GetOptions(source: Source.server));
       if (!currentDoc.exists) {
-        throw Exception('Task document does not exist at path: $collectionPath/$taskId');
+        throw FirestoreException('Task document does not exist at path: $collectionPath/$taskId', code: 'not-found');
       }
       
       final currentData = currentDoc.data()!;
-      debugPrint('TaskService.forceCompleteTask: Current document data:');
-      debugPrint('  Full data: $currentData');
-      debugPrint('  isCompleted type: ${currentData['isCompleted'].runtimeType}');
-      debugPrint('  isCompleted value: ${currentData['isCompleted']}');
+      Logger.debug('forceCompleteTask: Current document data:', tag: 'TaskService');
+      Logger.debug('  Full data: $currentData', tag: 'TaskService');
+      Logger.debug('  isCompleted type: ${currentData['isCompleted'].runtimeType}', tag: 'TaskService');
+      Logger.debug('  isCompleted value: ${currentData['isCompleted']}', tag: 'TaskService');
       
       // Force set the task as completed - use set() to completely overwrite if needed
       // First try with merge
@@ -413,7 +414,7 @@ class TaskService {
         'completedAt': DateTime.now().toIso8601String(),
       }, SetOptions(merge: true));
       
-      debugPrint('TaskService.forceCompleteTask: Set with merge completed');
+      Logger.debug('forceCompleteTask: Set with merge completed', tag: 'TaskService');
       
       // Verify immediately
       await Future.delayed(const Duration(milliseconds: 500));
@@ -421,30 +422,30 @@ class TaskService {
       if (verifyDoc.exists) {
         final verifyData = verifyDoc.data();
         final isCompleted = verifyData?['isCompleted'];
-        debugPrint('TaskService.forceCompleteTask: Verification - isCompleted=$isCompleted (type: ${isCompleted.runtimeType})');
+        Logger.debug('forceCompleteTask: Verification - isCompleted=$isCompleted (type: ${isCompleted.runtimeType})', tag: 'TaskService');
         
         // If still not true, try a different approach - get all fields and set them explicitly
         if (isCompleted != true) {
-          debugPrint('TaskService.forceCompleteTask: Merge failed, trying explicit field update');
+          Logger.warning('forceCompleteTask: Merge failed, trying explicit field update', tag: 'TaskService');
           final allData = Map<String, dynamic>.from(verifyData ?? {});
           allData['isCompleted'] = true;
           allData['completedAt'] = DateTime.now().toIso8601String();
           
           await docRef.set(allData);
-          debugPrint('TaskService.forceCompleteTask: Set all fields explicitly');
+          Logger.debug('forceCompleteTask: Set all fields explicitly', tag: 'TaskService');
           
           // Verify again
           await Future.delayed(const Duration(milliseconds: 500));
           final finalVerify = await docRef.get(GetOptions(source: Source.server));
           if (finalVerify.exists) {
             final finalData = finalVerify.data();
-            debugPrint('TaskService.forceCompleteTask: Final verification - isCompleted=${finalData?['isCompleted']}');
+            Logger.debug('forceCompleteTask: Final verification - isCompleted=${finalData?['isCompleted']}', tag: 'TaskService');
           }
         }
       }
-    } catch (e) {
-      debugPrint('TaskService.forceCompleteTask error: $e');
-      debugPrint('Task ID: $taskId');
+    } catch (e, st) {
+      Logger.error('forceCompleteTask error', error: e, stackTrace: st, tag: 'TaskService');
+      Logger.debug('Task ID: $taskId', tag: 'TaskService');
       rethrow;
     }
   }
@@ -460,7 +461,7 @@ class TaskService {
       final doc = await docRef.get(GetOptions(source: Source.server));
       
       if (!doc.exists) {
-        debugPrint('TaskService.getTaskInfo: Document not found: $taskId');
+        Logger.warning('getTaskInfo: Document not found: $taskId', tag: 'TaskService');
         return {'exists': false, 'path': collectionPath};
       }
       
@@ -473,8 +474,8 @@ class TaskService {
         'isCompleted': data?['isCompleted'],
         'isCompletedType': data?['isCompleted'].runtimeType.toString(),
       };
-    } catch (e) {
-      debugPrint('TaskService.getTaskInfo error: $e');
+    } catch (e, st) {
+      Logger.error('getTaskInfo error', error: e, stackTrace: st, tag: 'TaskService');
       return {'error': e.toString()};
     }
   }
@@ -482,15 +483,15 @@ class TaskService {
   /// Delete a stuck task (last resort)
   Future<void> deleteStuckTask(String taskId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
       final docRef = _firestore.collection(collectionPath).doc(taskId);
       await docRef.delete();
-      debugPrint('TaskService.deleteStuckTask: Deleted task $taskId');
-    } catch (e) {
-      debugPrint('TaskService.deleteStuckTask error: $e');
+      Logger.info('deleteStuckTask: Deleted task $taskId', tag: 'TaskService');
+    } catch (e, st) {
+      Logger.error('deleteStuckTask error', error: e, stackTrace: st, tag: 'TaskService');
       rethrow;
     }
   }
@@ -502,7 +503,7 @@ class TaskService {
     
     try {
       final collectionPath = await _collectionPath;
-      debugPrint('TaskService.deleteDocumentByDocId: Attempting to delete document $documentId');
+      Logger.deleteDocumentByDocId: Attempting to delete document $documentId');
       debugPrint('  Collection path: $collectionPath');
       debugPrint('  Family ID: $familyId');
       
@@ -512,7 +513,7 @@ class TaskService {
       final doc = await docRef.get(GetOptions(source: Source.server));
       
       if (!doc.exists) {
-        debugPrint('TaskService.deleteDocumentByDocId: Document $documentId does not exist');
+        Logger.warning('deleteDocumentByDocId: Document $documentId does not exist', tag: 'TaskService');
         // Try to find it by querying for documents with that ID in the data
         final snapshot = await _firestore
             .collection(collectionPath)
@@ -520,34 +521,34 @@ class TaskService {
             .get(GetOptions(source: Source.server));
         
         if (snapshot.docs.isNotEmpty) {
-          debugPrint('TaskService.deleteDocumentByDocId: Found ${snapshot.docs.length} document(s) with id=$documentId in data');
+          Logger.debug('deleteDocumentByDocId: Found ${snapshot.docs.length} document(s) with id=$documentId in data', tag: 'TaskService');
           for (var doc in snapshot.docs) {
-            debugPrint('  Deleting document ${doc.id}');
+            Logger.debug('  Deleting document ${doc.id}', tag: 'TaskService');
             await doc.reference.delete();
           }
           return;
         }
-        throw Exception('Document $documentId not found');
+        throw FirestoreException('Document $documentId not found', code: 'not-found');
       }
       
       final data = doc.data();
-      debugPrint('TaskService.deleteDocumentByDocId: Document exists, data: $data');
+      Logger.debug('deleteDocumentByDocId: Document exists, data: $data', tag: 'TaskService');
       
       // Delete it
       await docRef.delete();
-      debugPrint('TaskService.deleteDocumentByDocId: Delete command sent');
+      Logger.debug('deleteDocumentByDocId: Delete command sent', tag: 'TaskService');
       
       // Verify deletion
       await Future.delayed(const Duration(milliseconds: 500));
       final verifyDoc = await docRef.get(GetOptions(source: Source.server));
       if (!verifyDoc.exists) {
-        debugPrint('TaskService.deleteDocumentByDocId: Successfully deleted document $documentId');
+        Logger.info('deleteDocumentByDocId: Successfully deleted document $documentId', tag: 'TaskService');
       } else {
-        debugPrint('TaskService.deleteDocumentByDocId: WARNING - Document still exists after deletion attempt');
-        throw Exception('Document deletion verification failed');
+        Logger.warning('deleteDocumentByDocId: WARNING - Document still exists after deletion attempt', tag: 'TaskService');
+        throw FirestoreException('Document deletion verification failed', code: 'verification-failed');
       }
-    } catch (e) {
-      debugPrint('TaskService.deleteDocumentByDocId error: $e');
+    } catch (e, st) {
+      Logger.error('deleteDocumentByDocId error', error: e, stackTrace: st, tag: 'TaskService');
       rethrow;
     }
   }
@@ -559,7 +560,7 @@ class TaskService {
     
     try {
       final collectionPath = await _collectionPath;
-      debugPrint('TaskService.deleteDuplicateByTaskId: Finding duplicates for task ID $taskId');
+      Logger.deleteDuplicateByTaskId: Finding duplicates for task ID $taskId');
       
       // Find all documents that have this task ID in their 'id' field
       final snapshot = await _firestore
@@ -567,27 +568,27 @@ class TaskService {
           .where('id', isEqualTo: taskId)
           .get(GetOptions(source: Source.server));
       
-      debugPrint('TaskService.deleteDuplicateByTaskId: Found ${snapshot.docs.length} document(s) with id=$taskId');
+      Logger.deleteDuplicateByTaskId: Found ${snapshot.docs.length} document(s) with id=$taskId');
       
       final deleted = <String>[];
       for (var doc in snapshot.docs) {
         // Skip the one where document ID matches task ID (that's the correct one)
         if (doc.id != taskId) {
-          debugPrint('TaskService.deleteDuplicateByTaskId: Deleting duplicate document ${doc.id}');
+          Logger.deleteDuplicateByTaskId: Deleting duplicate document ${doc.id}');
           await doc.reference.delete();
           deleted.add(doc.id);
         } else {
-          debugPrint('TaskService.deleteDuplicateByTaskId: Keeping document ${doc.id} (document ID matches task ID)');
+          Logger.deleteDuplicateByTaskId: Keeping document ${doc.id} (document ID matches task ID)');
         }
       }
       
       if (deleted.isEmpty) {
-        debugPrint('TaskService.deleteDuplicateByTaskId: No duplicates found to delete');
+        Logger.deleteDuplicateByTaskId: No duplicates found to delete');
       } else {
-        debugPrint('TaskService.deleteDuplicateByTaskId: Deleted ${deleted.length} duplicate(s): $deleted');
+        Logger.deleteDuplicateByTaskId: Deleted ${deleted.length} duplicate(s): $deleted');
       }
     } catch (e) {
-      debugPrint('TaskService.deleteDuplicateByTaskId error: $e');
+      Logger.deleteDuplicateByTaskId error: $e');
       rethrow;
     }
   }
@@ -599,14 +600,14 @@ class TaskService {
     
     try {
       final collectionPath = await _collectionPath;
-      debugPrint('TaskService.cleanupDuplicates: Starting cleanup');
+      Logger.cleanupDuplicates: Starting cleanup');
       
       // Get all documents directly
       final snapshot = await _firestore
           .collection(collectionPath)
           .get(GetOptions(source: Source.server));
       
-      debugPrint('TaskService.cleanupDuplicates: Found ${snapshot.docs.length} documents');
+      Logger.cleanupDuplicates: Found ${snapshot.docs.length} documents');
       
       // Group by logical ID (from 'id' field in data)
       final logicalIdToDocs = <String, List<DocumentSnapshot>>{};
@@ -623,7 +624,7 @@ class TaskService {
         final docs = entry.value;
         
         if (docs.length > 1) {
-          debugPrint('TaskService.cleanupDuplicates: Found ${docs.length} duplicates for logical ID $logicalId');
+          Logger.cleanupDuplicates: Found ${docs.length} duplicates for logical ID $logicalId');
           
           // Find the preferred document (where doc ID matches logical ID)
           DocumentSnapshot? preferredDoc;
@@ -637,12 +638,12 @@ class TaskService {
           // If no preferred doc found, use the first one
           preferredDoc ??= docs.first;
           
-          debugPrint('TaskService.cleanupDuplicates: Preferred document: ${preferredDoc.id}');
+          Logger.cleanupDuplicates: Preferred document: ${preferredDoc.id}');
           
           // Delete all other documents
           for (var doc in docs) {
             if (doc.id != preferredDoc!.id) {
-              debugPrint('TaskService.cleanupDuplicates: Deleting duplicate document ${doc.id}');
+              Logger.cleanupDuplicates: Deleting duplicate document ${doc.id}');
               await doc.reference.delete();
               duplicatesToDelete.add(doc.id);
             }
@@ -651,12 +652,12 @@ class TaskService {
       }
       
       if (duplicatesToDelete.isEmpty) {
-        debugPrint('TaskService.cleanupDuplicates: No duplicates found');
+        Logger.cleanupDuplicates: No duplicates found');
       } else {
-        debugPrint('TaskService.cleanupDuplicates: Deleted ${duplicatesToDelete.length} duplicate document(s)');
+        Logger.cleanupDuplicates: Deleted ${duplicatesToDelete.length} duplicate document(s)');
       }
     } catch (e) {
-      debugPrint('TaskService.cleanupDuplicates error: $e');
+      Logger.cleanupDuplicates error: $e');
       rethrow;
     }
   }
@@ -719,7 +720,7 @@ class TaskService {
         'claimStatus': 'pending',
       }, SetOptions(merge: true));
       
-      debugPrint('TaskService.claimJob: Job $taskId claimed by $currentUserId');
+      Logger.claimJob: Job $taskId claimed by $currentUserId');
       
       // Send notification to job creator
       final jobTitle = data['title'] as String? ?? 'A job';
@@ -728,7 +729,7 @@ class TaskService {
         _notificationService.notifyJobClaimed(taskId, jobTitle, currentUserId);
       }
     } catch (e) {
-      debugPrint('TaskService.claimJob error: $e');
+      Logger.claimJob error: $e');
       rethrow;
     }
   }
@@ -793,9 +794,9 @@ class TaskService {
         'assignedTo': claimerId,
       }, SetOptions(merge: true));
       
-      debugPrint('TaskService.approveClaim: Claim approved for job $taskId by claimer $claimerId');
+      Logger.approveClaim: Claim approved for job $taskId by claimer $claimerId');
     } catch (e) {
-      debugPrint('TaskService.approveClaim error: $e');
+      Logger.approveClaim error: $e');
       rethrow;
     }
   }
@@ -861,9 +862,9 @@ class TaskService {
         'assignedTo': '',
       }, SetOptions(merge: true));
       
-      debugPrint('TaskService.rejectClaim: Claim rejected for job $taskId');
+      Logger.rejectClaim: Claim rejected for job $taskId');
     } catch (e) {
-      debugPrint('TaskService.rejectClaim error: $e');
+      Logger.rejectClaim error: $e');
       rethrow;
     }
   }
@@ -943,13 +944,13 @@ class TaskService {
         if (completerId != null) {
           // Debit family wallet (money paid out)
           await _familyWalletService.debitFamilyWallet(reward.toDouble());
-          debugPrint('TaskService.approveJob: Paid out $reward from family wallet to completer $completerId');
+          Logger.approveJob: Paid out $reward from family wallet to completer $completerId');
         }
       }
       
-      debugPrint('TaskService.approveJob: Job $taskId approved by $currentUserId');
+      Logger.approveJob: Job $taskId approved by $currentUserId');
     } catch (e) {
-      debugPrint('TaskService.approveJob error: $e');
+      Logger.approveJob error: $e');
       rethrow;
     }
   }
@@ -1002,15 +1003,15 @@ class TaskService {
 
       // Credit family wallet (return the money)
       await _familyWalletService.creditFamilyWallet(reward.toDouble());
-      debugPrint('TaskService.refundJob: Credited $reward to family wallet');
+      Logger.refundJob: Credited $reward to family wallet');
 
       // Send notification to creator
       final jobTitle = data['title'] as String? ?? 'A job';
       await _notificationService.notifyJobRefunded(taskId, jobTitle, reason, note);
       
-      debugPrint('TaskService.refundJob: Job $taskId refunded by $currentUserId');
+      Logger.refundJob: Job $taskId refunded by $currentUserId');
     } catch (e) {
-      debugPrint('TaskService.refundJob error: $e');
+      Logger.refundJob error: $e');
       rethrow;
     }
   }
