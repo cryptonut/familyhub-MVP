@@ -58,7 +58,7 @@ flutter run
 ## 💡 Important Notes
 
 - This is a **different API key** from your Firebase Auth key
-- Firebase Auth Key: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4` (for authentication)
+- Firebase Auth Key: `YOUR_FIREBASE_API_KEY` (for authentication - get from Firebase Console)
 - Google Maps Key: `YOUR_GOOGLE_MAPS_API_KEY_HERE` (for maps - get from Google Cloud Console)
 - Both are needed and serve different purposes
 

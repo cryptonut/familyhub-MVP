@@ -20,7 +20,7 @@ Login times out silently (30s) with no error. This typically means the API key i
 
 ### Step 1: Go to Google Cloud Console
 1. Visit: https://console.cloud.google.com/apis/credentials?project=family-hub-71ff0
-2. Find the **Android API key**: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+2. Find the **Android API key**: `YOUR_FIREBASE_API_KEY` (get from Firebase Console)
 3. Click to **Edit**
 
 ### Step 2: Check "Application restrictions"

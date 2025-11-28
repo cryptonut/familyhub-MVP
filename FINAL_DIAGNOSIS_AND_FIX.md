@@ -29,7 +29,7 @@ The API key has **TWO separate restriction types**:
 ### Step 1: Check API Key APPLICATION Restrictions
 
 1. Go to: https://console.cloud.google.com/apis/credentials?project=family-hub-71ff0
-2. Find **Android API key**: `AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4`
+2. Find **Android API key**: `YOUR_FIREBASE_API_KEY` (get from Firebase Console)
 3. Click **Edit**
 4. Look for **"Application restrictions"** section (separate from "API restrictions")
 
