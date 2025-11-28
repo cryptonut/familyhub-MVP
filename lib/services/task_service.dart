@@ -503,9 +503,9 @@ class TaskService {
     
     try {
       final collectionPath = await _collectionPath;
-      Logger.deleteDocumentByDocId: Attempting to delete document $documentId');
-      debugPrint('  Collection path: $collectionPath');
-      debugPrint('  Family ID: $familyId');
+      Logger.debug('deleteDocumentByDocId: Attempting to delete document $documentId', tag: 'TaskService');
+      Logger.debug('  Collection path: $collectionPath', tag: 'TaskService');
+      Logger.debug('  Family ID: $familyId', tag: 'TaskService');
       
       final docRef = _firestore.collection(collectionPath).doc(documentId);
       
