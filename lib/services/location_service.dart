@@ -15,7 +15,7 @@ class LocationService {
 
   Future<String> get _collectionPath async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     return 'families/$familyId/members';
   }
 
@@ -91,7 +91,7 @@ class LocationService {
     double longitude,
   ) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     final collectionPath = await _collectionPath;
     await _firestore.collection(collectionPath).doc(memberId).set({
@@ -103,7 +103,7 @@ class LocationService {
 
   Future<void> addMember(FamilyMember member) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     final collectionPath = await _collectionPath;
     await _firestore.collection(collectionPath).doc(member.id).set({

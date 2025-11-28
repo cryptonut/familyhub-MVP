@@ -499,7 +499,7 @@ class TaskService {
   /// Delete a specific document by its Firestore document ID
   Future<void> deleteDocumentByDocId(String documentId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
@@ -556,7 +556,7 @@ class TaskService {
   /// Delete duplicate document by querying for it
   Future<void> deleteDuplicateByTaskId(String taskId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
@@ -596,7 +596,7 @@ class TaskService {
   /// Find and delete duplicate tasks
   Future<void> cleanupDuplicates() async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
@@ -665,7 +665,7 @@ class TaskService {
   /// Claim a job (request to work on it)
   Future<void> claimJob(String taskId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
@@ -737,7 +737,7 @@ class TaskService {
   /// Approve a claim on a job
   Future<void> approveClaim(String taskId, String claimerId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
@@ -804,7 +804,7 @@ class TaskService {
   /// Reject a claim on a job
   Future<void> rejectClaim(String taskId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
@@ -872,7 +872,7 @@ class TaskService {
   /// Approve a completed job (for jobs that need approval)
   Future<void> approveJob(String taskId) async {
     final familyId = await _familyId;
-    if (familyId == null) throw Exception('User not part of a family');
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
       final collectionPath = await _collectionPath;
