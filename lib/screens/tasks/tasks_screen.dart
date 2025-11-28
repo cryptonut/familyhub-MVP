@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import '../../core/services/logger_service.dart';
 import '../../models/task.dart';
 import '../../services/task_service.dart';
 import '../../services/app_state.dart';
@@ -48,7 +48,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     final appState = Provider.of<AppState>(context, listen: false);
     final initialIndex = widget.initialTabIndex ?? appState.tasksTabIndex ?? 0;
     _tabController = TabController(length: 2, vsync: this, initialIndex: initialIndex);
-    debugPrint('TasksScreen.initState: Initializing, loading tasks... (initialTabIndex: $initialIndex)');
+    Logger.debug('initState: Initializing, loading tasks... (initialTabIndex: $initialIndex)', tag: 'TasksScreen');
     // Clear familyId cache to ensure we have the latest value
     _taskService.clearFamilyIdCache();
     
@@ -94,35 +94,35 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
 
   Future<void> _loadTasks({bool forceRefresh = false}) async {
     try {
-      debugPrint('TasksScreen._loadTasks: Loading tasks (forceRefresh: $forceRefresh)');
+      Logger.debug('_loadTasks: Loading tasks (forceRefresh: $forceRefresh)', tag: 'TasksScreen');
       final allTasks = await _taskService.getTasks(forceRefresh: forceRefresh);
       
       // Collect all unique user IDs (creators)
       final userIds = <String>{};
-      debugPrint('TasksScreen._loadTasks: Processing ${allTasks.length} tasks');
+      Logger.debug('_loadTasks: Processing ${allTasks.length} tasks', tag: 'TasksScreen');
       for (var task in allTasks) {
-        debugPrint('  - Task "${task.title}" (${task.id}): createdBy=${task.createdBy}');
+        Logger.debug('  - Task "${task.title}" (${task.id}): createdBy=${task.createdBy}', tag: 'TasksScreen');
         if (task.createdBy != null && task.createdBy!.isNotEmpty) {
           userIds.add(task.createdBy!);
         } else {
-          debugPrint('    WARNING: Task has no createdBy field!');
+          Logger.warning('    WARNING: Task has no createdBy field!', tag: 'TasksScreen');
         }
       }
-      debugPrint('TasksScreen._loadTasks: Found ${userIds.length} unique creator IDs: $userIds');
+      Logger.debug('_loadTasks: Found ${userIds.length} unique creator IDs: $userIds', tag: 'TasksScreen');
       
       // Fetch user names for all creators
       final userNames = <String, String>{};
-      debugPrint('TasksScreen._loadTasks: Fetching names for ${userIds.length} unique creators');
+      Logger.debug('_loadTasks: Fetching names for ${userIds.length} unique creators', tag: 'TasksScreen');
       for (var userId in userIds) {
         if (!_userNames.containsKey(userId)) {
           try {
             final userDoc = await _firestore.collection('users').doc(userId).get();
             if (userDoc.exists) {
               final userData = userDoc.data();
-              debugPrint('TasksScreen._loadTasks: User document for $userId:');
-              debugPrint('  - displayName: ${userData?['displayName']}');
-              debugPrint('  - email: ${userData?['email']}');
-              debugPrint('  - All fields: ${userData?.keys.toList()}');
+              Logger.debug('_loadTasks: User document for $userId:', tag: 'TasksScreen');
+              Logger.debug('  - displayName: ${userData?['displayName']}', tag: 'TasksScreen');
+              Logger.debug('  - email: ${userData?['email']}', tag: 'TasksScreen');
+              Logger.debug('  - All fields: ${userData?.keys.toList()}', tag: 'TasksScreen');
               
               final displayName = userData?['displayName'] as String?;
               final email = userData?['email'] as String?;
@@ -134,37 +134,37 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                   displayName.toLowerCase() != 'user') {
                 // Use displayName if it's not empty and not the default "User"
                 userName = displayName;
-                debugPrint('  - Using displayName: $userName');
+                Logger.debug('  - Using displayName: $userName', tag: 'TasksScreen');
               } else if (email != null && email.isNotEmpty) {
                 // Extract name from email (part before @) and capitalize first letter
                 final emailName = email.split('@').first;
                 userName = emailName.isNotEmpty 
                     ? emailName[0].toUpperCase() + emailName.substring(1)
                     : 'Unknown User';
-                debugPrint('  - Using email-derived name: $userName (from $email)');
+                Logger.debug('  - Using email-derived name: $userName (from $email)', tag: 'TasksScreen');
               } else {
                 userName = 'Unknown User';
-                debugPrint('  - No valid name found, using fallback');
+                Logger.debug('  - No valid name found, using fallback', tag: 'TasksScreen');
               }
               
               userNames[userId] = userName;
-              debugPrint('  - Selected name: $userName');
+              Logger.debug('  - Selected name: $userName', tag: 'TasksScreen');
             } else {
-              debugPrint('TasksScreen._loadTasks: User document does not exist for $userId');
+              Logger.warning('_loadTasks: User document does not exist for $userId', tag: 'TasksScreen');
               userNames[userId] = 'Unknown User';
             }
           } catch (e) {
-            debugPrint('TasksScreen._loadTasks: Error fetching user name for $userId: $e');
+            Logger.error('_loadTasks: Error fetching user name for $userId', error: e, tag: 'TasksScreen');
             userNames[userId] = 'Unknown User';
           }
         } else {
           // Use cached name
           userNames[userId] = _userNames[userId]!;
-          debugPrint('TasksScreen._loadTasks: Using cached name for $userId: ${_userNames[userId]}');
+          Logger.debug('_loadTasks: Using cached name for $userId: ${_userNames[userId]}', tag: 'TasksScreen');
         }
       }
       
-      debugPrint('TasksScreen._loadTasks: Final user names map: $userNames');
+      Logger.debug('_loadTasks: Final user names map: $userNames', tag: 'TasksScreen');
       
       // Update cache
       _userNames.addAll(userNames);
@@ -183,19 +183,19 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         return !task.isAwaitingApproval;
       }).toList();
       
-      debugPrint('TasksScreen._loadTasks: Loaded ${active.length} active, ${completed.length} completed');
+      Logger.info('_loadTasks: Loaded ${active.length} active, ${completed.length} completed', tag: 'TasksScreen');
       
       if (mounted) {
         setState(() {
           _activeTasks = active;
           _completedTasks = completed;
         });
-        debugPrint('TasksScreen._loadTasks: State updated');
+        Logger.debug('_loadTasks: State updated', tag: 'TasksScreen');
       } else {
-        debugPrint('TasksScreen._loadTasks: Widget not mounted, skipping setState');
+        Logger.debug('_loadTasks: Widget not mounted, skipping setState', tag: 'TasksScreen');
       }
     } catch (e) {
-      debugPrint('TasksScreen._loadTasks error: $e');
+      Logger.error('_loadTasks error', error: e, tag: 'TasksScreen');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -210,7 +210,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
   Future<void> _toggleTask(Task task) async {
     // Prevent multiple clicks on the same task
     if (_completingTaskIds.contains(task.id)) {
-      debugPrint('Task ${task.id} is already being completed, ignoring duplicate click');
+      Logger.debug('Task ${task.id} is already being completed, ignoring duplicate click', tag: 'TasksScreen');
       return;
     }
     
@@ -231,7 +231,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     // Special handling for the stuck task
     final isStuckTask = task.id == 'e237c1e4-90a6-4154-aaf9-eb4c4375663a';
     if (isStuckTask) {
-      debugPrint('Attempting to complete stuck task: ${task.id}');
+      Logger.warning('Attempting to complete stuck task: ${task.id}', tag: 'TasksScreen');
     }
     
     // Mark task as being completed
@@ -247,7 +247,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     try {
       // For stuck tasks, try force complete first
       if (isStuckTask) {
-        debugPrint('Using forceCompleteTask for stuck task ${task.id}');
+        Logger.info('Using forceCompleteTask for stuck task ${task.id}', tag: 'TasksScreen');
         await _taskService.forceCompleteTask(task.id);
       } else {
         // Use completeTask instead of toggleTaskCompletion to avoid race conditions
@@ -273,7 +273,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         
         // If task needs approval and is completed, it should stay in active (awaiting approval)
         if (task.needsApproval && updatedTask.isCompleted && updatedTask.isAwaitingApproval) {
-          debugPrint('Task ${task.id} completed and awaiting approval - correctly staying in active list');
+          Logger.debug('Task ${task.id} completed and awaiting approval - correctly staying in active list', tag: 'TasksScreen');
           success = true;
           break;
         }
@@ -282,21 +282,21 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         if (!updatedTask.isAwaitingApproval && updatedTask.isCompleted) {
           final stillActive = _activeTasks.any((t) => t.id == task.id);
           if (!stillActive) {
-            debugPrint('Task ${task.id} successfully moved to completed after ${i + 1} refresh(es)');
+            Logger.info('Task ${task.id} successfully moved to completed after ${i + 1} refresh(es)', tag: 'TasksScreen');
             success = true;
             break;
           }
         }
         
         if (i == 4) {
-          debugPrint('Warning: Task ${task.id} still appears in active list after 5 refreshes');
+          Logger.warning('Warning: Task ${task.id} still appears in active list after 5 refreshes', tag: 'TasksScreen');
         }
       }
       
       if (!success && mounted) {
         // If still not updated after retries, try force complete one more time
         if (isStuckTask) {
-          debugPrint('Retrying forceCompleteTask for stuck task ${task.id}');
+          Logger.warning('Retrying forceCompleteTask for stuck task ${task.id}', tag: 'TasksScreen');
           await _taskService.forceCompleteTask(task.id);
           await Future.delayed(const Duration(milliseconds: 500));
           await _loadTasks(forceRefresh: true);
@@ -598,7 +598,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
           PopupMenuButton(
             icon: const Icon(Icons.more_vert),
             itemBuilder: (context) {
-              debugPrint('TasksScreen: Building AppBar menu with 4 items');
+              Logger.debug('Building AppBar menu with 4 items', tag: 'TasksScreen');
               return [
                 const PopupMenuItem(
                   value: 'refresh',
@@ -643,9 +643,9 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
               ];
             },
             onSelected: (value) async {
-              debugPrint('TasksScreen: AppBar menu selected: $value');
+              Logger.debug('AppBar menu selected: $value', tag: 'TasksScreen');
               if (value == 'refresh') {
-                debugPrint('TasksScreen: Manual refresh triggered');
+                Logger.debug('Manual refresh triggered', tag: 'TasksScreen');
                 await _loadTasks(forceRefresh: true);
               } else if (value == 'cleanup') {
                 try {
@@ -813,7 +813,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
             ),
           );
           if (result == true) {
-            debugPrint('TasksScreen: Task saved, refreshing list');
+            Logger.info('Task saved, refreshing list', tag: 'TasksScreen');
             // Wait a moment for Firestore to process, then force refresh
             await Future.delayed(const Duration(milliseconds: 500));
             await _loadTasks(forceRefresh: true);
@@ -1137,7 +1137,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
   }
 
   Widget _buildTasksList(List<Task> tasks, bool isCompleted) {
-    debugPrint('_buildTasksList: Building list with ${tasks.length} tasks (isCompleted: $isCompleted)');
+    Logger.debug('_buildTasksList: Building list with ${tasks.length} tasks (isCompleted: $isCompleted)', tag: 'TasksScreen');
     
     if (tasks.isEmpty) {
       return EmptyState(
@@ -1145,7 +1145,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         title: isCompleted ? 'No completed jobs' : 'No active jobs',
         action: TextButton.icon(
           onPressed: () async {
-            debugPrint('Manual refresh from empty state');
+            Logger.debug('Manual refresh from empty state', tag: 'TasksScreen');
             await _loadTasks(forceRefresh: true);
           },
           icon: const Icon(Icons.refresh),
@@ -1186,7 +1186,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                   Builder(
                     builder: (context) {
                       final creatorName = _userNames[task.createdBy] ?? 'Unknown';
-                      debugPrint('TasksScreen._buildTasksList: Task ${task.id} createdBy=${task.createdBy}, name=$creatorName');
+                      Logger.debug('_buildTasksList: Task ${task.id} createdBy=${task.createdBy}, name=$creatorName', tag: 'TasksScreen');
                       return Row(
                         children: [
                           Icon(Icons.person_outline, size: 14, color: Colors.grey[600]),
@@ -1344,7 +1344,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
               itemBuilder: (context) {
                 final items = <PopupMenuItem>[];
                 final isStuckTask = task.id == 'e237c1e4-90a6-4154-aaf9-eb4c4375663a';
-                debugPrint('TasksScreen: Building task menu for task ${task.id} (isStuckTask: $isStuckTask, isCompleted: $isCompleted)');
+                Logger.debug('Building task menu for task ${task.id} (isStuckTask: $isStuckTask, isCompleted: $isCompleted)', tag: 'TasksScreen');
                 
                 if (!isCompleted) {
                   items.add(
@@ -1478,7 +1478,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                   ),
                 );
                 
-                debugPrint('TasksScreen: Task menu built with ${items.length} items');
+                Logger.debug('Task menu built with ${items.length} items', tag: 'TasksScreen');
                 return items;
               },
               onSelected: (value) async {
@@ -1547,7 +1547,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                       ),
                     );
                   }
-                  debugPrint('Task debug info: $info');
+                  Logger.debug('Task debug info: $info', tag: 'TasksScreen');
                 } else if (value == 'delete_stuck') {
                   // Delete the stuck task
                   if (mounted) {

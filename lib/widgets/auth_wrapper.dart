@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import '../core/services/logger_service.dart';
 import '../screens/home_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/family/join_family_screen.dart';
@@ -51,7 +52,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
               setState(() {
                 _pendingInviteCode = trimmedCode;
               });
-              debugPrint('Family invitation code found: $trimmedCode');
+              Logger.info('Family invitation code found: $trimmedCode', tag: 'AuthWrapper');
             }
           }
           
@@ -63,12 +64,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
               setState(() {
                 _pendingHubInviteId = trimmedId;
               });
-              debugPrint('Hub invite ID found: $trimmedId');
+              Logger.info('Hub invite ID found: $trimmedId', tag: 'AuthWrapper');
             }
           }
         } catch (e, stackTrace) {
-          debugPrint('Error checking for invite code: $e');
-          debugPrint('Stack trace: $stackTrace');
+          Logger.error('Error checking for invite code', error: e, stackTrace: stackTrace, tag: 'AuthWrapper');
           // Don't crash the app, just log the error
         }
       });
@@ -119,7 +119,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
     } catch (e) {
       // Catch any errors during the process
-      debugPrint('Error handling invite code: $e');
+      Logger.error('Error handling invite code', error: e, tag: 'AuthWrapper');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -143,7 +143,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, snapshot) {
         // Handle stream errors
         if (snapshot.hasError) {
-          debugPrint('AuthWrapper: Stream error - ${snapshot.error}');
+          Logger.error('Stream error', error: snapshot.error, tag: 'AuthWrapper');
           _resetState();
           return LoginScreen(pendingInviteCode: _pendingInviteCode);
         }
@@ -157,7 +157,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // No user = show login
         if (!snapshot.hasData || snapshot.data == null) {
-          debugPrint('AuthWrapper: No user - showing login');
+          Logger.debug('No user - showing login', tag: 'AuthWrapper');
           _resetState();
           
           if (_pendingHubInviteId != null && _pendingHubInviteId!.isNotEmpty) {
@@ -169,14 +169,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // User exists - validate it's a real session
         final user = snapshot.data!;
-        debugPrint('AuthWrapper: User found - ${user.uid}');
-        debugPrint('AuthWrapper: Firebase Auth session persisted (user automatically logged in)');
-        debugPrint('AuthWrapper: Email: ${user.email}');
-        debugPrint('AuthWrapper: Now attempting to load user data from Firestore...');
+        Logger.info('User found - ${user.uid}', tag: 'AuthWrapper');
+        Logger.debug('Firebase Auth session persisted (user automatically logged in)', tag: 'AuthWrapper');
+        Logger.debug('Email: ${user.email}', tag: 'AuthWrapper');
+        Logger.debug('Now attempting to load user data from Firestore...', tag: 'AuthWrapper');
         
         // Reset state if different user (new login after logout)
         if (_lastUserId != null && _lastUserId != user.uid) {
-          debugPrint('AuthWrapper: Different user detected - resetting state');
+          Logger.info('Different user detected - resetting state', tag: 'AuthWrapper');
           _resetState();
         }
         
@@ -195,15 +195,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
               // Use a reasonable timeout that works for both web and Android
               final userModel = await authService.getCurrentUserModel()
                   .timeout(const Duration(seconds: 10), onTimeout: () {
-                debugPrint('AuthWrapper: ⚠️ Firestore timeout - cannot load user data');
-                debugPrint('AuthWrapper: This may indicate network issues or API restrictions');
+                Logger.warning('⚠️ Firestore timeout - cannot load user data', tag: 'AuthWrapper');
+                Logger.warning('This may indicate network issues or API restrictions', tag: 'AuthWrapper');
                 return null;
               });
               
               if (userModel == null && mounted) {
-                debugPrint('AuthWrapper: ⚠️ WARNING - Cannot load user data from Firestore');
-                debugPrint('AuthWrapper: User is authenticated but Firestore is unavailable');
-                debugPrint('AuthWrapper: This will result in empty dashboard with no data');
+                Logger.warning('⚠️ WARNING - Cannot load user data from Firestore', tag: 'AuthWrapper');
+                Logger.warning('User is authenticated but Firestore is unavailable', tag: 'AuthWrapper');
+                Logger.warning('This will result in empty dashboard with no data', tag: 'AuthWrapper');
                 
                 // Show a warning to the user (platform-agnostic)
                 if (mounted) {
@@ -226,10 +226,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
                   );
                 }
               } else {
-                debugPrint('AuthWrapper: ✓ User data loaded successfully from Firestore');
+                Logger.info('✓ User data loaded successfully from Firestore', tag: 'AuthWrapper');
               }
             } catch (e) {
-              debugPrint('AuthWrapper: Error checking Firestore connectivity: $e');
+              Logger.error('Error checking Firestore connectivity', error: e, tag: 'AuthWrapper');
               // Only show error snackbar for critical Firestore unavailable errors
               if (mounted && e.toString().toLowerCase().contains('unavailable')) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -295,27 +295,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
       // Use timeout to prevent hanging
       final userModel = await authService.getCurrentUserModel()
           .timeout(const Duration(seconds: 3), onTimeout: () {
-        debugPrint('_triggerCalendarSyncIfEnabled: Timeout getting user model');
+        Logger.warning('_triggerCalendarSyncIfEnabled: Timeout getting user model', tag: 'AuthWrapper');
         return null;
       }).catchError((e) {
-        debugPrint('_triggerCalendarSyncIfEnabled: Error getting user model: $e');
+        Logger.error('_triggerCalendarSyncIfEnabled: Error getting user model', error: e, tag: 'AuthWrapper');
         return null;
       });
       
       if (userModel?.calendarSyncEnabled == true && userModel?.localCalendarId != null) {
         // Register background sync if not already registered (non-blocking)
         BackgroundSyncService.registerPeriodicSync().catchError((e) {
-          debugPrint('Error registering background sync: $e');
+          Logger.error('Error registering background sync', error: e, tag: 'AuthWrapper');
         });
         
         // Perform initial sync in background (don't block UI)
         final syncService = CalendarSyncService();
         syncService.performSync().catchError((e) {
-          debugPrint('Error performing initial calendar sync: $e');
+          Logger.error('Error performing initial calendar sync', error: e, tag: 'AuthWrapper');
         });
       }
     } catch (e) {
-      debugPrint('Error checking calendar sync status: $e');
+      Logger.error('Error checking calendar sync status', error: e, tag: 'AuthWrapper');
       // Don't rethrow - this is non-critical
     }
   }
