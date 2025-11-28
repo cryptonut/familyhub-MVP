@@ -657,7 +657,7 @@ class TaskService {
         Logger.info('cleanupDuplicates: Deleted ${duplicatesToDelete.length} duplicate document(s)', tag: 'TaskService');
       }
     } catch (e) {
-      Logger.cleanupDuplicates error: $e');
+      Logger.error('cleanupDuplicates error: $e', error: e, tag: 'TaskService');
       rethrow;
     }
   }
@@ -1011,7 +1011,7 @@ class TaskService {
       
       Logger.info('refundJob: Job $taskId refunded by $currentUserId', tag: 'TaskService');
     } catch (e) {
-      Logger.refundJob error: $e');
+      Logger.error('refundJob error: $e', error: e, tag: 'TaskService');
       rethrow;
     }
   }

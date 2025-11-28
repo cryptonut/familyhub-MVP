@@ -1,7 +1,8 @@
-import '../core/services/logger_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/errors/app_exceptions.dart';
+import '../core/services/logger_service.dart';
 import '../models/privacy_activity.dart';
 import '../models/user_model.dart';
 import 'auth_service.dart';
