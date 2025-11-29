@@ -9,6 +9,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'firebase_options.dart';
 import 'core/services/logger_service.dart';
 import 'core/constants/app_constants.dart';
+import 'config/config.dart';
 import 'services/app_state.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
@@ -73,6 +74,9 @@ void main() async {
   };
 
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize app configuration (Dev/Test/Prod)
+  Config.initialize();
   
   // Initialize timezone data for device_calendar
   try {

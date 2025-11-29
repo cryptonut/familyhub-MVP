@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "559662117534",
+    "project_id": "family-hub-71ff0",
+    "storage_bucket": "family-hub-71ff0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:559662117534:android:a59145c8a69587aee7c18f",
+        "android_client_info": {
+          "package_name": "com.example.familyhub_mvp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "559662117534-2g5q5vot1gkodl6r1gstpu6prik7mivl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.familyhub_mvp",
+            "certificate_hash": "bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c"
+          }
+        },
+        {
+          "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
