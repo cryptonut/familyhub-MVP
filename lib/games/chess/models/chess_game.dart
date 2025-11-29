@@ -1,3 +1,5 @@
+import 'chess_move.dart';
+
 /// Model representing a chess game
 class ChessGame {
   final String id;

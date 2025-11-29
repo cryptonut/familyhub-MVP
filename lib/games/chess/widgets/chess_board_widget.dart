@@ -175,10 +175,15 @@ class _ChessBoardWidgetState extends State<ChessBoardWidget> {
     }
   }
 
+  /// Convert 0x88 index to square name
+  /// The chess library uses 0x88 format where:
+  /// - file = index & 0x0F (lower 4 bits)
+  /// - rank = index >> 4 (upper 4 bits)
   String _indexToSquare(int index) {
-    final file = String.fromCharCode('a'.codeUnitAt(0) + (index % 8));
-    final rank = (index ~/ 8) + 1;
-    return '$file$rank';
+    final file = index & 0x0F; // Lower 4 bits
+    final rank = index >> 4; // Upper 4 bits
+    final fileChar = String.fromCharCode('a'.codeUnitAt(0) + file);
+    return '$fileChar${rank + 1}';
   }
 
   String _getPieceSymbol(chess_lib.Piece? piece) {
@@ -219,7 +224,9 @@ class _ChessBoardWidgetState extends State<ChessBoardWidget> {
 
   String _getSquareName(int row, int col) {
     final file = String.fromCharCode('a'.codeUnitAt(0) + col);
-    final rank = widget.isWhiteBottom ? (8 - row).toString() : (row + 1).toString();
+    // When white is at bottom: row 0 = rank 8, row 7 = rank 1
+    // When black is at bottom: row 0 = rank 1, row 7 = rank 8
+    final rank = widget.isWhiteBottom ? (8 - row) : (row + 1);
     return '$file$rank';
   }
 
@@ -262,10 +269,11 @@ class _ChessBoardWidgetState extends State<ChessBoardWidget> {
               final col = index % 8;
               final isLight = (row + col) % 2 == 0;
               
-              // Adjust for board orientation
-              final displayRow = widget.isWhiteBottom ? 7 - row : row;
-              final displayCol = widget.isWhiteBottom ? col : 7 - col;
-              final square = _getSquareName(displayRow, displayCol);
+              // Calculate square name directly from grid position
+              // Grid index 0-63 maps to squares a1-h8 when white is at bottom
+              // When white is at bottom: row 0 = rank 8, row 7 = rank 1
+              // When black is at bottom: row 0 = rank 1, row 7 = rank 8
+              final square = _getSquareName(row, col);
               
               final piece = widget.game.get(square);
               final isSelected = _selectedSquare == square;
@@ -275,7 +283,7 @@ class _ChessBoardWidgetState extends State<ChessBoardWidget> {
                 onTap: widget.isInteractive ? () => _onSquareTap(square) : null,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: _getSquareColor(displayRow, displayCol, isLight),
+                    color: _getSquareColor(row, col, isLight),
                     border: isSelected
                         ? Border.all(color: Colors.blue, width: 3)
                         : isValidMove

@@ -351,9 +351,8 @@ service cloud.firestore {
     
     // Chess matchmaking queue
     match /chess_matchmaking/{queueId} {
-      // Users can read their own queue entry
-      allow read: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+      // Users can read all queue entries (needed for matchmaking)
+      allow read: if isAuthenticated();
       
       // Users can create their own queue entry
       allow create: if isAuthenticated() && 

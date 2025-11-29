@@ -67,8 +67,8 @@ class ChessAIService {
         score += 2;
       }
 
-      // Prefer castling
-      if (move.flags.contains('k') || move.flags.contains('q')) {
+      // Prefer castling (flags is an int with bit flags)
+      if ((move.flags & 0x01) != 0 || (move.flags & 0x02) != 0) {
         score += 10;
       }
 
@@ -191,6 +191,8 @@ class ChessAIService {
         return 9;
       case chess_lib.PieceType.KING:
         return 100;
+      default:
+        return 0;
     }
   }
 
@@ -221,11 +223,15 @@ class ChessAIService {
     return ChessMove.fromUCI(uci);
   }
 
-  /// Convert index to square name
+  /// Convert 0x88 index to square name
+  /// The chess library uses 0x88 format where:
+  /// - file = index & 0x0F (lower 4 bits)
+  /// - rank = index >> 4 (upper 4 bits)
   String _indexToSquare(int index) {
-    final file = String.fromCharCode('a'.codeUnitAt(0) + (index % 8));
-    final rank = (index ~/ 8) + 1;
-    return '$file$rank';
+    final file = index & 0x0F; // Lower 4 bits
+    final rank = index >> 4; // Upper 4 bits
+    final fileChar = String.fromCharCode('a'.codeUnitAt(0) + file);
+    return '$fileChar${rank + 1}';
   }
 }
 

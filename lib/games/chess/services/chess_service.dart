@@ -40,7 +40,7 @@ class ChessService {
       return game;
     } catch (e, st) {
       Logger.error('Error creating solo game', error: e, stackTrace: st, tag: 'ChessService');
-      throw AppException('Failed to create game: ${e.toString()}');
+      throw FirestoreException('Failed to create game: ${e.toString()}');
     }
   }
 
@@ -49,6 +49,8 @@ class ChessService {
     required String whitePlayerId,
     required String whitePlayerName,
     required String familyId,
+    String? blackPlayerId, // Optional: specific opponent
+    String? blackPlayerName,
     int timeLimitMs = 600000,
   }) async {
     try {
@@ -57,6 +59,8 @@ class ChessService {
         id: gameId,
         whitePlayerId: whitePlayerId,
         whitePlayerName: whitePlayerName,
+        blackPlayerId: blackPlayerId,
+        blackPlayerName: blackPlayerName,
         mode: GameMode.family,
         familyId: familyId,
         initialTimeMs: timeLimitMs,
@@ -67,7 +71,7 @@ class ChessService {
       return game;
     } catch (e, st) {
       Logger.error('Error creating family game', error: e, stackTrace: st, tag: 'ChessService');
-      throw AppException('Failed to create game: ${e.toString()}');
+      throw FirestoreException('Failed to create game: ${e.toString()}');
     }
   }
 
@@ -80,15 +84,15 @@ class ChessService {
     try {
       final gameDoc = await _firestore.collection('chess_games').doc(gameId).get();
       if (!gameDoc.exists) {
-        throw AppException('Game not found');
+        throw FirestoreException('Game not found', code: 'not-found');
       }
 
       final game = ChessGame.fromJson(gameDoc.data()!);
       if (game.status != GameStatus.waiting) {
-        throw AppException('Game is not waiting for players');
+        throw ValidationException('Game is not waiting for players');
       }
       if (game.mode != GameMode.family) {
-        throw AppException('Not a family game');
+        throw ValidationException('Not a family game');
       }
 
       final updatedGame = game.copyWith(
@@ -122,7 +126,7 @@ class ChessService {
           final familyData = familyDoc.data();
           final openModeEnabled = familyData?['openChessModeEnabled'] as bool? ?? false;
           if (!openModeEnabled) {
-            throw AppException('Open chess mode is disabled for your family');
+            throw ValidationException('Open chess mode is disabled for your family');
           }
         }
       }
@@ -272,18 +276,18 @@ class ChessService {
     try {
       final gameDoc = await _firestore.collection('chess_games').doc(gameId).get();
       if (!gameDoc.exists) {
-        throw AppException('Game not found');
+        throw FirestoreException('Game not found', code: 'not-found');
       }
 
       var game = ChessGame.fromJson(gameDoc.data()!);
       if (game.status != GameStatus.active) {
-        throw AppException('Game is not active');
+        throw ValidationException('Game is not active');
       }
 
       // Validate it's the user's turn
       if (userId != null) {
         if (!game.isMyTurn(userId)) {
-          throw AppException('Not your turn');
+          throw ValidationException('Not your turn');
         }
       }
 
@@ -300,7 +304,7 @@ class ChessService {
       final validMoves = chess.generate_moves({'verbose': true});
       final validMove = validMoves.firstWhere(
         (m) => m.from == fromIndex && m.to == toIndex && (move.promotion == null || _getPromotionPiece(move.promotion!) == m.promotion),
-        orElse: () => throw AppException('Invalid move'),
+        orElse: () => throw ValidationException('Invalid move'),
       );
 
       // Make the move
@@ -316,7 +320,7 @@ class ChessService {
         to: move.to,
         promotion: move.promotion,
         uci: moveUCI,
-        san: chess.history.isNotEmpty ? chess.history.last : null,
+        san: chess.history.isNotEmpty ? (chess.history.last as String) : null,
         timestamp: DateTime.now(),
       );
 
@@ -333,10 +337,11 @@ class ChessService {
         moves: updatedMoves,
         isWhiteTurn: !game.isWhiteTurn,
         lastMove: moveUCI,
-        whiteCanCastleKingside: chess.castling['w']?.contains('K') ?? false,
-        whiteCanCastleQueenside: chess.castling['w']?.contains('Q') ?? false,
-        blackCanCastleKingside: chess.castling['b']?.contains('k') ?? false,
-        blackCanCastleQueenside: chess.castling['b']?.contains('q') ?? false,
+        // Castling rights - chess library stores as string like "KQkq"
+        whiteCanCastleKingside: (chess.castling.toString().contains('K')),
+        whiteCanCastleQueenside: (chess.castling.toString().contains('Q')),
+        blackCanCastleKingside: (chess.castling.toString().contains('k')),
+        blackCanCastleQueenside: (chess.castling.toString().contains('q')),
         enPassantSquare: chess.ep_square != null ? _indexToSquare(chess.ep_square!) : null,
         halfmoveClock: chess.half_moves,
         fullmoveNumber: chess.move_number,
@@ -347,8 +352,8 @@ class ChessService {
         updatedGame = updatedGame.copyWith(
           status: GameStatus.finished,
           finishedAt: DateTime.now(),
-          result: game.isWhiteTurn ? GameResult.blackWin : GameResult.whiteWin,
-          winnerId: game.isWhiteTurn ? game.blackPlayerId : game.whitePlayerId,
+          result: game.isWhiteTurn ? GameResult.whiteWin : GameResult.blackWin,
+          winnerId: game.isWhiteTurn ? game.whitePlayerId : game.blackPlayerId,
           resultReason: 'checkmate',
         );
       } else if (isStalemate || isDraw) {
@@ -380,9 +385,9 @@ class ChessService {
   Future<void> resignGame(String gameId, String userId) async {
     try {
       final game = await getGame(gameId);
-      if (game == null) throw AppException('Game not found');
-      if (game.status != GameStatus.active) throw AppException('Game is not active');
-      if (!game.isPlayer(userId)) throw AppException('You are not a player in this game');
+      if (game == null) throw FirestoreException('Game not found', code: 'not-found');
+      if (game.status != GameStatus.active) throw ValidationException('Game is not active');
+      if (!game.isPlayer(userId)) throw ValidationException('You are not a player in this game');
 
       final winnerId = game.whitePlayerId == userId ? game.blackPlayerId : game.whitePlayerId;
       final updatedGame = game.copyWith(
@@ -483,18 +488,22 @@ class ChessService {
     }
   }
 
-  /// Helper: Convert square name to index
+  /// Helper: Convert square name to 0x88 index format
+  /// The chess library uses 0x88 format where:
+  /// - file = index & 0x0F (lower 4 bits)
+  /// - rank = index >> 4 (upper 4 bits)
   int _squareToIndex(String square) {
     final file = square[0].codeUnitAt(0) - 'a'.codeUnitAt(0);
     final rank = int.parse(square[1]) - 1;
-    return rank * 8 + file;
+    return (rank << 4) | file; // 0x88 format
   }
 
-  /// Helper: Convert index to square name
+  /// Helper: Convert 0x88 index to square name
   String _indexToSquare(int index) {
-    final file = String.fromCharCode('a'.codeUnitAt(0) + (index % 8));
-    final rank = (index ~/ 8) + 1;
-    return '$file$rank';
+    final file = index & 0x0F; // Lower 4 bits
+    final rank = index >> 4; // Upper 4 bits
+    final fileChar = String.fromCharCode('a'.codeUnitAt(0) + file);
+    return '$fileChar${rank + 1}';
   }
 
   /// Helper: Get promotion piece type

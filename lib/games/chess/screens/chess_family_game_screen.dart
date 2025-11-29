@@ -76,6 +76,8 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
         whitePlayerId: user.uid,
         whitePlayerName: userModel?.displayName ?? 'Player',
         familyId: userModel!.familyId!,
+        blackPlayerId: opponent.uid,
+        blackPlayerName: opponent.displayName,
       );
 
       // Navigate to game screen
