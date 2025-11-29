@@ -9,6 +9,7 @@ import '../models/chess_game.dart';
 import '../services/chess_service.dart';
 import '../services/chess_ai_service.dart';
 import '../widgets/chess_board_widget.dart';
+import '../utils/chess_move_validator.dart';
 
 /// Solo game screen (vs AI)
 class ChessSoloGameScreen extends StatefulWidget {
@@ -72,10 +73,52 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
       );
 
       _chessEngine = chess_lib.Chess();
-      _chessEngine!.load(game.fen);
+      
+      // CRITICAL FIX: Always use the CORRECT starting FEN for new games
+      // The chess library seems to have issues, so we'll force the correct FEN
+      final correctStartingFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+      
+      Logger.debug('ChessSoloGameScreen: Loading game. Game FEN: ${game.fen}, Game isWhiteTurn: ${game.isWhiteTurn}', tag: 'ChessSoloGameScreen');
+      
+      // For new games (no moves yet), always use the correct starting FEN
+      if (game.moves.isEmpty) {
+        Logger.debug('ChessSoloGameScreen: New game detected, using correct starting FEN', tag: 'ChessSoloGameScreen');
+        _chessEngine!.load(correctStartingFen);
+      } else {
+        // For existing games, use the game's FEN but verify it
+        var fenToLoad = game.fen;
+        final fenParts = fenToLoad.split(' ');
+        if (fenParts.length > 1) {
+          final expectedTurnChar = game.isWhiteTurn ? 'w' : 'b';
+          if (fenParts[1] != expectedTurnChar) {
+            Logger.warning('FEN turn indicator "${fenParts[1]}" does not match. Fixing to "$expectedTurnChar"', tag: 'ChessSoloGameScreen');
+            fenParts[1] = expectedTurnChar;
+            fenToLoad = fenParts.join(' ');
+          }
+        }
+        _chessEngine!.load(fenToLoad);
+      }
 
+      // CRITICAL: Verify the engine state is correct
+      final engineTurn = _chessEngine!.turn;
+      final expectedTurn = game.isWhiteTurn ? chess_lib.Color.WHITE : chess_lib.Color.BLACK;
+      final engineFen = _chessEngine!.fen;
+      
+      Logger.debug('ChessSoloGameScreen: Engine loaded. FEN: $engineFen, Engine turn: $engineTurn, Expected: $expectedTurn', tag: 'ChessSoloGameScreen');
+      
+      // If turn is still wrong, force correct FEN
+      if (engineTurn != expectedTurn) {
+        Logger.error('CRITICAL: Engine turn mismatch! Forcing correct FEN. Engine turn: $engineTurn, Expected: $expectedTurn', tag: 'ChessSoloGameScreen');
+        _chessEngine = chess_lib.Chess();
+        _chessEngine!.load(correctStartingFen);
+        Logger.debug('ChessSoloGameScreen: Reloaded with correct FEN. New turn: ${_chessEngine!.turn}', tag: 'ChessSoloGameScreen');
+      }
+
+      // For solo games, ensure status is active and sync turn with chess engine
       setState(() {
-        _game = game;
+        _game = game.copyWith(
+          status: GameStatus.active, // Solo games should be active immediately
+        );
         _isLoading = false;
       });
 
@@ -94,13 +137,22 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted || _game == null || _game!.status != GameStatus.active) {
+      if (!mounted || _game == null) {
+        timer.cancel();
+        return;
+      }
+      
+      // For solo games, timer should run when status is active or waiting
+      if (_game!.status != GameStatus.active && _game!.status != GameStatus.waiting) {
         timer.cancel();
         return;
       }
 
       setState(() {
-        if (_game!.isWhiteTurn) {
+        // Use chess engine turn if available, otherwise use game state
+        final isWhiteTurn = _chessEngine?.turn == chess_lib.Color.WHITE ?? _game!.isWhiteTurn;
+        
+        if (isWhiteTurn) {
           _whiteTimeRemaining = (_whiteTimeRemaining - 1000).clamp(0, double.infinity).toInt();
           if (_whiteTimeRemaining <= 0) {
             _handleTimeout(true);
@@ -124,28 +176,54 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
   }
 
   Future<void> _makeMove(String moveUCI) async {
-    if (_isMakingMove || _game == null || _chessEngine == null) return;
-    if (_game!.status != GameStatus.active) return;
-    if (!_game!.isWhiteTurn) return; // AI's turn
+    Logger.debug('_makeMove: Received move $moveUCI, _isMakingMove=$_isMakingMove, isWhiteTurn=${_game?.isWhiteTurn}', tag: 'ChessSoloGameScreen');
+    
+    if (_isMakingMove || _game == null || _chessEngine == null) {
+      Logger.warning('_makeMove: Cannot make move - _isMakingMove=$_isMakingMove, _game=${_game != null}, _chessEngine=${_chessEngine != null}', tag: 'ChessSoloGameScreen');
+      return;
+    }
+    // For solo games, allow moves when status is active or waiting
+    if (_game!.status != GameStatus.active && _game!.status != GameStatus.waiting) {
+      Logger.warning('_makeMove: Game not active - status=${_game!.status}', tag: 'ChessSoloGameScreen');
+      return;
+    }
+    
+    // Check chess engine turn instead of game state (more reliable)
+    final isWhiteTurn = _chessEngine!.turn == chess_lib.Color.WHITE;
+    if (!isWhiteTurn) {
+      Logger.warning('_makeMove: Not white\'s turn (engine turn: ${_chessEngine!.turn})', tag: 'ChessSoloGameScreen');
+      return; // AI's turn
+    }
 
     setState(() => _isMakingMove = true);
 
     try {
-      // Validate move
-      final move = _chessEngine!.move(moveUCI);
-      if (move == null) {
+      Logger.debug('_makeMove: Attempting to make move $moveUCI', tag: 'ChessSoloGameScreen');
+      final fenBefore = _chessEngine!.fen;
+      Logger.debug('_makeMove: FEN before move: $fenBefore', tag: 'ChessSoloGameScreen');
+      
+      // Use custom validator to execute the move properly
+      final newFen = ChessMoveValidator.executeMove(_chessEngine!, moveUCI.substring(0, 2), moveUCI.substring(2, 4));
+      if (newFen == null) {
+        Logger.error('_makeMove: Invalid move - validator returned null', tag: 'ChessSoloGameScreen');
         throw Exception('Invalid move');
       }
+      
+      Logger.debug('_makeMove: Move executed successfully. FEN changed from $fenBefore to $newFen', tag: 'ChessSoloGameScreen');
 
-      // Update local state
-      _chessEngine!.load(_chessEngine!.fen);
+      // Update local state - sync with chess engine turn
+      // DO NOT reload the FEN - move() already updated the engine state
+      final isWhiteTurn = _chessEngine!.turn == chess_lib.Color.WHITE;
       setState(() {
         _game = _game!.copyWith(
           fen: _chessEngine!.fen,
-          isWhiteTurn: false,
+          isWhiteTurn: isWhiteTurn,
           lastMove: moveUCI,
+          status: GameStatus.active, // Ensure status is active
         );
       });
+      
+      Logger.debug('_makeMove: Updated game state - isWhiteTurn=$isWhiteTurn, fen=${_chessEngine!.fen}', tag: 'ChessSoloGameScreen');
 
       // Check for game end
       if (_chessEngine!.in_checkmate) {
@@ -181,19 +259,32 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
         difficulty: _difficulty,
       );
 
-      // Make AI move
-      final moveResult = _chessEngine!.move(aiMove.uci);
-      if (moveResult == null) {
-        throw Exception('AI move failed');
+      final fenBefore = _chessEngine!.fen;
+      Logger.debug('_makeAIMove: FEN before AI move: $fenBefore', tag: 'ChessSoloGameScreen');
+      
+      // Use custom validator to execute the AI move properly
+      final from = aiMove.uci.substring(0, 2);
+      final to = aiMove.uci.substring(2, 4);
+      final newFen = ChessMoveValidator.executeMove(_chessEngine!, from, to);
+      if (newFen == null) {
+        throw Exception('AI move failed - validator returned null');
       }
 
+      Logger.debug('_makeAIMove: AI move executed. FEN changed from $fenBefore to $newFen', tag: 'ChessSoloGameScreen');
+
+      // Sync game state with chess engine turn
+      // DO NOT reload the FEN - move() already updated the engine state
+      final isWhiteTurn = _chessEngine!.turn == chess_lib.Color.WHITE;
       setState(() {
         _game = _game!.copyWith(
           fen: _chessEngine!.fen,
-          isWhiteTurn: true,
+          isWhiteTurn: isWhiteTurn,
           lastMove: aiMove.uci,
+          status: GameStatus.active, // Ensure status is active
         );
       });
+      
+      Logger.debug('_makeAIMove: Updated game state - isWhiteTurn=$isWhiteTurn, fen=${_chessEngine!.fen}', tag: 'ChessSoloGameScreen');
 
       // Check for game end
       if (_chessEngine!.in_checkmate) {
@@ -299,18 +390,30 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
                 Expanded(
                   child: ModernCard(
                     padding: const EdgeInsets.all(AppTheme.spacingSM),
-                    color: _game!.isWhiteTurn ? Colors.blue.shade50 : null,
+                    color: _game!.isWhiteTurn ? Colors.blue.shade100 : null,
                     child: Column(
                       children: [
                         Text(
                           _game!.whitePlayerName ?? 'You',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: _game!.isWhiteTurn 
+                                ? Colors.blue.shade900 
+                                : Theme.of(context).textTheme.bodyLarge?.color,
+                          ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           _formatTime(_whiteTimeRemaining),
                           style: TextStyle(
-                            fontSize: 18,
-                            color: _whiteTimeRemaining < 60000 ? Colors.red : null,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: _whiteTimeRemaining < 60000 
+                                ? Colors.red.shade700 
+                                : (_game!.isWhiteTurn 
+                                    ? Colors.blue.shade900 
+                                    : Theme.of(context).textTheme.bodyLarge?.color),
                           ),
                         ),
                       ],
@@ -321,18 +424,30 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
                 Expanded(
                   child: ModernCard(
                     padding: const EdgeInsets.all(AppTheme.spacingSM),
-                    color: !_game!.isWhiteTurn ? Colors.blue.shade50 : null,
+                    color: !_game!.isWhiteTurn ? Colors.blue.shade100 : null,
                     child: Column(
                       children: [
                         Text(
                           _game!.blackPlayerName ?? 'AI',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: !_game!.isWhiteTurn 
+                                ? Colors.blue.shade900 
+                                : Theme.of(context).textTheme.bodyLarge?.color,
+                          ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           _formatTime(_blackTimeRemaining),
                           style: TextStyle(
-                            fontSize: 18,
-                            color: _blackTimeRemaining < 60000 ? Colors.red : null,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: _blackTimeRemaining < 60000 
+                                ? Colors.red.shade700 
+                                : (!_game!.isWhiteTurn 
+                                    ? Colors.blue.shade900 
+                                    : Theme.of(context).textTheme.bodyLarge?.color),
                           ),
                         ),
                       ],
@@ -344,12 +459,12 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
             
             const SizedBox(height: AppTheme.spacingMD),
             
-            // Chess board
+            // Chess board - use chess engine turn for interactivity
             ChessBoardWidget(
               game: _chessEngine!,
-              onMove: _isMakingMove ? null : _makeMove,
+              onMove: (_chessEngine!.turn == chess_lib.Color.WHITE && !_isMakingMove) ? _makeMove : null,
               isWhiteBottom: true,
-              isInteractive: _game!.isWhiteTurn && !_isMakingMove,
+              isInteractive: _chessEngine!.turn == chess_lib.Color.WHITE && !_isMakingMove,
               lastMoveFrom: lastMoveFrom,
               lastMoveTo: lastMoveTo,
             ),

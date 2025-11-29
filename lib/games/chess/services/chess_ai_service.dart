@@ -2,6 +2,7 @@ import 'package:chess/chess.dart' as chess_lib;
 import 'dart:math';
 import '../../../core/services/logger_service.dart';
 import '../models/chess_move.dart';
+import '../utils/chess_move_validator.dart';
 import 'chess_service.dart';
 
 /// Service for AI chess opponent
@@ -31,17 +32,17 @@ class ChessAIService {
 
   /// Easy: Random valid move
   ChessMove _getRandomMove(chess_lib.Chess game) {
-    final moves = game.generate_moves({'verbose': true});
+    final moves = ChessMoveValidator.generateAllValidMoves(game);
     if (moves.isEmpty) {
       throw Exception('No valid moves available');
     }
     final move = moves[_random.nextInt(moves.length)];
-    return _moveToChessMove(move);
+    return _mapToChessMove(move);
   }
 
   /// Medium: Prefer captures and center control
   ChessMove _getMediumMove(chess_lib.Chess game) {
-    final moves = game.generate_moves({'verbose': true});
+    final moves = ChessMoveValidator.generateAllValidMoves(game);
     if (moves.isEmpty) {
       throw Exception('No valid moves available');
     }
@@ -51,32 +52,27 @@ class ChessAIService {
       int score = 0;
 
       // Prefer captures
-      final capturedPiece = game.get(_indexToSquare(move.to));
-      if (capturedPiece != null) {
-        score += _getPieceValue(capturedPiece.type) * 10;
+      if (move['captured'] != null) {
+        score += _getPieceValue(move['captured'] as chess_lib.PieceType) * 10;
       }
 
       // Prefer center squares
       final centerSquares = ['e4', 'e5', 'd4', 'd5'];
-      if (centerSquares.contains(_indexToSquare(move.to))) {
+      if (centerSquares.contains(move['to'])) {
         score += 5;
       }
 
       // Prefer developing pieces (knights and bishops)
-      if (move.piece == chess_lib.PieceType.KNIGHT || move.piece == chess_lib.PieceType.BISHOP) {
+      final pieceType = move['piece'] as chess_lib.PieceType;
+      if (pieceType == chess_lib.PieceType.KNIGHT || pieceType == chess_lib.PieceType.BISHOP) {
         score += 2;
-      }
-
-      // Prefer castling (flags is an int with bit flags)
-      if ((move.flags & 0x01) != 0 || (move.flags & 0x02) != 0) {
-        score += 10;
       }
 
       // Prefer checks
       final testGame = chess_lib.Chess();
       testGame.load(game.fen);
-      testGame.move({'from': move.from, 'to': move.to, 'promotion': move.promotion});
-      if (testGame.in_check) {
+      final testFen = ChessMoveValidator.executeMove(testGame, move['from'] as String, move['to'] as String);
+      if (testFen != null && testGame.in_check) {
         score += 5;
       }
 
@@ -87,23 +83,24 @@ class ChessAIService {
     scoredMoves.sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
     final topMoves = scoredMoves.take(3).toList();
     final selected = topMoves[_random.nextInt(topMoves.length)];
-    return _moveToChessMove(selected['move'] as chess_lib.Move);
+    return _mapToChessMove(selected['move'] as Map<String, dynamic>);
   }
 
   /// Hard: Minimax algorithm with alpha-beta pruning
   ChessMove _getHardMove(chess_lib.Chess game) {
-    final moves = game.generate_moves({'verbose': true});
+    final moves = ChessMoveValidator.generateAllValidMoves(game);
     if (moves.isEmpty) {
       throw Exception('No valid moves available');
     }
 
     int bestScore = -9999;
-    chess_lib.Move? bestMove;
+    Map<String, dynamic>? bestMove;
 
     for (var move in moves) {
       final testGame = chess_lib.Chess();
       testGame.load(game.fen);
-      testGame.move({'from': move.from, 'to': move.to, 'promotion': move.promotion});
+      final testFen = ChessMoveValidator.executeMove(testGame, move['from'] as String, move['to'] as String);
+      if (testFen == null) continue;
 
       final score = _minimax(testGame, 3, false, -9999, 9999);
       if (score > bestScore) {
@@ -112,7 +109,7 @@ class ChessAIService {
       }
     }
 
-    return _moveToChessMove(bestMove ?? moves[0]);
+    return _mapToChessMove(bestMove ?? moves[0]);
   }
 
   /// Minimax algorithm with alpha-beta pruning
@@ -121,13 +118,18 @@ class ChessAIService {
       return _evaluatePosition(game);
     }
 
+    final moves = ChessMoveValidator.generateAllValidMoves(game);
+    if (moves.isEmpty) {
+      return _evaluatePosition(game);
+    }
+
     if (isMaximizing) {
       int maxEval = -9999;
-      final moves = game.generate_moves({'verbose': true});
       for (var move in moves) {
         final testGame = chess_lib.Chess();
         testGame.load(game.fen);
-        testGame.move({'from': move.from, 'to': move.to, 'promotion': move.promotion});
+        final testFen = ChessMoveValidator.executeMove(testGame, move['from'] as String, move['to'] as String);
+        if (testFen == null) continue;
         final eval = _minimax(testGame, depth - 1, false, alpha, beta);
         maxEval = max(maxEval, eval);
         alpha = max(alpha, eval);
@@ -136,11 +138,11 @@ class ChessAIService {
       return maxEval;
     } else {
       int minEval = 9999;
-      final moves = game.generate_moves({'verbose': true});
       for (var move in moves) {
         final testGame = chess_lib.Chess();
         testGame.load(game.fen);
-        testGame.move({'from': move.from, 'to': move.to, 'promotion': move.promotion});
+        final testFen = ChessMoveValidator.executeMove(testGame, move['from'] as String, move['to'] as String);
+        if (testFen == null) continue;
         final eval = _minimax(testGame, depth - 1, true, alpha, beta);
         minEval = min(minEval, eval);
         beta = min(beta, eval);
@@ -219,6 +221,15 @@ class ChessAIService {
           promotion = null;
       }
     }
+    final uci = promotion != null ? '$from$to$promotion' : '$from$to';
+    return ChessMove.fromUCI(uci);
+  }
+  
+  /// Convert map format to ChessMove
+  ChessMove _mapToChessMove(Map<String, dynamic> move) {
+    final from = move['from'] as String;
+    final to = move['to'] as String;
+    final promotion = move['promotion'] as String?;
     final uci = promotion != null ? '$from$to$promotion' : '$from$to';
     return ChessMove.fromUCI(uci);
   }

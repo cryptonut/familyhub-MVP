@@ -83,10 +83,14 @@ class ChessGame {
       whitePlayerName: whitePlayerName,
       blackPlayerName: blackPlayerName,
       mode: mode,
-      status: blackPlayerId == null ? GameStatus.waiting : GameStatus.active,
+      // Solo games (blackPlayerId == null) should be active immediately
+      // Multiplayer games start as waiting until opponent joins
+      status: (blackPlayerId == null && mode == GameMode.solo) 
+          ? GameStatus.active 
+          : (blackPlayerId == null ? GameStatus.waiting : GameStatus.active),
       familyId: familyId,
       createdAt: DateTime.now(),
-      startedAt: blackPlayerId != null ? DateTime.now() : null,
+      startedAt: (blackPlayerId != null || mode == GameMode.solo) ? DateTime.now() : null,
       fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
       moves: [],
       whiteTimeRemaining: initialTimeMs,

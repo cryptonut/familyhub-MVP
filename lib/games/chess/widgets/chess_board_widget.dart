@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:chess/chess.dart' as chess_lib;
 import '../../../core/services/logger_service.dart';
+import '../utils/chess_move_validator.dart';
 
 /// Improved chess board widget with proper rendering and interaction
 class ChessBoardWidget extends StatefulWidget {
@@ -32,53 +33,78 @@ class ChessBoardWidget extends StatefulWidget {
 class _ChessBoardWidgetState extends State<ChessBoardWidget> {
   String? _selectedSquare;
   List<String> _validMoves = [];
+  Function(String)? _onMoveCallback; // Store callback to prevent null issues
 
   @override
   void initState() {
     super.initState();
     _selectedSquare = widget.selectedSquare;
     _validMoves = widget.validMoves ?? [];
+    _onMoveCallback = widget.onMove;
   }
 
   @override
   void didUpdateWidget(ChessBoardWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Update callback reference
+    _onMoveCallback = widget.onMove;
+    
     if (oldWidget.game.fen != widget.game.fen) {
+      Logger.debug('didUpdateWidget: FEN changed, clearing selection', tag: 'ChessBoardWidget');
       setState(() {
         _selectedSquare = null;
         _validMoves = [];
       });
     }
-    _selectedSquare = widget.selectedSquare;
-    _validMoves = widget.validMoves ?? [];
+    // Only update from widget props if they're explicitly provided
+    if (widget.selectedSquare != null || widget.validMoves != null) {
+      _selectedSquare = widget.selectedSquare;
+      _validMoves = widget.validMoves ?? [];
+    }
   }
 
   void _onSquareTap(String square) {
-    if (!widget.isInteractive) return;
+    Logger.debug('_onSquareTap: Tapped $square, isInteractive=${widget.isInteractive}, onMove=${widget.onMove != null}, currentTurn=${widget.game.turn}', tag: 'ChessBoardWidget');
+    
+    if (!widget.isInteractive) {
+      Logger.warning('_onSquareTap: Board is not interactive', tag: 'ChessBoardWidget');
+      return;
+    }
 
     if (_selectedSquare == null) {
       // Select a piece
       final piece = widget.game.get(square);
+      Logger.debug('_onSquareTap: Selecting piece at $square, piece=${piece?.type}, color=${piece?.color}, turn=${widget.game.turn}', tag: 'ChessBoardWidget');
+      
       if (piece != null && piece.color == widget.game.turn) {
+        final validMoves = _getValidMovesForSquare(square);
+        Logger.debug('_onSquareTap: Selected $square, found ${validMoves.length} valid moves: $validMoves', tag: 'ChessBoardWidget');
         setState(() {
           _selectedSquare = square;
-          _validMoves = _getValidMovesForSquare(square);
+          _validMoves = validMoves;
         });
+      } else {
+        Logger.debug('_onSquareTap: Cannot select - piece is null or wrong color', tag: 'ChessBoardWidget');
       }
     } else {
       // Try to make a move
+      Logger.debug('_onSquareTap: Selected square is $_selectedSquare, tapped $square, validMoves=$_validMoves', tag: 'ChessBoardWidget');
+      
       if (_validMoves.contains(square)) {
         final moveUCI = '$_selectedSquare$square';
+        Logger.debug('_onSquareTap: Valid move detected, calling _makeMove with $moveUCI', tag: 'ChessBoardWidget');
         _makeMove(moveUCI);
       } else {
         // Select a different piece or deselect
         final piece = widget.game.get(square);
         if (piece != null && piece.color == widget.game.turn) {
+          Logger.debug('_onSquareTap: Selecting different piece at $square', tag: 'ChessBoardWidget');
           setState(() {
             _selectedSquare = square;
             _validMoves = _getValidMovesForSquare(square);
           });
         } else {
+          Logger.debug('_onSquareTap: Deselecting piece', tag: 'ChessBoardWidget');
           setState(() {
             _selectedSquare = null;
             _validMoves = [];
@@ -89,28 +115,77 @@ class _ChessBoardWidgetState extends State<ChessBoardWidget> {
   }
 
   void _makeMove(String moveUCI) {
-    // Check if promotion is needed
-    final fromSquare = moveUCI.substring(0, 2);
-    final toSquare = moveUCI.substring(2, 4);
-    final piece = widget.game.get(fromSquare);
-    
-    if (piece?.type == chess_lib.PieceType.PAWN) {
-      final toRank = int.parse(toSquare[1]);
-      if ((piece!.color == chess_lib.Color.WHITE && toRank == 8) ||
-          (piece.color == chess_lib.Color.BLACK && toRank == 1)) {
-        // Need promotion - show dialog
-        _showPromotionDialog(fromSquare, toSquare);
+    try {
+      Logger.debug('_makeMove: Attempting move $moveUCI, onMove=${widget.onMove != null}, isInteractive=${widget.isInteractive}', tag: 'ChessBoardWidget');
+      
+      // Check if promotion is needed
+      if (moveUCI.length < 4) {
+        Logger.error('_makeMove: Invalid moveUCI format: $moveUCI', tag: 'ChessBoardWidget');
         return;
       }
-    }
+      
+      final fromSquare = moveUCI.substring(0, 2);
+      final toSquare = moveUCI.substring(2, 4);
+      final piece = widget.game.get(fromSquare);
+      
+      if (piece == null) {
+        Logger.warning('_makeMove: No piece at $fromSquare', tag: 'ChessBoardWidget');
+        setState(() {
+          _selectedSquare = null;
+          _validMoves = [];
+        });
+        return;
+      }
+      
+      if (piece.type == chess_lib.PieceType.PAWN) {
+        final toRank = int.parse(toSquare[1]);
+        if ((piece.color == chess_lib.Color.WHITE && toRank == 8) ||
+            (piece.color == chess_lib.Color.BLACK && toRank == 1)) {
+          // Need promotion - show dialog
+          Logger.debug('_makeMove: Pawn promotion needed for $moveUCI', tag: 'ChessBoardWidget');
+          _showPromotionDialog(fromSquare, toSquare);
+          return;
+        }
+      }
 
-    if (widget.onMove != null) {
-      widget.onMove!(moveUCI);
+      // Use stored callback to prevent null issues during rebuilds
+      final callback = _onMoveCallback ?? widget.onMove;
+      
+      if (callback != null) {
+        Logger.debug('_makeMove: Calling onMove callback with $moveUCI', tag: 'ChessBoardWidget');
+        // Call the move callback first
+        try {
+          callback(moveUCI);
+          // Clear selection after calling callback (move should succeed)
+          setState(() {
+            _selectedSquare = null;
+            _validMoves = [];
+          });
+        } catch (e, stackTrace) {
+          Logger.error('_makeMove: Error calling onMove callback', error: e, stackTrace: stackTrace, tag: 'ChessBoardWidget');
+          // On error, keep selection so user can try again
+        }
+      } else {
+        Logger.warning('_makeMove: onMove callback is null - cannot make move. isInteractive=${widget.isInteractive}, game.turn=${widget.game.turn}', tag: 'ChessBoardWidget');
+        // Don't clear selection if callback is null - user should see the piece is still selected
+        // Show a visual indicator that the move failed
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot make move - game state may have changed'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e, stackTrace) {
+      Logger.error('_makeMove: Error making move', error: e, stackTrace: stackTrace, tag: 'ChessBoardWidget');
+      // On error, clear selection
+      setState(() {
+        _selectedSquare = null;
+        _validMoves = [];
+      });
     }
-    setState(() {
-      _selectedSquare = null;
-      _validMoves = [];
-    });
   }
 
   void _showPromotionDialog(String from, String to) {
@@ -166,19 +241,27 @@ class _ChessBoardWidgetState extends State<ChessBoardWidget> {
   }
 
   List<String> _getValidMovesForSquare(String square) {
-    try {
-      final moves = widget.game.generate_moves({'square': square, 'verbose': true});
-      return moves.map((m) => _indexToSquare(m.to)).toList();
-    } catch (e) {
-      Logger.error('Error getting valid moves', error: e, tag: 'ChessBoardWidget');
-      return [];
+    // Use the custom validator that actually works
+    return ChessMoveValidator.getValidMoves(widget.game, square);
+  }
+  
+  /// Convert square name (e.g., "e2") to 0x88 index
+  /// 0x88 format: rank in upper 4 bits, file in lower 4 bits
+  /// Example: e2 = file 4 (e), rank 1 (2-1) = 0x11 = 17
+  int _squareToIndex(String square) {
+    if (square.length != 2) {
+      Logger.error('_squareToIndex: Invalid square format: $square', tag: 'ChessBoardWidget');
+      return 0;
     }
+    final file = square[0].codeUnitAt(0) - 'a'.codeUnitAt(0);
+    final rank = int.parse(square[1]) - 1;
+    final index = (rank << 4) | file; // 0x88 format
+    Logger.debug('_squareToIndex: $square -> file=$file, rank=$rank, index=$index (0x${index.toRadixString(16)})', tag: 'ChessBoardWidget');
+    return index;
   }
 
-  /// Convert 0x88 index to square name
-  /// The chess library uses 0x88 format where:
-  /// - file = index & 0x0F (lower 4 bits)
-  /// - rank = index >> 4 (upper 4 bits)
+  /// Convert chess library index to square name
+  /// Uses EXACT same implementation as chess_service.dart and chess_ai_service.dart (proven to work)
   String _indexToSquare(int index) {
     final file = index & 0x0F; // Lower 4 bits
     final rank = index >> 4; // Upper 4 bits
