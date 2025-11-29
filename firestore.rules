@@ -325,6 +325,48 @@ service cloud.firestore {
       allow update: if isAuthenticated();
       allow delete: if isAuthenticated();
     }
+    
+    // Chess games collection
+    match /chess_games/{gameId} {
+      // Players can read their own games
+      allow read: if isAuthenticated() && 
+        (resource.data.whitePlayerId == request.auth.uid ||
+         resource.data.blackPlayerId == request.auth.uid ||
+         request.auth.uid in resource.data.spectators);
+      
+      // Users can create games
+      allow create: if isAuthenticated() && 
+        request.resource.data.whitePlayerId == request.auth.uid;
+      
+      // Players can update their own games (make moves)
+      allow update: if isAuthenticated() && 
+        (resource.data.whitePlayerId == request.auth.uid ||
+         resource.data.blackPlayerId == request.auth.uid);
+      
+      // Players can delete their own games (resign/abort)
+      allow delete: if isAuthenticated() && 
+        (resource.data.whitePlayerId == request.auth.uid ||
+         resource.data.blackPlayerId == request.auth.uid);
+    }
+    
+    // Chess matchmaking queue
+    match /chess_matchmaking/{queueId} {
+      // Users can read their own queue entry
+      allow read: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      
+      // Users can create their own queue entry
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // Users can update their own queue entry
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      
+      // Users can delete their own queue entry
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
   }
 }
 
