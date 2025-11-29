@@ -7,10 +7,10 @@ import '../../models/game_stats.dart';
 import '../../models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
-import 'chess_puzzle_screen.dart';
 import 'word_scramble_screen.dart';
 import 'family_bingo_screen.dart';
 import 'leaderboard_screen.dart';
+import '../../games/chess/screens/chess_lobby_screen.dart';
 
 class GamesHomeScreen extends StatefulWidget {
   const GamesHomeScreen({super.key});
@@ -94,15 +94,15 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
                       ),
                     ),
                     _buildGameCard(
-                      title: 'Chess Puzzles',
-                      description: 'Solve chess puzzles solo',
+                      title: 'Chess',
+                      description: 'Play chess vs AI, family, or online',
                       icon: Icons.sports_esports,
                       color: Colors.brown,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const ChessPuzzleScreen(),
+                            builder: (context) => const ChessLobbyScreen(),
                           ),
                         ).then((_) => _loadData());
                       },
