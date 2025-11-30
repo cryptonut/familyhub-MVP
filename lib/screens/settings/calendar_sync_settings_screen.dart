@@ -951,11 +951,25 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
               final eventCount = calendar.id != null ? eventCounts[calendar.id!] : null;
               final hasEvents = eventCount != null && eventCount > 0;
               
+              // Build display name with fallback
+              final displayName = calendar.name?.isNotEmpty == true
+                  ? calendar.name!
+                  : (calendar.accountName?.isNotEmpty == true
+                      ? calendar.accountName!
+                      : 'Unnamed Calendar');
+              
+              // Build subtitle with account info if different from name
+              final subtitle = calendar.accountName != null && 
+                              calendar.accountName!.isNotEmpty &&
+                              calendar.name != calendar.accountName
+                  ? calendar.accountName!
+                  : null;
+              
               return ListTile(
                 title: Row(
                   children: [
                     Expanded(
-                      child: Text(calendar.name ?? 'Unnamed Calendar'),
+                      child: Text(displayName),
                     ),
                     if (eventCount != null) ...[
                       const SizedBox(width: 8),
@@ -970,9 +984,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                     ],
                   ],
                 ),
-                subtitle: calendar.accountName != null && calendar.accountName!.isNotEmpty
-                    ? Text(calendar.accountName!)
-                    : null,
+                subtitle: subtitle != null ? Text(subtitle) : null,
                 trailing: hasEvents
                     ? Icon(Icons.check_circle, color: Colors.green.shade700, size: 20)
                     : Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
