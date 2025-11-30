@@ -92,6 +92,17 @@ class CalendarSyncService {
 
       final calendarsResult = await _deviceCalendar.retrieveCalendars();
       if (calendarsResult.isSuccess && calendarsResult.data != null) {
+        Logger.info(
+          'Retrieved ${calendarsResult.data!.length} calendars from device',
+          tag: 'CalendarSyncService',
+        );
+        // Log calendar details for debugging
+        for (var cal in calendarsResult.data!) {
+          Logger.debug(
+            'Calendar: ${cal.name} (ID: ${cal.id}, Account: ${cal.accountName}, ReadOnly: ${cal.isReadOnly})',
+            tag: 'CalendarSyncService',
+          );
+        }
         return calendarsResult.data!;
       }
       
@@ -243,7 +254,8 @@ class CalendarSyncService {
   }
 
   /// Convert device_calendar Event to FamilyHub CalendarEvent
-  Future<CalendarEvent?> _deviceEventToFamilyHub(Event deviceEvent) async {
+  /// [existingEventId] - If provided, use this ID instead of generating a new one (for updates)
+  Future<CalendarEvent?> _deviceEventToFamilyHub(Event deviceEvent, {String? existingEventId}) async {
     try {
       // Extract FamilyHub event ID from description
       final fhEventId = _extractFhEventId(deviceEvent.description);
@@ -258,8 +270,11 @@ class CalendarSyncService {
         description = description.replaceAll(RegExp(r'\[FamilyHub:[^\]]+\]'), '').trim();
       }
 
+      // Use existing event ID if provided (for updates), otherwise use extracted ID or generate new one
+      final eventId = existingEventId ?? fhEventId ?? const Uuid().v4();
+
       final event = CalendarEvent(
-        id: fhEventId ?? const Uuid().v4(),
+        id: eventId,
         title: deviceEvent.title ?? 'Untitled Event',
         description: description,
         startTime: _fromTZDateTime(deviceEvent.start),
@@ -367,25 +382,271 @@ class CalendarSyncService {
       }
 
       // Get events from device calendar since last sync
-      final startDate = lastSyncedAt ?? DateTime.now().subtract(const Duration(days: 30));
-      final endDate = DateTime.now().add(const Duration(days: 180));
+      // For first sync or if lastSync was very recent (< 1 hour), look back 90 days
+      // For subsequent syncs, only get events since last sync
+      final now = DateTime.now();
+      DateTime startDate;
+      if (lastSyncedAt == null) {
+        // First sync - look back 90 days
+        startDate = now.subtract(const Duration(days: 90));
+      } else {
+        final timeSinceLastSync = now.difference(lastSyncedAt);
+        if (timeSinceLastSync.inHours < 1) {
+          // Last sync was very recent - likely a retry or first sync after setup
+          // Look back 90 days to catch existing events
+          startDate = now.subtract(const Duration(days: 90));
+          Logger.info(
+            'Last sync was recent (${timeSinceLastSync.inMinutes} min ago), looking back 90 days for existing events',
+            tag: 'CalendarSyncService',
+          );
+        } else {
+          // Normal sync - only get events since last sync
+          startDate = lastSyncedAt;
+        }
+      }
+      final endDate = now.add(const Duration(days: 180));
+      
+      Logger.info(
+        'Syncing events from ${startDate.toIso8601String()} to ${endDate.toIso8601String()}',
+        tag: 'CalendarSyncService',
+      );
 
+      Logger.info(
+        'Attempting to retrieve events from calendar ID: $calendarId',
+        tag: 'CalendarSyncService',
+      );
+      
+      // Verify calendar is accessible and get its properties
+      Calendar? selectedCalendar;
+      String? verifiedCalendarId = calendarId;
+      try {
+        final calendarsResult = await _deviceCalendar.retrieveCalendars();
+        if (calendarsResult.isSuccess && calendarsResult.data != null) {
+          // Normalize comparison to handle whitespace and type issues
+          selectedCalendar = calendarsResult.data!.firstWhere(
+            (cal) => cal.id?.trim() == calendarId?.trim(),
+            orElse: () => Calendar(),
+          );
+          if (selectedCalendar.id == null || selectedCalendar.id!.isEmpty) {
+            Logger.error(
+              'Calendar ID "$calendarId" not found in available calendars',
+              tag: 'CalendarSyncService',
+            );
+            // Log all available calendars for debugging
+            Logger.info(
+              'Available calendars: ${calendarsResult.data!.map((c) => '${c.name} (ID: "${c.id}", Type: ${c.id.runtimeType})').join(', ')}',
+              tag: 'CalendarSyncService',
+            );
+            return;
+          }
+          // Use the verified calendar ID from the actual calendar object
+          verifiedCalendarId = selectedCalendar.id;
+          Logger.info(
+            'Calendar found: ${selectedCalendar.name} (ID: "$verifiedCalendarId", ReadOnly: ${selectedCalendar.isReadOnly}, Account: ${selectedCalendar.accountName})',
+            tag: 'CalendarSyncService',
+          );
+          
+          // If calendar is read-only, warn but continue (we can still read events)
+          if (selectedCalendar.isReadOnly == true) {
+            Logger.warning(
+              'Calendar ${selectedCalendar.name} is read-only. Events can be read but not modified.',
+              tag: 'CalendarSyncService',
+            );
+          }
+        }
+      } catch (e) {
+        Logger.warning('Could not verify calendar before retrieving events', error: e, tag: 'CalendarSyncService');
+      }
+      
+      // Re-check permissions before retrieving events
+      if (!await hasPermissions()) {
+        Logger.error('Calendar permissions revoked during sync', tag: 'CalendarSyncService');
+        return;
+      }
+      
+      Logger.info(
+        'Calling retrieveEvents with verified calendarId: "$verifiedCalendarId" (original: "$calendarId")',
+        tag: 'CalendarSyncService',
+      );
+      
       final deviceEventsResult = await _deviceCalendar.retrieveEvents(
-        calendarId,
+        verifiedCalendarId ?? calendarId,
         RetrieveEventsParams(
           startDate: _toTZDateTime(startDate),
           endDate: _toTZDateTime(endDate),
         ),
       );
 
-      if (!deviceEventsResult.isSuccess || deviceEventsResult.data == null) {
-        Logger.warning('Failed to retrieve device events', tag: 'CalendarSyncService');
+      if (!deviceEventsResult.isSuccess) {
+        final errorMessages = deviceEventsResult.errors.map((e) => e.toString()).join(', ');
+        Logger.error(
+          'Failed to retrieve device events. Errors: $errorMessages',
+          tag: 'CalendarSyncService',
+        );
+        return;
+      }
+      
+      if (deviceEventsResult.data == null) {
+        Logger.warning(
+          'retrieveEvents returned null data (but was successful). Calendar might be empty or have permission issues.',
+          tag: 'CalendarSyncService',
+        );
+        // Try to diagnose: check if we can retrieve events from a wider date range as a test
+        Logger.info(
+          'Attempting diagnostic: checking if calendar has ANY events in a wider range (1 year back, 1 year forward)',
+          tag: 'CalendarSyncService',
+        );
+        final diagnosticResult = await _deviceCalendar.retrieveEvents(
+          calendarId,
+          RetrieveEventsParams(
+            startDate: _toTZDateTime(now.subtract(const Duration(days: 365))),
+            endDate: _toTZDateTime(now.add(const Duration(days: 365))),
+          ),
+        );
+        if (diagnosticResult.isSuccess && diagnosticResult.data != null) {
+          Logger.info(
+            'Diagnostic: Found ${diagnosticResult.data!.length} events in wider date range (1 year back/forward)',
+            tag: 'CalendarSyncService',
+          );
+          if (diagnosticResult.data!.isEmpty) {
+            Logger.warning(
+              'Calendar appears to be empty - no events found even in 1-year range',
+              tag: 'CalendarSyncService',
+            );
+          } else {
+            Logger.warning(
+              'Calendar has events but not in the requested date range (${startDate.toIso8601String()} to ${endDate.toIso8601String()})',
+              tag: 'CalendarSyncService',
+            );
+          }
+        }
         return;
       }
 
       final deviceEvents = deviceEventsResult.data!;
+      Logger.info('Retrieved ${deviceEvents.length} events from device calendar', tag: 'CalendarSyncService');
+      
+      // If no events found, run diagnostic to check if calendar has events at all
+      if (deviceEvents.isEmpty) {
+        Logger.warning(
+          'No events found in calendar ${selectedCalendar?.name ?? calendarId} for date range ${startDate.toIso8601String()} to ${endDate.toIso8601String()}',
+          tag: 'CalendarSyncService',
+        );
+        
+        // Diagnostic: Check if calendar has ANY events in a wider range
+        Logger.info(
+          'Running diagnostic: Checking if calendar has events in wider date range (1 year back/forward)',
+          tag: 'CalendarSyncService',
+        );
+        final diagnosticResult = await _deviceCalendar.retrieveEvents(
+          calendarId,
+          RetrieveEventsParams(
+            startDate: _toTZDateTime(now.subtract(const Duration(days: 365))),
+            endDate: _toTZDateTime(now.add(const Duration(days: 365))),
+          ),
+        );
+        if (diagnosticResult.isSuccess && diagnosticResult.data != null) {
+          Logger.info(
+            'Diagnostic result: Found ${diagnosticResult.data!.length} events in 1-year range',
+            tag: 'CalendarSyncService',
+          );
+          if (diagnosticResult.data!.isEmpty) {
+            Logger.warning(
+              'Calendar "${selectedCalendar?.name ?? calendarId}" appears to be completely empty (no events in 1-year range)',
+              tag: 'CalendarSyncService',
+            );
+            // Try checking other calendars to see if they have events
+            Logger.info(
+              'Checking other calendars for events...',
+              tag: 'CalendarSyncService',
+            );
+            try {
+              final allCalendarsResult = await _deviceCalendar.retrieveCalendars();
+              if (allCalendarsResult.isSuccess && allCalendarsResult.data != null) {
+                for (var cal in allCalendarsResult.data!) {
+                  if (cal.id == null || cal.id == calendarId) continue; // Skip null IDs and the selected calendar
+                  final testResult = await _deviceCalendar.retrieveEvents(
+                    cal.id!,
+                    RetrieveEventsParams(
+                      startDate: _toTZDateTime(now.subtract(const Duration(days: 90))),
+                      endDate: _toTZDateTime(now.add(const Duration(days: 180))),
+                    ),
+                  );
+                  if (testResult.isSuccess && testResult.data != null && testResult.data!.isNotEmpty) {
+                    Logger.info(
+                      'Found ${testResult.data!.length} events in calendar "${cal.name}" (ID: "${cal.id}")',
+                      tag: 'CalendarSyncService',
+                    );
+                  }
+                }
+              }
+            } catch (e) {
+              Logger.warning('Error checking other calendars', error: e, tag: 'CalendarSyncService');
+            }
+          } else {
+            Logger.warning(
+              'Calendar has ${diagnosticResult.data!.length} events but they are outside the requested date range. '
+              'Requested: ${startDate.toIso8601String()} to ${endDate.toIso8601String()}',
+              tag: 'CalendarSyncService',
+            );
+          }
+        }
+      }
+      
       final batch = _firestore.batch();
       int importedCount = 0;
+      int skippedFamilyHubCount = 0;
+      int failedConversionCount = 0;
+      int updatedCount = 0;
+
+      // Get calendar name for source tracking
+      String? calendarName;
+      try {
+        final calendarsResult = await _deviceCalendar.retrieveCalendars();
+        if (calendarsResult.isSuccess && calendarsResult.data != null) {
+          final calendar = calendarsResult.data!.firstWhere(
+            (cal) => cal.id == calendarId,
+            orElse: () => Calendar(),
+          );
+          calendarName = calendar.name ?? calendar.accountName ?? 'Device Calendar';
+          Logger.info('Syncing from calendar: $calendarName (ID: $calendarId)', tag: 'CalendarSyncService');
+        }
+      } catch (e) {
+        Logger.warning('Could not get calendar name', error: e, tag: 'CalendarSyncService');
+        calendarName = 'Device Calendar';
+      }
+
+      // Get existing imported events to check for duplicates by deviceEventId
+      final existingEventsQuery = await _firestore
+          .collection('families')
+          .doc(familyId)
+          .collection('events')
+          .where('deviceEventId', isEqualTo: null) // This won't work, we need a different approach
+          .get();
+      
+      // Better approach: Query all events and filter in memory (deviceEventId might not be indexed)
+      // Or check each event individually - more efficient for small datasets
+      final eventsCollection = _firestore
+          .collection('families')
+          .doc(familyId)
+          .collection('events');
+      
+      // Build a map of deviceEventId -> Firestore document ID for quick lookup
+      final deviceEventIdMap = <String, String>{};
+      try {
+        final allEventsSnapshot = await eventsCollection
+            .where('importedFromDevice', isEqualTo: true)
+            .get();
+        for (var doc in allEventsSnapshot.docs) {
+          final data = doc.data();
+          final storedDeviceEventId = data['deviceEventId'] as String?;
+          if (storedDeviceEventId != null) {
+            deviceEventIdMap[storedDeviceEventId] = doc.id;
+          }
+        }
+      } catch (e) {
+        Logger.warning('Error loading existing imported events for duplicate check', error: e, tag: 'CalendarSyncService');
+      }
 
       for (var deviceEvent in deviceEvents) {
         // Check if this is a FamilyHub event (has fh_event_id in description)
@@ -393,18 +654,36 @@ class CalendarSyncService {
         
         if (fhEventId != null) {
           // This is a FamilyHub event - FamilyHub wins on conflicts, so skip
+          skippedFamilyHubCount++;
+          Logger.debug('Skipping FamilyHub event: ${deviceEvent.title} (ID: $fhEventId)', tag: 'CalendarSyncService');
           continue;
         }
 
-        // This is an external event - import it
-        final fhEvent = await _deviceEventToFamilyHub(deviceEvent);
-        if (fhEvent == null) continue;
+        // Check if this device event was already imported (by deviceEventId)
+        String? existingEventId;
+        if (deviceEvent.eventId != null && deviceEventIdMap.containsKey(deviceEvent.eventId)) {
+          existingEventId = deviceEventIdMap[deviceEvent.eventId];
+          Logger.debug(
+            'Found existing imported event for deviceEventId "${deviceEvent.eventId}": $existingEventId',
+            tag: 'CalendarSyncService',
+          );
+        }
 
-        final eventRef = _firestore
-            .collection('families')
-            .doc(familyId)
-            .collection('events')
-            .doc(fhEvent.id);
+        // This is an external event - import it
+        final fhEvent = await _deviceEventToFamilyHub(deviceEvent, existingEventId: existingEventId);
+        if (fhEvent == null) {
+          failedConversionCount++;
+          Logger.warning('Failed to convert device event to FamilyHub: ${deviceEvent.title}', tag: 'CalendarSyncService');
+          continue;
+        }
+        
+        final isUpdate = existingEventId != null;
+        Logger.debug(
+          '${isUpdate ? 'Updating' : 'Importing'} event: ${fhEvent.title} (${fhEvent.startTime})',
+          tag: 'CalendarSyncService',
+        );
+
+        final eventRef = eventsCollection.doc(fhEvent.id);
 
         batch.set(eventRef, {
           'title': fhEvent.title,
@@ -420,17 +699,38 @@ class CalendarSyncService {
           'rsvpStatus': fhEvent.rsvpStatus,
           'importedFromDevice': true, // Mark as imported
           'deviceEventId': deviceEvent.eventId, // Store device event ID for future updates
+          'sourceCalendar': calendarName != null ? 'Synced from $calendarName' : 'Synced from Device Calendar',
+          'createdBy': userModel.uid, // Set creator to current user for imported events
         }, SetOptions(merge: true));
 
-        importedCount++;
+        if (isUpdate) {
+          updatedCount++;
+        } else {
+          importedCount++;
+        }
       }
 
-      if (importedCount > 0) {
+      if (importedCount > 0 || updatedCount > 0) {
         await batch.commit();
-        Logger.info('Imported $importedCount events from device calendar', tag: 'CalendarSyncService');
+        Logger.info(
+          'Successfully ${importedCount > 0 ? "imported $importedCount new events" : ""}${importedCount > 0 && updatedCount > 0 ? " and " : ""}${updatedCount > 0 ? "updated $updatedCount existing events" : ""} from device calendar',
+          tag: 'CalendarSyncService',
+        );
+        // Only update lastSyncedAt if we actually imported or updated events
+        await updateLastSyncedAt();
+      } else {
+        Logger.warning(
+          'No events imported or updated. Total: ${deviceEvents.length}, Skipped (FamilyHub): $skippedFamilyHubCount, Failed conversion: $failedConversionCount',
+          tag: 'CalendarSyncService',
+        );
+        // Don't update lastSyncedAt if no events were imported - allows retry with same date range
+        if (deviceEvents.isEmpty) {
+          Logger.info(
+            'No events found in device calendar. This might be normal if the calendar is empty or date range has no events.',
+            tag: 'CalendarSyncService',
+          );
+        }
       }
-
-      await updateLastSyncedAt();
     } catch (e) {
       Logger.error('Error syncing from device', error: e, tag: 'CalendarSyncService');
       rethrow;
@@ -496,6 +796,72 @@ class CalendarSyncService {
     } catch (e) {
       Logger.warning('Error checking if event exists in device', error: e, tag: 'CalendarSyncService');
       return false;
+    }
+  }
+
+  /// Remove all synced calendar events (for testing/cleanup)
+  /// Returns the number of events deleted
+  Future<int> removeAllSyncedEvents({bool resetLastSyncedAt = false}) async {
+    try {
+      final userModel = await _authService.getCurrentUserModel();
+      final familyId = userModel?.familyId;
+      if (userModel == null || familyId == null) {
+        throw AuthException('User not part of a family', code: 'no-family');
+      }
+
+      // Get all events with importedFromDevice = true
+      final eventsRef = _firestore
+          .collection('families')
+          .doc(familyId)
+          .collection('events');
+
+      final snapshot = await eventsRef
+          .where('importedFromDevice', isEqualTo: true)
+          .get();
+
+      final syncedEvents = snapshot.docs;
+      Logger.info('Found ${syncedEvents.length} synced events to delete', tag: 'CalendarSyncService');
+
+      if (syncedEvents.isEmpty) {
+        Logger.info('No synced events to delete', tag: 'CalendarSyncService');
+        return 0;
+      }
+
+      // Delete events in batches (Firestore batch limit is 500)
+      int deletedCount = 0;
+      const batchSize = 500;
+
+      for (int i = 0; i < syncedEvents.length; i += batchSize) {
+        final batch = _firestore.batch();
+        final batchEnd = (i + batchSize < syncedEvents.length)
+            ? i + batchSize
+            : syncedEvents.length;
+
+        for (int j = i; j < batchEnd; j++) {
+          batch.delete(syncedEvents[j].reference);
+        }
+
+        await batch.commit();
+        deletedCount += batchEnd - i;
+        Logger.info('Deleted $deletedCount / ${syncedEvents.length} events...', tag: 'CalendarSyncService');
+      }
+
+      // Optionally reset lastSyncedAt
+      if (resetLastSyncedAt) {
+        final user = _auth.currentUser;
+        if (user != null) {
+          await _firestore.collection('users').doc(user.uid).update({
+            'lastSyncedAt': FieldValue.delete(),
+          });
+          Logger.info('Reset lastSyncedAt timestamp', tag: 'CalendarSyncService');
+        }
+      }
+
+      Logger.info('Successfully deleted $deletedCount synced events', tag: 'CalendarSyncService');
+      return deletedCount;
+    } catch (e, st) {
+      Logger.error('Error removing synced events', error: e, stackTrace: st, tag: 'CalendarSyncService');
+      rethrow;
     }
   }
 }

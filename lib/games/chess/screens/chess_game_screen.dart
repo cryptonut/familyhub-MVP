@@ -338,6 +338,58 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       return const SizedBox.shrink();
     }
 
+    // Handle waiting status - show waiting for opponent message
+    if (_game!.status == GameStatus.waiting) {
+      final isCreator = _game!.whitePlayerId == user.uid;
+      final opponentName = isCreator 
+          ? (_game!.blackPlayerName ?? 'Opponent')
+          : (_game!.whitePlayerName ?? 'Opponent');
+      
+      return Scaffold(
+        appBar: AppBar(title: const Text('Chess')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                isCreator 
+                    ? 'Waiting for $opponentName to join...'
+                    : 'Game created by $opponentName\nTap to join',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              if (!isCreator) ...[
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final userModel = await _authService.getCurrentUserModel();
+                      await _chessService.joinFamilyGame(
+                        gameId: _game!.id,
+                        blackPlayerId: user.uid,
+                        blackPlayerName: userModel?.displayName ?? 'Player',
+                      );
+                      // Game will update via stream, no need to reload
+                    } catch (e) {
+                      Logger.error('Error joining game', error: e, tag: 'ChessGameScreen');
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error joining: ${e.toString()}')),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Join Game'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
     final isWhite = _game!.isPlayerWhite(user.uid) ?? true;
     final isMyTurn = _game!.isMyTurn(user.uid);
     final lastMove = _game!.lastMove;

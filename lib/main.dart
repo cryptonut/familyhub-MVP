@@ -14,6 +14,7 @@ import 'services/app_state.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/background_sync_service.dart';
+import 'providers/user_data_provider.dart';
 import 'widgets/auth_wrapper.dart';
 import 'widgets/error_handler.dart';
 import 'utils/app_theme.dart';
@@ -395,6 +396,7 @@ class FamilyHubApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()),
+        ChangeNotifierProvider(create: (_) => UserDataProvider()),
         Provider(create: (_) => AuthService()),
       ],
       child: ErrorHandler(

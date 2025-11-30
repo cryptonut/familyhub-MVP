@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/services/logger_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/app_state.dart';
+import '../../providers/user_data_provider.dart';
 import '../../services/calendar_service.dart';
 import '../../services/task_service.dart';
 import '../../services/wallet_service.dart';
@@ -53,10 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Task> _pendingApprovals = [];
   List<Map<String, dynamic>> _refundNotifications = []; // List of refund notification documents
   List<PayoutRequest> _pendingPayoutRequests = []; // Pending payout requests (for Bankers)
-  List<UserModel> _familyMembers = [];
   Map<String, bool> _unreadMessages = {}; // Map of userId -> hasUnreadMessages
-  UserModel? _familyCreator;
-  UserModel? _currentUserModel;
   double _walletBalance = 0.0;
   double _familyWalletBalance = 0.0;
   int _activeJobsCount = 0;
@@ -64,144 +62,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _pendingApprovalsCount = 0;
   int _refundNotificationsCount = 0;
   int _pendingPayoutRequestsCount = 0;
-  bool _isLoading = true;
+  bool _isLoadingDashboardData = false; // Only for dashboard-specific data, not user data
 
   @override
   void initState() {
     super.initState();
-    _loadDashboardData();
-    // Set up periodic refresh to check for new approvals
-    _setupPeriodicRefresh();
-  }
-
-  void _setupPeriodicRefresh() {
-    // Refresh every 30 seconds to check for new approvals
-    Future.delayed(const Duration(seconds: 30), () {
+    // Load user data from provider (uses cache if available)
+    final userProvider = Provider.of<UserDataProvider>(context, listen: false);
+    userProvider.loadUserData(forceRefresh: false).then((_) {
+      // Once user data is loaded (from cache or fresh), load dashboard data
       if (mounted) {
-        _loadDashboardData();
-        _setupPeriodicRefresh(); // Schedule next refresh
+        _loadDashboardData(showCachedFirst: true);
       }
     });
   }
 
-  Future<void> _loadDashboardData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadDashboardData({bool showCachedFirst = false}) async {
+    // Get user data from provider (uses cache)
+    final userProvider = Provider.of<UserDataProvider>(context, listen: false);
     
-    // CRITICAL: Load family members FIRST, before any other operations
-    // This ensures they're available even if other operations fail
-    try {
-      final authService = AuthService();
-      final currentUserId = _auth.currentUser?.uid;
-      
-      // Get current user model first - with timeout to detect Firestore issues
-      _currentUserModel = await authService.getCurrentUserModel()
-          .timeout(const Duration(seconds: 10), onTimeout: () {
-        Logger.warning('getCurrentUserModel timeout - Firestore unavailable', tag: 'DashboardScreen');
-        return null;
-      });
-      
-      if (_currentUserModel == null) {
-        Logger.warning('⚠️ Cannot load user model - Firestore may be unavailable', tag: 'DashboardScreen');
-        // Show error and return early
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Cannot load user data. Firestore may be unavailable.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
-            ),
-          );
-        }
-        return;
+    // If showing cached first, don't show loading spinner
+    if (!showCachedFirst) {
+      setState(() => _isLoadingDashboardData = true);
+    }
+    
+    // Ensure user data is loaded (will use cache if available)
+    await userProvider.loadUserData(forceRefresh: false);
+    
+    // Get user data from provider
+    final currentUserModel = userProvider.currentUser;
+    final familyMembers = userProvider.familyMembers;
+    
+    if (currentUserModel == null) {
+      Logger.warning('⚠️ Cannot load user model - Firestore may be unavailable', tag: 'DashboardScreen');
+      if (mounted) {
+        setState(() => _isLoadingDashboardData = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot load user data. Firestore may be unavailable.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
       }
-      
-      // Get all family members (this includes current user)
-      final allFamilyMembers = await authService.getFamilyMembers()
-          .timeout(const Duration(seconds: 10), onTimeout: () {
-        Logger.warning('getFamilyMembers timeout - Firestore unavailable', tag: 'DashboardScreen');
-        return <UserModel>[];
-      });
-      
-      Logger.debug('=== LOADING FAMILY MEMBERS (PRIORITY) ===', tag: 'DashboardScreen');
-      Logger.debug('Current User ID: $currentUserId', tag: 'DashboardScreen');
-      Logger.debug('Current user model: ${_currentUserModel?.displayName} (${_currentUserModel?.uid})', tag: 'DashboardScreen');
-      Logger.debug('Current user familyId: "${_currentUserModel?.familyId}"', tag: 'DashboardScreen');
-      Logger.debug('All family members from query: ${allFamilyMembers.length}', tag: 'DashboardScreen');
-      
-      // Build the family members list immediately
-      _familyMembers = [];
-      if (allFamilyMembers.isNotEmpty) {
-        Logger.debug('✓ Using ${allFamilyMembers.length} members from query', tag: 'DashboardScreen');
-        // Sort: current user first, then others alphabetically
-        final sorted = List<UserModel>.from(allFamilyMembers);
-        sorted.sort((a, b) {
-          if (a.uid == currentUserId) return -1;
-          if (b.uid == currentUserId) return 1;
-          return a.displayName.compareTo(b.displayName);
-        });
-        _familyMembers = sorted;
-        Logger.debug('✓ Sorted list has ${_familyMembers.length} members', tag: 'DashboardScreen');
-      } else if (_currentUserModel != null) {
-        Logger.warning('⚠️ Query returned empty, adding current user only', tag: 'DashboardScreen');
-        _familyMembers.add(_currentUserModel!);
-      }
-      
-      Logger.debug('=== FAMILY MEMBERS LOADED ===', tag: 'DashboardScreen');
-      Logger.debug('_familyMembers.length: ${_familyMembers.length}', tag: 'DashboardScreen');
-      for (var member in _familyMembers) {
-        Logger.debug('  - ${member.displayName} (${member.uid}), familyId: "${member.familyId}"', tag: 'DashboardScreen');
-      }
-      
-      // Get family creator (non-critical)
-      try {
-        _familyCreator = await authService.getFamilyCreator();
-        Logger.debug('Family creator: ${_familyCreator?.displayName} (${_familyCreator?.uid})', tag: 'DashboardScreen');
-      } catch (e) {
-        Logger.warning('Error getting family creator (non-critical)', error: e, tag: 'DashboardScreen');
-        _familyCreator = null;
-      }
-    } catch (e) {
-      Logger.error('Error loading family members', error: e, tag: 'DashboardScreen');
-      final errorStr = e.toString().toLowerCase();
-      
-      // Check if this is a Firestore unavailable error
-      if (errorStr.contains('unavailable') || errorStr.contains('timeout')) {
-        Logger.warning('⚠️ Firestore unavailable - cannot load family data', tag: 'DashboardScreen');
-        // Don't set loading to false yet - we want to show an error state
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            // Keep empty lists to show error state
-          });
-          
-          // Show error message to user
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
-                'Cannot load data from Firestore. Please sign out and sign back in.',
-                style: TextStyle(color: Colors.white),
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 8),
-              action: SnackBarAction(
-                label: 'Sign Out',
-                textColor: Colors.white,
-                onPressed: () async {
-                  final authService = AuthService();
-                  await authService.signOut();
-                },
-              ),
-            ),
-          );
-        }
-        return; // Don't continue loading other data
-      }
-      
-      // Even if this fails, try to at least show current user
-      if (_currentUserModel != null && _familyMembers.isEmpty) {
-        _familyMembers = [_currentUserModel!];
-      }
+      return;
     }
     
     try {
@@ -227,10 +131,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .toList()
         ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
-      // Load active tasks with force refresh to ensure we get the latest data
-      final allTasks = await _taskService.getTasks(forceRefresh: true);
+      // Load active tasks - force refresh to ensure we get latest data
+      List<Task> allTasks = [];
+      try {
+        // Force refresh to ensure we get newly created jobs
+        allTasks = await _taskService.getTasks(forceRefresh: true);
+        Logger.debug('Dashboard: Loaded ${allTasks.length} total tasks', tag: 'DashboardScreen');
+        
+        // Debug: Log all tasks with full details
+        if (allTasks.isEmpty) {
+          Logger.warning('Dashboard: No tasks loaded from Firestore!', tag: 'DashboardScreen');
+        } else {
+          for (var task in allTasks) {
+            Logger.debug('Dashboard: Task "${task.title}" (id: ${task.id}) - reward: ${task.reward}, needsApproval: ${task.needsApproval}, isCompleted: ${task.isCompleted}, createdBy: ${task.createdBy}', tag: 'DashboardScreen');
+          }
+        }
+      } catch (e, st) {
+        Logger.error('Dashboard: Error loading tasks', error: e, stackTrace: st, tag: 'DashboardScreen');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading jobs: $e'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        // Continue with empty list - don't break the dashboard
+        allTasks = [];
+      }
+      // Upcoming jobs = tasks with rewards OR needsApproval that are not completed and not awaiting approval
       _upcomingTasks = allTasks
-          .where((task) => !task.isCompleted && !task.isAwaitingApproval)
+          .where((task) => 
+            ((task.reward != null && task.reward! > 0) || task.needsApproval == true) &&
+            !task.isCompleted && 
+            !task.isAwaitingApproval
+          )
           .toList();
       
       // Sort tasks by due date (if available) or creation date
@@ -268,7 +204,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final chatService = ChatService();
         final currentUserId = _auth.currentUser?.uid;
         _unreadMessages.clear();
-        for (var member in _familyMembers) {
+        for (var member in familyMembers) {
           // Skip checking unread for current user
           if (member.uid == currentUserId) continue;
           
@@ -286,13 +222,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       // Count active and completed jobs
+      // Jobs are defined as: tasks with rewards > 0 OR tasks with needsApproval (legacy jobs)
       final currentUserId = _auth.currentUser?.uid;
-      _activeJobsCount = allTasks.where((task) => 
+      
+      // Debug: Log all tasks to see their reward values
+      for (var task in allTasks) {
+        Logger.debug('Dashboard: Task "${task.title}" - reward: ${task.reward}, needsApproval: ${task.needsApproval}, isCompleted: ${task.isCompleted}, createdBy: ${task.createdBy}', tag: 'DashboardScreen');
+      }
+      
+      // Jobs are tasks with rewards OR tasks that need approval (legacy jobs)
+      final jobs = allTasks.where((task) => 
+        (task.reward != null && task.reward! > 0) || task.needsApproval == true
+      ).toList();
+      
+      Logger.debug('Dashboard: Found ${jobs.length} jobs (${allTasks.where((t) => t.reward != null && t.reward! > 0).length} with rewards, ${allTasks.where((t) => (t.reward == null || t.reward == 0) && t.needsApproval == true).length} legacy) out of ${allTasks.length} total tasks', tag: 'DashboardScreen');
+      
+      _activeJobsCount = jobs.where((task) => 
         !task.isCompleted || task.isAwaitingApproval
       ).length;
-      _completedJobsCount = allTasks.where((task) => 
+      _completedJobsCount = jobs.where((task) => 
         task.isCompleted && !task.isAwaitingApproval
       ).length;
+      
+      Logger.debug('Dashboard: Active jobs: $_activeJobsCount, Completed jobs: $_completedJobsCount', tag: 'DashboardScreen');
 
       // Get pending approvals (jobs that need creator's action)
       _pendingApprovals = allTasks.where((task) {
@@ -344,24 +296,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Logger.error('Error loading dashboard data', error: e, stackTrace: StackTrace.current, tag: 'DashboardScreen');
     } finally {
       if (mounted) {
-        Logger.debug('=== CALLING setState TO UPDATE UI ===', tag: 'DashboardScreen');
-        Logger.debug('_familyMembers.length before setState: ${_familyMembers.length}', tag: 'DashboardScreen');
         setState(() {
-          _isLoading = false;
+          _isLoadingDashboardData = false;
         });
-        Logger.debug('_familyMembers.length after setState: ${_familyMembers.length}', tag: 'DashboardScreen');
       }
+      
+      // Refresh user data in background (non-blocking)
+      userProvider.refreshInBackground();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    // Use Consumer to listen to UserDataProvider changes
+    return Consumer<UserDataProvider>(
+      builder: (context, userProvider, child) {
+        final currentUserModel = userProvider.currentUser;
+        final familyMembers = userProvider.familyMembers;
+        final familyCreator = userProvider.familyCreator;
+        
+        // Show loading only if we have no cached data AND dashboard data is loading
+        if (currentUserModel == null && userProvider.isLoading) {
+          return const LoadingIndicator(message: 'Loading dashboard...');
+        }
+        
+        // If we have cached user data, show dashboard immediately (even if dashboard data is still loading)
+        return _buildDashboardContent(
+          currentUserModel: currentUserModel,
+          familyMembers: familyMembers,
+          familyCreator: familyCreator,
+        );
+      },
+    );
+  }
+  
+  Widget _buildDashboardContent({
+    required UserModel? currentUserModel,
+    required List<UserModel> familyMembers,
+    required UserModel? familyCreator,
+  }) {
+    if (_isLoadingDashboardData && currentUserModel == null) {
       return const LoadingIndicator(message: 'Loading dashboard...');
     }
 
     return RefreshIndicator(
-      onRefresh: _loadDashboardData,
+      onRefresh: () => _loadDashboardData(showCachedFirst: false),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
@@ -369,7 +348,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // My Family Section (at the top)
-            _buildMyFamily(),
+            _buildMyFamily(
+              currentUserModel: currentUserModel,
+              familyMembers: familyMembers,
+              familyCreator: familyCreator,
+            ),
             const SizedBox(height: 16),
             
             // Pending Approvals (prominent if there are any)
@@ -386,7 +369,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             
             // Pending Payout Requests (for Bankers)
             if (_pendingPayoutRequestsCount > 0) ...[
-              _buildPendingPayoutRequests(),
+              _buildPendingPayoutRequests(familyMembers),
               const SizedBox(height: 16),
             ],
             
@@ -405,7 +388,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 24),
             
             // Upcoming Tasks
-            _buildUpcomingTasks(),
+            _buildUpcomingTasks(familyMembers),
             const SizedBox(height: 24),
             
             // Wallet Balance Card (at the bottom)
@@ -505,7 +488,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildMyFamily() {
+  Widget _buildMyFamily({
+    required UserModel? currentUserModel,
+    required List<UserModel> familyMembers,
+    required UserModel? familyCreator,
+  }) {
     final currentUserId = _auth.currentUser?.uid;
     
     return ModernCard(
@@ -527,7 +514,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                if (_familyMembers.isEmpty)
+                if (familyMembers.isEmpty)
                   Text(
                     'No members',
                     style: TextStyle(
@@ -537,7 +524,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   )
                 else
                   Text(
-                    '${_familyMembers.length} member${_familyMembers.length == 1 ? '' : 's'}',
+                    '${familyMembers.length} member${familyMembers.length == 1 ? '' : 's'}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -546,7 +533,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            if (_familyMembers.isEmpty)
+            if (familyMembers.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Center(
@@ -563,18 +550,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
-                children: _familyMembers.map((member) {
+                children: familyMembers.map((member) {
                   final isCurrentUser = member.uid == currentUserId;
                   final hasUnread = _unreadMessages[member.uid] == true;
                   
                   // Calculate relationship from current user's perspective
                   String? relationshipLabel;
-                  if (_currentUserModel != null && _familyCreator != null) {
+                  if (currentUserModel != null && familyCreator != null) {
                     final relationship = RelationshipUtils.getRelationshipFromPerspective(
-                      viewer: _currentUserModel!,
+                      viewer: currentUserModel,
                       target: member,
-                      creator: _familyCreator,
-                      allMembers: _familyMembers,
+                      creator: familyCreator,
+                      allMembers: familyMembers,
                     );
                     relationshipLabel = relationship != null 
                         ? RelationshipUtils.getRelationshipLabel(relationship)
@@ -582,9 +569,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   }
                   
                   // Check if current user can edit relationships
-                  final canEditRelationship = _currentUserModel != null && 
-                      _familyCreator != null &&
-                      (_familyCreator!.uid == _currentUserModel!.uid || _currentUserModel!.isAdmin());
+                  final canEditRelationship = currentUserModel != null && 
+                      familyCreator != null &&
+                      (familyCreator.uid == currentUserModel.uid || currentUserModel.isAdmin());
                   
                   return InkWell(
                     onTap: isCurrentUser ? () {
@@ -617,10 +604,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context: context,
                         builder: (context) => RelationshipDialog(
                           user: member,
-                          currentUser: _currentUserModel,
-                          familyCreator: _familyCreator,
+                          currentUser: currentUserModel,
+                          familyCreator: familyCreator,
                           onUpdated: () {
-                            _loadDashboardData();
+                            _loadDashboardData(showCachedFirst: false);
                           },
                         ),
                       );
@@ -747,10 +734,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       context: context,
                                       builder: (context) => RelationshipDialog(
                                         user: member,
-                                        currentUser: _currentUserModel,
-                                        familyCreator: _familyCreator,
+                                        currentUser: currentUserModel,
+                                        familyCreator: familyCreator,
                                         onUpdated: () {
-                                          _loadDashboardData();
+                                          _loadDashboardData(showCachedFirst: false);
                                         },
                                       ),
                                     );
@@ -1184,13 +1171,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 TextButton.icon(
                   onPressed: () async {
                     // Mark notification as read
-                    if (notification['id'] != null) {
+                    final notificationId = notification['id'] as String?;
+                    if (notificationId != null) {
                       await _firestore
                           .collection('notifications')
-                          .doc(notification['id'])
+                          .doc(notificationId)
                           .update({'read': true});
                     }
-                    _loadDashboardData();
+                    _loadDashboardData(showCachedFirst: false);
                   },
                   icon: const Icon(Icons.close, size: 18),
                   label: const Text('Dismiss'),
@@ -1202,10 +1190,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ElevatedButton.icon(
                   onPressed: () async {
                     // Mark notification as read
-                    if (notification['id'] != null) {
+                    final notificationId = notification['id'] as String?;
+                    if (notificationId != null) {
                       await _firestore
                           .collection('notifications')
-                          .doc(notification['id'])
+                          .doc(notificationId)
                           .update({'read': true});
                     }
                     // Show refund notification dialog with options
@@ -1234,7 +1223,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildPendingPayoutRequests() {
+  Widget _buildPendingPayoutRequests(List<UserModel> familyMembers) {
     return Card(
       elevation: 3,
       color: Colors.purple.shade50,
@@ -1288,7 +1277,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ..._pendingPayoutRequests.take(3).map((request) => _buildPayoutRequestCard(request)),
+            ..._pendingPayoutRequests.take(3).map((request) => _buildPayoutRequestCard(request, familyMembers)),
             if (_pendingPayoutRequests.length > 3)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -1308,9 +1297,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildPayoutRequestCard(PayoutRequest request) {
+  Widget _buildPayoutRequestCard(PayoutRequest request, List<UserModel> familyMembers) {
     // Get requester name
-    final requester = _familyMembers.firstWhere(
+    final requester = familyMembers.firstWhere(
       (m) => m.uid == request.userId,
       orElse: () => UserModel(
         uid: request.userId,
@@ -1515,7 +1504,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               );
               if (result == true && mounted) {
-                _loadDashboardData();
+                // Wait a moment for Firestore to process, then force refresh
+                await Future.delayed(const Duration(milliseconds: 500));
+                await _loadDashboardData(showCachedFirst: false);
               }
             },
             icon: const Icon(Icons.add),
@@ -1607,7 +1598,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildUpcomingTasks() {
+  Widget _buildUpcomingTasks(List<UserModel> familyMembers) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1628,12 +1619,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           )
         else
-          ..._upcomingTasks.take(5).map((task) => _buildTaskCard(task)),
+          ..._upcomingTasks.take(5).map((task) => _buildTaskCard(task, familyMembers)),
       ],
     );
   }
 
-  Widget _buildTaskCard(Task task) {
+  Widget _buildTaskCard(Task task, List<UserModel> familyMembers) {
     final isOverdue = task.dueDate != null && 
         task.dueDate!.isBefore(DateTime.now()) && 
         !task.isCompleted;
@@ -1657,7 +1648,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (isClaimed && task.claimedBy != null) {
       final claimerId = task.claimedBy!;
       // Try to find in family members first
-      final claimer = _familyMembers.firstWhere(
+      final claimer = familyMembers.firstWhere(
         (m) => m.uid == claimerId,
         orElse: () => UserModel(
           uid: claimerId,

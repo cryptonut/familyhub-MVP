@@ -4,8 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../core/services/logger_service.dart';
 import '../../models/task.dart';
+import '../../models/user_model.dart';
 import '../../services/task_service.dart';
 import '../../services/app_state.dart';
+import '../../providers/user_data_provider.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
@@ -41,6 +43,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
   // Filters for completed jobs
   String _completedFilter = 'Anyone'; // 'Me' or 'Anyone'
   String _timePeriodFilter = 'All'; // 'Week', 'Month', '3 Months', '1yr', 'All'
+  bool _completedFiltersExpanded = false; // Collapsible state for completed filters
 
   @override
   void initState() {
@@ -49,15 +52,12 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     final initialIndex = widget.initialTabIndex ?? appState.tasksTabIndex ?? 0;
     _tabController = TabController(length: 2, vsync: this, initialIndex: initialIndex);
     Logger.debug('initState: Initializing, loading tasks... (initialTabIndex: $initialIndex)', tag: 'TasksScreen');
-    // Clear familyId cache to ensure we have the latest value
-    _taskService.clearFamilyIdCache();
-    
     // Use post-frame callback to avoid setState during build
     // This prevents "setState() or markNeedsBuild() called during build" errors
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Clear the tasksTabIndex after using it - deferred to post-frame
       appState.clearTasksTabIndex();
-      _loadTasks(forceRefresh: true);
+      _loadTasks(forceRefresh: false); // Use cache for faster load
       // Switch to the desired tab if specified
       if (initialIndex != 0 && _tabController.index != initialIndex) {
         _tabController.animateTo(initialIndex);
@@ -77,9 +77,10 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         appState.clearTasksTabIndex();
       });
     }
-    // Reload tasks when navigating to this screen (when currentIndex becomes 2)
+    // Only reload if data is stale (older than 30 seconds)
+    // This prevents unnecessary refreshes when navigating back to the screen
     if (appState.currentIndex == 2) {
-      _loadTasks(forceRefresh: true);
+      _loadTasks(forceRefresh: false); // Use cache, refresh in background if needed
     }
   }
 
@@ -110,57 +111,70 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
       }
       Logger.debug('_loadTasks: Found ${userIds.length} unique creator IDs: $userIds', tag: 'TasksScreen');
       
-      // Fetch user names for all creators
+      // Fetch user names - use UserDataProvider first (cached family members), then batch fetch remaining
       final userNames = <String, String>{};
       Logger.debug('_loadTasks: Fetching names for ${userIds.length} unique creators', tag: 'TasksScreen');
+      
+      // Try to get names from UserDataProvider first (family members are cached)
+      final userProvider = Provider.of<UserDataProvider>(context, listen: false);
+      final familyMembers = userProvider.familyMembers;
+      
+      // Batch fetch remaining users not in family
+      final usersToFetch = <String>[];
       for (var userId in userIds) {
         if (!_userNames.containsKey(userId)) {
-          try {
-            final userDoc = await _firestore.collection('users').doc(userId).get();
-            if (userDoc.exists) {
-              final userData = userDoc.data();
-              Logger.debug('_loadTasks: User document for $userId:', tag: 'TasksScreen');
-              Logger.debug('  - displayName: ${userData?['displayName']}', tag: 'TasksScreen');
-              Logger.debug('  - email: ${userData?['email']}', tag: 'TasksScreen');
-              Logger.debug('  - All fields: ${userData?.keys.toList()}', tag: 'TasksScreen');
-              
-              final displayName = userData?['displayName'] as String?;
-              final email = userData?['email'] as String?;
-              
-              // Try displayName first (but skip if it's the default "User"), then email, then fallback
-              String userName;
-              if (displayName != null && 
-                  displayName.isNotEmpty && 
-                  displayName.toLowerCase() != 'user') {
-                // Use displayName if it's not empty and not the default "User"
-                userName = displayName;
-                Logger.debug('  - Using displayName: $userName', tag: 'TasksScreen');
-              } else if (email != null && email.isNotEmpty) {
-                // Extract name from email (part before @) and capitalize first letter
-                final emailName = email.split('@').first;
-                userName = emailName.isNotEmpty 
-                    ? emailName[0].toUpperCase() + emailName.substring(1)
-                    : 'Unknown User';
-                Logger.debug('  - Using email-derived name: $userName (from $email)', tag: 'TasksScreen');
-              } else {
-                userName = 'Unknown User';
-                Logger.debug('  - No valid name found, using fallback', tag: 'TasksScreen');
-              }
-              
-              userNames[userId] = userName;
-              Logger.debug('  - Selected name: $userName', tag: 'TasksScreen');
-            } else {
-              Logger.warning('_loadTasks: User document does not exist for $userId', tag: 'TasksScreen');
-              userNames[userId] = 'Unknown User';
-            }
-          } catch (e) {
-            Logger.error('_loadTasks: Error fetching user name for $userId', error: e, tag: 'TasksScreen');
-            userNames[userId] = 'Unknown User';
+          // Check family members first (most common case, already cached)
+          final familyMember = familyMembers.firstWhere(
+            (m) => m.uid == userId,
+            orElse: () => UserModel(
+              uid: '', 
+              email: '', 
+              displayName: '',
+              createdAt: DateTime.now(),
+              familyId: '',
+            ),
+          );
+          
+          if (familyMember.uid.isNotEmpty) {
+            // Use cached family member name
+            final name = familyMember.displayName.isNotEmpty 
+                ? familyMember.displayName 
+                : (familyMember.email.isNotEmpty 
+                    ? familyMember.email.split('@').first 
+                    : 'Unknown User');
+            userNames[userId] = name;
+          } else {
+            usersToFetch.add(userId);
           }
         } else {
           // Use cached name
           userNames[userId] = _userNames[userId]!;
-          Logger.debug('_loadTasks: Using cached name for $userId: ${_userNames[userId]}', tag: 'TasksScreen');
+        }
+      }
+      
+      // Batch fetch remaining users (parallel)
+      if (usersToFetch.isNotEmpty) {
+        final futures = usersToFetch.map((userId) async {
+          try {
+            final userModel = await userProvider.getUserModel(userId);
+            if (userModel != null) {
+              final name = userModel.displayName.isNotEmpty 
+                  ? userModel.displayName 
+                  : (userModel.email.isNotEmpty 
+                      ? userModel.email.split('@').first 
+                      : 'Unknown User');
+              return MapEntry(userId, name);
+            }
+            return MapEntry(userId, 'Unknown User');
+          } catch (e) {
+            Logger.warning('_loadTasks: Error fetching user $userId', error: e, tag: 'TasksScreen');
+            return MapEntry(userId, 'Unknown User');
+          }
+        });
+        
+        final results = await Future.wait(futures);
+        for (var entry in results) {
+          userNames[entry.key] = entry.value;
         }
       }
       
@@ -836,7 +850,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
 
   Widget _buildSearchAndFilterBar() {
     return Container(
-      padding: const EdgeInsets.all(AppTheme.spacingMD),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
@@ -847,44 +861,60 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         ),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Search bar
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search jobs...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        setState(() {
-                          _searchController.clear();
-                          _searchQuery = '';
-                        });
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+          // Search bar - more compact
+          SizedBox(
+            height: 40,
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search jobs...',
+                hintStyle: const TextStyle(fontSize: 14),
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                isDense: true,
               ),
-              filled: true,
-              fillColor: Colors.grey.shade100,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
             ),
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
-            },
           ),
-          const SizedBox(height: 12),
-          // Filter chips
+          const SizedBox(height: 6),
+          // Filter chips - more compact
           Row(
             children: [
               Expanded(
                 child: FilterChip(
-                  label: Text('Priority: $_priorityFilter'),
+                  label: Text(
+                    'Priority: $_priorityFilter',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   selected: _priorityFilter != 'All',
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
                   onSelected: (selected) {
                     showDialog(
                       context: context,
@@ -912,11 +942,17 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: FilterChip(
-                  label: Text('Status: $_statusFilter'),
+                  label: Text(
+                    'Status: $_statusFilter',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   selected: _statusFilter != 'All',
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
                   onSelected: (selected) {
                     showDialog(
                       context: context,
@@ -1059,72 +1095,141 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     
     return Column(
       children: [
-        // Filter controls
+        // Compact filter controls - collapsible
         Container(
-          padding: const EdgeInsets.all(12),
-          color: Colors.grey[100],
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          color: Colors.grey[50],
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.filter_list, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Filters:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+              // Collapsible header
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _completedFiltersExpanded = !_completedFiltersExpanded;
+                  });
+                },
+                child: Row(
+                  children: [
+                    Icon(
+                      _completedFiltersExpanded ? Icons.expand_less : Icons.expand_more,
+                      size: 18,
+                      color: Colors.grey[700],
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 4),
+                    Text(
+                      'Filters',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const Spacer(),
+                    if (_completedFilter != 'Anyone' || _timePeriodFilter != 'All')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'Active',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              // Completer filter
-              Row(
-                children: [
-                  const Text('Completed by: '),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: 'Anyone', label: Text('Anyone')),
-                        ButtonSegment(value: 'Me', label: Text('Me')),
+              // Expandable filter content
+              if (_completedFiltersExpanded) ...[
+                    const SizedBox(height: 8),
+                    // Completer filter - more compact
+                    Row(
+                      children: [
+                        Text(
+                          'Completed by:',
+                          style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: SegmentedButton<String>(
+                            segments: const [
+                              ButtonSegment(
+                                value: 'Anyone',
+                                label: Text('Anyone', style: TextStyle(fontSize: 11)),
+                              ),
+                              ButtonSegment(
+                                value: 'Me',
+                                label: Text('Me', style: TextStyle(fontSize: 11)),
+                              ),
+                            ],
+                            selected: {_completedFilter},
+                            style: const ButtonStyle(
+                              padding: MaterialStatePropertyAll(EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onSelectionChanged: (Set<String> newSelection) {
+                              setState(() {
+                                _completedFilter = newSelection.first;
+                              });
+                            },
+                          ),
+                        ),
                       ],
-                      selected: {_completedFilter},
-                      onSelectionChanged: (Set<String> newSelection) {
-                        setState(() {
-                          _completedFilter = newSelection.first;
-                        });
-                      },
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // Time period filter
-              Row(
-                children: [
-                  const Text('Time period: '),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: 'Week', label: Text('Week')),
-                        ButtonSegment(value: 'Month', label: Text('Month')),
-                        ButtonSegment(value: '3 Months', label: Text('3M')),
-                        ButtonSegment(value: '1yr', label: Text('1yr')),
-                        ButtonSegment(value: 'All', label: Text('All')),
+                    const SizedBox(height: 6),
+                    // Time period filter - more compact
+                    Row(
+                      children: [
+                        Text(
+                          'Time period:',
+                          style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: SegmentedButton<String>(
+                            segments: const [
+                              ButtonSegment(
+                                value: 'Week',
+                                label: Text('Week', style: TextStyle(fontSize: 10)),
+                              ),
+                              ButtonSegment(
+                                value: 'Month',
+                                label: Text('Month', style: TextStyle(fontSize: 10)),
+                              ),
+                              ButtonSegment(
+                                value: '3 Months',
+                                label: Text('3M', style: TextStyle(fontSize: 10)),
+                              ),
+                              ButtonSegment(
+                                value: '1yr',
+                                label: Text('1yr', style: TextStyle(fontSize: 10)),
+                              ),
+                              ButtonSegment(
+                                value: 'All',
+                                label: Text('All', style: TextStyle(fontSize: 10)),
+                              ),
+                            ],
+                            selected: {_timePeriodFilter},
+                            style: const ButtonStyle(
+                              padding: MaterialStatePropertyAll(EdgeInsets.symmetric(horizontal: 4, vertical: 4)),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            onSelectionChanged: (Set<String> newSelection) {
+                              setState(() {
+                                _timePeriodFilter = newSelection.first;
+                              });
+                            },
+                          ),
+                        ),
                       ],
-                      selected: {_timePeriodFilter},
-                      onSelectionChanged: (Set<String> newSelection) {
-                        setState(() {
-                          _timePeriodFilter = newSelection.first;
-                        });
-                      },
                     ),
-                  ),
-                ],
-              ),
+                  ],
             ],
           ),
         ),

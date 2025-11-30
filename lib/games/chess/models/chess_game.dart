@@ -31,6 +31,7 @@ class ChessGame {
   final String? resultReason; // checkmate, stalemate, resignation, timeout, etc.
   final List<String> spectators; // user IDs watching the game
   final Map<String, dynamic>? metadata; // AI difficulty, etc.
+  final String? invitedPlayerId; // For family games: the player who was invited (but hasn't joined yet)
 
   ChessGame({
     required this.id,
@@ -62,6 +63,7 @@ class ChessGame {
     this.resultReason,
     List<String>? spectators,
     this.metadata,
+    this.invitedPlayerId,
   }) : spectators = spectators ?? [];
 
   /// Create a new game
@@ -75,7 +77,13 @@ class ChessGame {
     String? familyId,
     int initialTimeMs = 600000, // 10 minutes default
     Map<String, dynamic>? metadata,
+    String? invitedPlayerId, // For family games: intended opponent who hasn't joined yet
   }) {
+    // For family games, if blackPlayerId is provided but we also have invitedPlayerId,
+    // it means the opponent was invited but hasn't joined - keep status as waiting
+    final shouldBeActive = blackPlayerId != null && 
+                          (mode != GameMode.family || invitedPlayerId == null);
+    
     return ChessGame(
       id: id,
       whitePlayerId: whitePlayerId,
@@ -83,10 +91,10 @@ class ChessGame {
       whitePlayerName: whitePlayerName,
       blackPlayerName: blackPlayerName,
       mode: mode,
-      status: blackPlayerId == null ? GameStatus.waiting : GameStatus.active,
+      status: shouldBeActive ? GameStatus.active : GameStatus.waiting,
       familyId: familyId,
       createdAt: DateTime.now(),
-      startedAt: blackPlayerId != null ? DateTime.now() : null,
+      startedAt: shouldBeActive ? DateTime.now() : null,
       fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
       moves: [],
       whiteTimeRemaining: initialTimeMs,
@@ -99,6 +107,7 @@ class ChessGame {
       halfmoveClock: 0,
       fullmoveNumber: 1,
       metadata: metadata,
+      invitedPlayerId: invitedPlayerId,
     );
   }
 
@@ -132,6 +141,7 @@ class ChessGame {
         'resultReason': resultReason,
         'spectators': spectators,
         'metadata': metadata,
+        'invitedPlayerId': invitedPlayerId,
       };
 
   factory ChessGame.fromJson(Map<String, dynamic> json) {
@@ -186,6 +196,7 @@ class ChessGame {
               .toList() ??
           [],
       metadata: json['metadata'] as Map<String, dynamic>?,
+      invitedPlayerId: json['invitedPlayerId'] as String?,
     );
   }
 
@@ -219,6 +230,7 @@ class ChessGame {
     String? resultReason,
     List<String>? spectators,
     Map<String, dynamic>? metadata,
+    String? invitedPlayerId,
   }) {
     return ChessGame(
       id: id ?? this.id,
@@ -250,6 +262,7 @@ class ChessGame {
       resultReason: resultReason ?? this.resultReason,
       spectators: spectators ?? this.spectators,
       metadata: metadata ?? this.metadata,
+      invitedPlayerId: invitedPlayerId ?? this.invitedPlayerId,
     );
   }
 

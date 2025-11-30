@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../models/calendar_event.dart';
 import '../../services/calendar_service.dart';
 import '../../services/calendar_sync_service.dart';
 import '../../services/auth_service.dart';
+import '../../core/services/logger_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
 import 'add_edit_event_screen.dart';
+import 'event_details_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -27,29 +30,51 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Map<String, bool> _eventSyncStatus = {}; // eventId -> isSynced
   String _searchQuery = '';
   List<CalendarEvent> _allEvents = [];
+  bool _isSearchVisible = false;
+
+  StreamSubscription<List<CalendarEvent>>? _eventsSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadEvents();
+    _setupEventsListener();
+  }
+
+  void _setupEventsListener() {
+    // Use Firestore stream for real-time updates
+    // This automatically refreshes when events are added/updated/deleted (e.g., after sync)
+    _eventsSubscription = _calendarService.getEventsStream().listen(
+      (events) {
+        if (mounted) {
+          setState(() {
+            _allEvents = events;
+            _eventsMap = _groupEventsByDate(_getFilteredEvents());
+          });
+          // Check sync status for events
+          _checkEventSyncStatus(events);
+        }
+      },
+      onError: (error) {
+        Logger.error('Error in events stream', error: error, tag: 'CalendarScreen');
+        if (mounted) {
+          setState(() {
+            _allEvents = [];
+            _eventsMap = {};
+          });
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
+    _eventsSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadEvents() async {
-    final events = await _calendarService.getEvents();
-    setState(() {
-      _allEvents = events;
-      _eventsMap = _groupEventsByDate(_getFilteredEvents());
-    });
-    
-    // Check sync status for events
-    _checkEventSyncStatus(events);
-  }
+  // Removed _loadEvents() - now using Firestore streams for real-time updates
+  // Events automatically refresh when sync completes or events are added/updated/deleted
 
   List<CalendarEvent> _getFilteredEvents() {
     if (_searchQuery.isEmpty) {
@@ -117,6 +142,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
         title: const Text('Calendar'),
         actions: [
           IconButton(
+            icon: Icon(_isSearchVisible ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                _isSearchVisible = !_isSearchVisible;
+                if (!_isSearchVisible) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                  _eventsMap = _groupEventsByDate(_getFilteredEvents());
+                }
+              });
+            },
+            tooltip: _isSearchVisible ? 'Close search' : 'Search events',
+          ),
+          IconButton(
             icon: const Icon(Icons.today),
             onPressed: () {
               setState(() {
@@ -130,79 +169,118 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
       body: Column(
         children: [
-          // Search bar
-          Container(
-            padding: const EdgeInsets.all(AppTheme.spacingMD),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search events...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            _searchController.clear();
-                            _searchQuery = '';
-                            _eventsMap = _groupEventsByDate(_getFilteredEvents());
-                          });
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          // Search bar - shown/hidden based on state
+          if (_isSearchVisible)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
+                decoration: InputDecoration(
+                  hintText: 'Search events...',
+                  hintStyle: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(
+                            Icons.clear,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              _searchQuery = '';
+                              _eventsMap = _groupEventsByDate(_getFilteredEvents());
+                              _isSearchVisible = false; // Hide search bar when cleared
+                            });
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surface,
+                  isDense: true,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                    _eventsMap = _groupEventsByDate(_getFilteredEvents());
+                    // Hide search bar if text is cleared
+                    if (value.isEmpty) {
+                      _isSearchVisible = false;
+                    }
+                  });
+                },
               ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                  _eventsMap = _groupEventsByDate(_getFilteredEvents());
-                });
-              },
             ),
-          ),
-          TableCalendar<CalendarEvent>(
-            firstDay: DateTime.utc(2020, 1, 1),
-            lastDay: DateTime.utc(2030, 12, 31),
-            focusedDay: _focusedDay,
-            selectedDayPredicate: (day) => app_date_utils.AppDateUtils.isSameDay(_selectedDay, day),
-            eventLoader: _getEventsForDay,
-            startingDayOfWeek: StartingDayOfWeek.monday,
-            calendarStyle: CalendarStyle(
-              outsideDaysVisible: false,
-              markerDecoration: const BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-              ),
-              todayDecoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
-              ),
-              selectedDecoration: const BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-              ),
-            ),
-            headerStyle: const HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
-            ),
-            onDaySelected: (selectedDay, focusedDay) {
-              setState(() {
-                _selectedDay = selectedDay;
-                _focusedDay = focusedDay;
-              });
-            },
-            onPageChanged: (focusedDay) {
-              _focusedDay = focusedDay;
-            },
-          ),
-          const Divider(),
+          // Calendar and events - scrollable together
           Expanded(
-            child: _buildEventsList(),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Calendar - let it size naturally
+                  TableCalendar<CalendarEvent>(
+                    firstDay: DateTime.utc(2020, 1, 1),
+                    lastDay: DateTime.utc(2030, 12, 31),
+                    focusedDay: _focusedDay,
+                    selectedDayPredicate: (day) => app_date_utils.AppDateUtils.isSameDay(_selectedDay, day),
+                    eventLoader: _getEventsForDay,
+                    startingDayOfWeek: StartingDayOfWeek.monday,
+                    calendarStyle: CalendarStyle(
+                      outsideDaysVisible: false,
+                      markerDecoration: const BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                      ),
+                      todayDecoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      selectedDecoration: const BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    headerStyle: const HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                    ),
+                    onDaySelected: (selectedDay, focusedDay) {
+                      setState(() {
+                        _selectedDay = selectedDay;
+                        _focusedDay = focusedDay;
+                      });
+                    },
+                    onPageChanged: (focusedDay) {
+                      setState(() {
+                        _focusedDay = focusedDay;
+                      });
+                    },
+                  ),
+                  const Divider(height: 1),
+                  // Events list - not expanded, just takes what it needs
+                  _buildEventsList(),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -219,9 +297,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               },
             ),
           );
-          if (result == true) {
-            _loadEvents();
-          }
+          // No need to manually reload - Firestore stream will automatically update
         },
         child: const Icon(Icons.add),
       ),
@@ -229,21 +305,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Widget _buildEventsList() {
-    final dayEvents = _getEventsForDay(_selectedDay);
+    // When searching, show all matching events; otherwise show events for selected day
+    final List<CalendarEvent> eventsToShow;
+    if (_searchQuery.isNotEmpty) {
+      eventsToShow = _getFilteredEvents();
+    } else {
+      eventsToShow = _getEventsForDay(_selectedDay);
+    }
     
-    if (dayEvents.isEmpty) {
+    if (eventsToShow.isEmpty) {
       return EmptyState(
         icon: Icons.event_busy,
-        title: 'No events',
-        message: 'No events for ${app_date_utils.AppDateUtils.formatDate(_selectedDay)}',
+        title: _searchQuery.isNotEmpty ? 'No matching events' : 'No events',
+        message: _searchQuery.isNotEmpty
+            ? 'No events match "$_searchQuery"'
+            : 'No events for ${app_date_utils.AppDateUtils.formatDate(_selectedDay)}',
       );
     }
 
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(8),
-      itemCount: dayEvents.length,
+      itemCount: eventsToShow.length,
       itemBuilder: (context, index) {
-        final event = dayEvents[index];
+        final event = eventsToShow[index];
         return ModernCard(
           margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
           padding: EdgeInsets.zero,
@@ -263,8 +349,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
+                // Show sync icon if event was synced from external calendar
+                if (event.sourceCalendar != null && event.sourceCalendar!.isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.sync,
+                    size: 16,
+                    color: Colors.blue[700],
+                  ),
+                ],
+                // Show calendar icon if synced to device calendar
                 if (_eventSyncStatus[event.id] == true) ...[
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   Icon(
                     Icons.calendar_today,
                     size: 16,
@@ -335,29 +431,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       },
                     ),
                   );
-                  if (result == true) {
-                    _loadEvents();
-                  }
+                  // No need to manually reload - Firestore stream will automatically update
                 } else if (value == 'delete') {
                   await _calendarService.deleteEvent(event.id);
-                  _loadEvents();
+                  // No need to manually reload - Firestore stream will automatically update
                 }
               },
             ),
             onTap: () async {
-              final result = await Navigator.push(
+              await Navigator.push(
                 context,
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secondaryAnimation) =>
-                      AddEditEventScreen(event: event),
+                      EventDetailsScreen(event: event),
                   transitionsBuilder: (context, animation, secondaryAnimation, child) {
                     return FadeTransition(opacity: animation, child: child);
                   },
                 ),
               );
-              if (result == true) {
-                _loadEvents();
-              }
+              // No need to manually reload - Firestore stream will automatically update
             },
           ),
         );

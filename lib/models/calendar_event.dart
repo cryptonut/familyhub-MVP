@@ -11,6 +11,9 @@ class CalendarEvent {
   final String? recurrenceRule; // Simple format: "daily", "weekly", "monthly", "yearly" or RRULE format
   final List<String> invitedMemberIds;
   final Map<String, String> rsvpStatus; // memberId -> "going"/"maybe"/"declined"
+  final String? createdBy; // User ID of event creator
+  final List<String> photoUrls; // URLs of photos attached to event
+  final String? sourceCalendar; // Calendar name/account where event originated (e.g., "Gmail", "Samsung Calendar", "FamilyHub")
 
   CalendarEvent({
     required this.id,
@@ -25,8 +28,12 @@ class CalendarEvent {
     this.recurrenceRule,
     List<String>? invitedMemberIds,
     Map<String, String>? rsvpStatus,
+    this.createdBy,
+    List<String>? photoUrls,
+    this.sourceCalendar,
   }) : invitedMemberIds = invitedMemberIds ?? const [],
-       rsvpStatus = rsvpStatus ?? const {};
+       rsvpStatus = rsvpStatus ?? const {},
+       photoUrls = photoUrls ?? const [];
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -41,6 +48,9 @@ class CalendarEvent {
         if (recurrenceRule != null) 'recurrenceRule': recurrenceRule,
         'invitedMemberIds': invitedMemberIds,
         'rsvpStatus': rsvpStatus,
+        if (createdBy != null) 'createdBy': createdBy,
+        'photoUrls': photoUrls,
+        if (sourceCalendar != null) 'sourceCalendar': sourceCalendar,
       };
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) {
@@ -54,7 +64,7 @@ class CalendarEvent {
     return CalendarEvent(
       id: json['id'] as String,
       title: json['title'] as String,
-      description: json['description'] as String,
+      description: (json['description'] as String?) ?? '',
       startTime: DateTime.parse(json['startTime'] as String),
       endTime: DateTime.parse(json['endTime'] as String),
       location: json['location'] as String?,
@@ -64,6 +74,9 @@ class CalendarEvent {
       recurrenceRule: json['recurrenceRule'] as String?,
       invitedMemberIds: List<String>.from(json['invitedMemberIds'] as List? ?? []),
       rsvpStatus: rsvpStatus,
+      createdBy: json['createdBy'] as String?,
+      photoUrls: List<String>.from(json['photoUrls'] as List? ?? []),
+      sourceCalendar: json['sourceCalendar'] as String?,
     );
   }
 
@@ -80,6 +93,9 @@ class CalendarEvent {
     String? recurrenceRule,
     List<String>? invitedMemberIds,
     Map<String, String>? rsvpStatus,
+    String? createdBy,
+    List<String>? photoUrls,
+    String? sourceCalendar,
   }) =>
       CalendarEvent(
         id: id ?? this.id,
@@ -94,6 +110,9 @@ class CalendarEvent {
         recurrenceRule: recurrenceRule ?? this.recurrenceRule,
         invitedMemberIds: invitedMemberIds ?? this.invitedMemberIds,
         rsvpStatus: rsvpStatus ?? this.rsvpStatus,
+        createdBy: createdBy ?? this.createdBy,
+        photoUrls: photoUrls ?? this.photoUrls,
+        sourceCalendar: sourceCalendar ?? this.sourceCalendar,
       );
 }
 
