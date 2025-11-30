@@ -71,10 +71,13 @@ class TaskService {
       final tasks = snapshot.docs.map((doc) {
         try {
           final data = doc.data() as Map<String, dynamic>;
-          return Task.fromJson({
+          final task = Task.fromJson({
             'id': doc.id,
             ...data,
           });
+          // Debug: Log task details to help diagnose missing jobs
+          Logger.debug('getTasks: Loaded task "${task.title}" - reward: ${task.reward}, needsApproval: ${task.needsApproval}, isCompleted: ${task.isCompleted}', tag: 'TaskService');
+          return task;
         } catch (e, st) {
           Logger.warning('getTasks: Error parsing task ${doc.id}', error: e, stackTrace: st, tag: 'TaskService');
           return null;

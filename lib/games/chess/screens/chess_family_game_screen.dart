@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/services/logger_service.dart';
 import '../../../services/auth_service.dart';
@@ -23,11 +24,19 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
   List<UserModel> _familyMembers = [];
   List<ChessGame> _waitingGames = [];
   bool _isLoading = true;
+  StreamSubscription<List<ChessGame>>? _waitingGamesSubscription;
+  String? _currentFamilyId;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _waitingGamesSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -39,18 +48,32 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
       // Filter out current user
       final otherMembers = members.where((m) => m.uid != user?.uid).toList();
 
-      // Load waiting games
-      List<ChessGame> waitingGames = [];
-      if (user != null) {
-        final activeGames = await _chessService.getActiveGames(user.uid);
-        waitingGames = activeGames
-            .where((g) => g.mode == GameMode.family && g.status == GameStatus.waiting)
-            .toList();
+      // Get family ID for streaming
+      final userModel = await _authService.getCurrentUserModel();
+      _currentFamilyId = userModel?.familyId;
+
+      // Set up real-time stream for waiting games
+      if (_currentFamilyId != null && user != null) {
+        _waitingGamesSubscription?.cancel();
+        _waitingGamesSubscription = _chessService
+            .streamWaitingFamilyGames(_currentFamilyId!)
+            .listen((games) {
+          if (mounted) {
+            setState(() {
+              // Filter: games where current user is invited OR games where they're not the creator
+              _waitingGames = games
+                  .where((g) => 
+                      (g.invitedPlayerId == user.uid) || // User was invited
+                      (g.whitePlayerId != user.uid && g.invitedPlayerId == null) // Open invitation
+                  )
+                  .toList();
+            });
+          }
+        });
       }
 
       setState(() {
         _familyMembers = otherMembers;
-        _waitingGames = waitingGames;
         _isLoading = false;
       });
     } catch (e) {
@@ -76,9 +99,19 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
         whitePlayerId: user.uid,
         whitePlayerName: userModel?.displayName ?? 'Player',
         familyId: userModel!.familyId!,
-        blackPlayerId: opponent.uid,
-        blackPlayerName: opponent.displayName,
+        invitedPlayerId: opponent.uid, // Invite Kate - she needs to join
+        invitedPlayerName: opponent.displayName,
       );
+      
+      // Show message that game was created and opponent needs to join
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Game created! ${opponent.displayName} will see it in their waiting games.'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
 
       // Navigate to game screen
       if (mounted) {
@@ -194,24 +227,33 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
   }
 
   Widget _buildWaitingGameCard(ChessGame game) {
+    final user = _authService.currentUser;
+    final isInvited = game.invitedPlayerId == user?.uid;
+    final challengerName = game.whitePlayerName ?? 'Unknown';
+    
     return ModernCard(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
       padding: const EdgeInsets.all(AppTheme.spacingMD),
       onTap: () => _joinGame(game),
       child: Row(
         children: [
-          const Icon(Icons.notifications_active, color: Colors.orange),
+          Icon(
+            isInvited ? Icons.notifications_active : Icons.person_add,
+            color: isInvited ? Colors.orange : Colors.blue,
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${game.whitePlayerName} challenged you!',
+                  isInvited 
+                      ? '$challengerName challenged you!'
+                      : 'Game by $challengerName',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Tap to join',
+                  isInvited ? 'Tap to join' : 'Tap to join as opponent',
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 ),
               ],

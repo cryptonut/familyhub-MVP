@@ -89,7 +89,10 @@ service cloud.firestore {
            resource.data.claimedBy == request.auth.uid ||
            resource.data.assignedTo == request.auth.uid ||
            // Allow any family member to complete tasks that don't require claim
-           (resource.data.requiresClaim == false || !('requiresClaim' in resource.data)));
+           (resource.data.requiresClaim == false || !('requiresClaim' in resource.data)) ||
+           // Allow any family member to claim a job (set claimedBy and claimStatus)
+           (request.resource.data.claimedBy == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimedBy', 'claimStatus'])));
         allow delete: if belongsToFamily(familyId) && 
           resource.data.createdBy == request.auth.uid;
       }
@@ -98,6 +101,45 @@ service cloud.firestore {
       match /events/{eventId} {
         allow read: if belongsToFamily(familyId);
         allow write: if belongsToFamily(familyId);
+        
+        // Event-specific chat messages subcollection
+        match /chats/{messageId} {
+          // Helper function to check if user has access to event chat
+          // Access granted to: event creator + invitedMemberIds
+          function hasEventChatAccess() {
+            let eventData = get(/databases/$(database)/documents/families/$(familyId)/events/$(eventId)).data;
+            let createdBy = eventData.createdBy;
+            let invitedMemberIds = eventData.invitedMemberIds is list ? eventData.invitedMemberIds : [];
+            return request.auth != null && 
+              (createdBy == request.auth.uid || 
+               request.auth.uid in invitedMemberIds);
+          }
+          
+          // Helper function to check if user is Admin
+          function isAdmin() {
+            return isAuthenticated() && 
+              userDocumentExists() &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['Admin', 'admin']);
+          }
+          
+          // Read: Only event creator + invited members
+          allow read: if belongsToFamily(familyId) && hasEventChatAccess();
+          
+          // Create: Only event creator + invited members, and sender must be current user
+          allow create: if belongsToFamily(familyId) && 
+            hasEventChatAccess() &&
+            request.resource.data.senderId == request.auth.uid;
+          
+          // Update: Only message sender can edit their own messages
+          allow update: if belongsToFamily(familyId) && 
+            hasEventChatAccess() &&
+            resource.data.senderId == request.auth.uid;
+          
+          // Delete: Message sender OR admin can delete
+          allow delete: if belongsToFamily(familyId) && 
+            hasEventChatAccess() &&
+            (resource.data.senderId == request.auth.uid || isAdmin());
+        }
       }
       
       // Chat messages subcollection

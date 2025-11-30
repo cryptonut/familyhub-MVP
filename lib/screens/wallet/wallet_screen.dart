@@ -34,6 +34,7 @@ class _WalletScreenState extends State<WalletScreen> {
   List<Task> _completedJobs = []; // Jobs completed by user
   List<RecurringPayment> _pocketMoneyPayments = []; // Recurring payments received
   Map<String, String> _userNames = {}; // Map of user ID to display name
+  Map<String, double> _runningBalances = {}; // Map of task ID to running balance after that transaction
   double _totalBalance = 0.0;
   bool _isLoading = true;
   bool _isBanker = false;
@@ -59,6 +60,9 @@ class _WalletScreenState extends State<WalletScreen> {
       
       // Calculate total balance using the same tasks list
       _totalBalance = await _walletService.calculateWalletBalance(tasks: allTasks);
+      
+      // Calculate running balances for each transaction
+      _calculateRunningBalances();
       
       // Check if user is Banker
       final userModel = await _authService.getCurrentUserModel();
@@ -115,6 +119,48 @@ class _WalletScreenState extends State<WalletScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  /// Calculate running balance after each transaction
+  /// Transactions are sorted chronologically (oldest first), then we work forward
+  void _calculateRunningBalances() {
+    _runningBalances.clear();
+    
+    // Create a list of all transactions with their type and date
+    final List<Map<String, dynamic>> allTransactions = [];
+    
+    // Add created jobs (liabilities - negative)
+    for (var task in _createdJobs) {
+      final transactionDate = task.createdAt;
+      allTransactions.add({
+        'task': task,
+        'type': 'created',
+        'date': transactionDate,
+        'amount': -(task.reward ?? 0),
+      });
+    }
+    
+    // Add completed jobs (income - positive)
+    for (var task in _completedJobs) {
+      final transactionDate = task.completedAt ?? task.createdAt;
+      allTransactions.add({
+        'task': task,
+        'type': 'completed',
+        'date': transactionDate,
+        'amount': task.reward ?? 0,
+      });
+    }
+    
+    // Sort by date (oldest first)
+    allTransactions.sort((a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime));
+    
+    // Calculate running balance starting from 0
+    double runningBalance = 0.0;
+    for (var transaction in allTransactions) {
+      runningBalance += transaction['amount'] as double;
+      final task = transaction['task'] as Task;
+      _runningBalances[task.id] = runningBalance;
     }
   }
 
@@ -415,6 +461,7 @@ class _WalletScreenState extends State<WalletScreen> {
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   '+\$${task.reward!.toStringAsFixed(2)}',
@@ -424,12 +471,28 @@ class _WalletScreenState extends State<WalletScreen> {
                     color: Colors.green.shade700,
                   ),
                 ),
-                Text(
-                  'AUD',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey[600],
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'AUD',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    if (_runningBalances.containsKey(task.id)) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        'Balance: \$${_runningBalances[task.id]!.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -510,6 +573,7 @@ class _WalletScreenState extends State<WalletScreen> {
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   '-\$${task.reward!.toStringAsFixed(2)}',
@@ -519,12 +583,28 @@ class _WalletScreenState extends State<WalletScreen> {
                     color: Colors.red.shade700,
                   ),
                 ),
-                Text(
-                  'AUD',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey[600],
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'AUD',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    if (_runningBalances.containsKey(task.id)) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        'Balance: \$${_runningBalances[task.id]!.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

@@ -208,9 +208,36 @@ git branch -d hotfix/critical-bug-fix
 
    This ensures prod is always stable!
 
-## Questions?
+## 🤔 Common Questions
 
-- **"Can I build dev flavor from main?"** → Yes! Flavors and branches are independent.
-- **"Do I need separate branches?"** → Not required, but helpful for teams.
-- **"Which flavor should I build?"** → Dev for testing, QA for stable testing, Prod for releases.
+### "Can I work on dev and test at the same time?"
+
+**Answer:** You work in ONE codebase, but you switch branches:
+- **For development:** Work in `develop` branch, build `dev` flavor
+- **For testing:** Merge `develop` → `release/qa`, then build `qa` flavor
+- **For production:** Merge `release/qa` → `main`, then build `prod` flavor
+
+**You don't make changes directly in `release/qa`** - always develop in `develop`, then merge when ready.
+
+### "How do changes stay separate?"
+
+**Answer:** Git branches keep them separate:
+- `develop` branch = Your working code (can be unstable)
+- `release/qa` branch = Stable code ready for testing (merged from `develop`)
+- `main` branch = Production code (merged from `release/qa`)
+
+When you switch branches (`git checkout develop` vs `git checkout release/qa`), Git swaps the entire codebase. The files in your workspace change to match that branch.
+
+### "Can I build dev flavor from main?"
+
+**Answer:** Technically yes, but **don't do this!** The convention is:
+- **dev flavor** → Always build from `develop` branch
+- **qa flavor** → Always build from `release/qa` branch
+- **prod flavor** → Always build from `main` branch
+
+This ensures prod is always stable!
+
+### "Do I need separate code folders?"
+
+**Answer:** No! Git handles this. One workspace, switch branches as needed.
 

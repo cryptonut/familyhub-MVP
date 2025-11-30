@@ -1240,6 +1240,21 @@ class AuthService {
     }
   }
   
+  /// Get user by ID
+  Future<UserModel?> getUserById(String userId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (!doc.exists) return null;
+      return UserModel.fromJson({
+        'uid': userId,
+        ...doc.data()!,
+      });
+    } catch (e) {
+      Logger.warning('Error getting user by ID', error: e, tag: 'AuthService');
+      return null;
+    }
+  }
+
   /// Get the family creator (the user who created the family)
   /// This is typically the user with the earliest createdAt date in the family
   Future<UserModel?> getFamilyCreator() async {

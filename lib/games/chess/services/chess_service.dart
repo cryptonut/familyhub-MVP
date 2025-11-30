@@ -45,29 +45,33 @@ class ChessService {
   }
 
   /// Create a family game (invite family member)
+  /// When inviting a specific opponent, the game is created in "waiting" status
+  /// The opponent must join via joinFamilyGame to start the game
   Future<ChessGame> createFamilyGame({
     required String whitePlayerId,
     required String whitePlayerName,
     required String familyId,
-    String? blackPlayerId, // Optional: specific opponent
-    String? blackPlayerName,
+    String? invitedPlayerId, // The player being invited (they must join)
+    String? invitedPlayerName, // Name of invited player (for display)
     int timeLimitMs = 600000,
   }) async {
     try {
       final gameId = _uuid.v4();
+      // Create game in waiting status - blackPlayerId is null until opponent joins
       final game = ChessGame.newGame(
         id: gameId,
         whitePlayerId: whitePlayerId,
         whitePlayerName: whitePlayerName,
-        blackPlayerId: blackPlayerId,
-        blackPlayerName: blackPlayerName,
+        blackPlayerId: null, // Will be set when opponent joins
+        blackPlayerName: invitedPlayerName, // Show name for display, but they haven't joined yet
         mode: GameMode.family,
         familyId: familyId,
         initialTimeMs: timeLimitMs,
+        invitedPlayerId: invitedPlayerId, // Store intended opponent
       );
 
       await _firestore.collection('chess_games').doc(gameId).set(game.toJson());
-      Logger.info('Created family chess game: $gameId', tag: 'ChessService');
+      Logger.info('Created family chess game: $gameId (invited: $invitedPlayerId)', tag: 'ChessService');
       return game;
     } catch (e, st) {
       Logger.error('Error creating family game', error: e, stackTrace: st, tag: 'ChessService');
@@ -76,6 +80,7 @@ class ChessService {
   }
 
   /// Join a family game
+  /// Validates that the joining player is the invited opponent (if game has an invited player)
   Future<ChessGame> joinFamilyGame({
     required String gameId,
     required String blackPlayerId,
@@ -94,16 +99,27 @@ class ChessService {
       if (game.mode != GameMode.family) {
         throw ValidationException('Not a family game');
       }
+      
+      // Validate: If game has an invited player, only that player can join
+      if (game.invitedPlayerId != null && game.invitedPlayerId != blackPlayerId) {
+        throw ValidationException('This game was created for a different player');
+      }
+      
+      // Prevent joining your own game
+      if (game.whitePlayerId == blackPlayerId) {
+        throw ValidationException('You cannot join your own game');
+      }
 
       final updatedGame = game.copyWith(
         blackPlayerId: blackPlayerId,
         blackPlayerName: blackPlayerName,
         status: GameStatus.active,
         startedAt: DateTime.now(),
+        invitedPlayerId: null, // Clear invitation once player joins
       );
 
       await _firestore.collection('chess_games').doc(gameId).update(updatedGame.toJson());
-      Logger.info('Player joined family game: $gameId', tag: 'ChessService');
+      Logger.info('Player $blackPlayerId joined family game: $gameId', tag: 'ChessService');
       return updatedGame;
     } catch (e, st) {
       Logger.error('Error joining family game', error: e, stackTrace: st, tag: 'ChessService');
@@ -423,6 +439,38 @@ class ChessService {
       Logger.error('Error getting active games', error: e, stackTrace: st, tag: 'ChessService');
       return [];
     }
+  }
+
+  /// Get waiting family games for a family
+  Future<List<ChessGame>> getWaitingFamilyGames(String familyId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('chess_games')
+          .where('mode', isEqualTo: 'family')
+          .where('familyId', isEqualTo: familyId)
+          .where('status', isEqualTo: 'waiting')
+          .get();
+
+      return snapshot.docs
+          .map((doc) => ChessGame.fromJson(doc.data()))
+          .toList();
+    } catch (e, st) {
+      Logger.error('Error getting waiting family games', error: e, stackTrace: st, tag: 'ChessService');
+      return [];
+    }
+  }
+
+  /// Stream waiting family games for real-time updates
+  Stream<List<ChessGame>> streamWaitingFamilyGames(String familyId) {
+    return _firestore
+        .collection('chess_games')
+        .where('mode', isEqualTo: 'family')
+        .where('familyId', isEqualTo: familyId)
+        .where('status', isEqualTo: 'waiting')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ChessGame.fromJson(doc.data()))
+            .toList());
   }
 
   /// Get user's game history
