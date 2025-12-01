@@ -54,8 +54,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDummy',
-    appId: '1:559662117534:ios:dummy',
+    apiKey: 'AIzaSyCfFAiDiGNJJHkBf8AIg8O0zAiuv_34bos',
+    appId: '1:559662117534:ios:ff9b5497b88d5719e7c18f',
     messagingSenderId: '559662117534',
     projectId: 'family-hub-71ff0',
     storageBucket: 'family-hub-71ff0.firebasestorage.app',
@@ -63,8 +63,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDummy',
-    appId: '1:559662117534:ios:dummy',
+    apiKey: 'AIzaSyCfFAiDiGNJJHkBf8AIg8O0zAiuv_34bos',
+    appId: '1:559662117534:ios:ff9b5497b88d5719e7c18f',
     messagingSenderId: '559662117534',
     projectId: 'family-hub-71ff0',
     storageBucket: 'family-hub-71ff0.firebasestorage.app',
