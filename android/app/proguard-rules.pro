@@ -66,3 +66,8 @@
 # Don't warn about missing classes (some may be optional)
 -dontwarn com.builttoroam.devicecalendar.**
 
+# Ignore missing Google Play Core classes (optional, not needed for our app)
+-dontwarn com.google.android.play.core.splitcompat.**
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.tasks.**
+
