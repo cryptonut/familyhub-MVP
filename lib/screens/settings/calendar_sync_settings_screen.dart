@@ -6,6 +6,7 @@ import '../../services/calendar_sync_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/background_sync_service.dart';
 import '../../models/user_model.dart';
+import '../../core/services/logger_service.dart';
 import 'package:intl/intl.dart';
 
 class CalendarSyncSettingsScreen extends StatefulWidget {
@@ -910,8 +911,23 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
     try {
       final now = DateTime.now();
       final deviceCalendar = DeviceCalendarPlugin();
+      
+      // Log calendar details for debugging (especially in release builds)
       for (var calendar in _deviceCalendars) {
-        if (calendar.id == null) continue;
+        Logger.debug(
+          'Calendar for event count: name="${calendar.name}", accountName="${calendar.accountName}", id="${calendar.id}"',
+          tag: 'CalendarSyncSettingsScreen',
+        );
+      }
+      
+      for (var calendar in _deviceCalendars) {
+        if (calendar.id == null) {
+          Logger.warning(
+            'Calendar has null ID: name="${calendar.name}", accountName="${calendar.accountName}"',
+            tag: 'CalendarSyncSettingsScreen',
+          );
+          continue;
+        }
         try {
           final result = await deviceCalendar.retrieveEvents(
             calendar.id!,
@@ -922,13 +938,32 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
           );
           if (result.isSuccess && result.data != null) {
             eventCounts[calendar.id!] = result.data!.length;
+            Logger.debug(
+              'Calendar "${calendar.name}" (${calendar.accountName}): ${result.data!.length} events',
+              tag: 'CalendarSyncSettingsScreen',
+            );
+          } else {
+            Logger.warning(
+              'Failed to retrieve events for calendar "${calendar.name}": ${result.errors.map((e) => e.toString()).join(", ")}',
+              tag: 'CalendarSyncSettingsScreen',
+            );
           }
-        } catch (e) {
-          // Ignore errors for individual calendars
+        } catch (e, st) {
+          Logger.error(
+            'Error retrieving events for calendar "${calendar.name}" (ID: ${calendar.id})',
+            error: e,
+            stackTrace: st,
+            tag: 'CalendarSyncSettingsScreen',
+          );
         }
       }
-    } catch (e) {
-      // Ignore errors
+    } catch (e, st) {
+      Logger.error(
+        'Error checking event counts for calendars',
+        error: e,
+        stackTrace: st,
+        tag: 'CalendarSyncSettingsScreen',
+      );
     }
 
     // Close loading dialog

@@ -91,26 +91,49 @@ class CalendarSyncService {
       }
 
       final calendarsResult = await _deviceCalendar.retrieveCalendars();
+      
+      // Enhanced logging for release build debugging
+      Logger.info(
+        'retrieveCalendars result: isSuccess=${calendarsResult.isSuccess}, data=${calendarsResult.data != null ? calendarsResult.data!.length : "null"}, errors=${calendarsResult.errors.length}',
+        tag: 'CalendarSyncService',
+      );
+      
       if (calendarsResult.isSuccess && calendarsResult.data != null) {
         Logger.info(
           'Retrieved ${calendarsResult.data!.length} calendars from device',
           tag: 'CalendarSyncService',
         );
-        // Log calendar details for debugging
+        // Log calendar details for debugging (critical for release builds)
         for (var cal in calendarsResult.data!) {
-          Logger.debug(
-            'Calendar: ${cal.name} (ID: ${cal.id}, Account: ${cal.accountName}, ReadOnly: ${cal.isReadOnly})',
+          Logger.info(
+            'Calendar details: name="${cal.name}" (null: ${cal.name == null}), accountName="${cal.accountName}" (null: ${cal.accountName == null}), id="${cal.id}" (null: ${cal.id == null}), readOnly=${cal.isReadOnly}',
             tag: 'CalendarSyncService',
           );
+          
+          // Warn if critical properties are null (indicates R8/obfuscation issue)
+          if (cal.name == null && cal.accountName == null) {
+            Logger.warning(
+              'Calendar has both name and accountName as null! This may indicate R8 obfuscation issue. ID: "${cal.id}"',
+              tag: 'CalendarSyncService',
+            );
+          }
         }
         return calendarsResult.data!;
       }
       
       if (!calendarsResult.isSuccess) {
         final errorMsg = calendarsResult.errors.map((e) => e.toString()).join(', ');
+        Logger.error(
+          'Failed to retrieve calendars. Errors: $errorMsg',
+          tag: 'CalendarSyncService',
+        );
         throw PermissionException('Failed to retrieve calendars: $errorMsg', code: 'retrieve-failed');
       }
       
+      Logger.warning(
+        'retrieveCalendars returned success but data is null',
+        tag: 'CalendarSyncService',
+      );
       return [];
     } catch (e) {
       Logger.error('Error getting device calendars', error: e, tag: 'CalendarSyncService');
