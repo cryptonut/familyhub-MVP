@@ -1,0 +1,31 @@
+Hi [Brother-in-law's name],
+
+I need help setting up our Flutter app for iOS testing. The Android version is working, but we need to build and test on iOS. Since you have a Mac and dev experience, could you help?
+
+The good news: All the iOS configuration files are already prepared! You just need to:
+1. Clone the repo (or pull latest)
+2. Install CocoaPods dependencies
+3. Open in Xcode and configure signing
+4. Build and test
+
+I've created detailed step-by-step instructions in the repo: `IOS_SETUP_FOR_DEVELOPER.md`
+
+Quick summary:
+- Repo: https://github.com/cryptonut/familyhub-MVP
+- Branch: `develop`
+- Bundle ID: `com.example.familyhubMvp`
+- Firebase is already configured
+- All permissions are set up
+
+Estimated time: 30-60 minutes (first time)
+
+The instructions cover:
+- Prerequisites
+- Step-by-step setup
+- Common issues & solutions
+- Testing checklist
+
+Let me know if you have any questions or run into issues!
+
+Thanks!
+
