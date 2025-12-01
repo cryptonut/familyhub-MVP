@@ -11,7 +11,8 @@ class CalendarEvent {
   final String? recurrenceRule; // Simple format: "daily", "weekly", "monthly", "yearly" or RRULE format
   final List<String> invitedMemberIds;
   final Map<String, String> rsvpStatus; // memberId -> "going"/"maybe"/"declined"
-  final String? createdBy; // User ID of event creator
+  final String? createdBy; // User ID of event creator (immutable, historical record)
+  final String? eventOwnerId; // User ID of event owner (changeable by owner or admin)
   final List<String> photoUrls; // URLs of photos attached to event
   final String? sourceCalendar; // Calendar name/account where event originated (e.g., "Gmail", "Samsung Calendar", "FamilyHub")
 
@@ -29,6 +30,7 @@ class CalendarEvent {
     List<String>? invitedMemberIds,
     Map<String, String>? rsvpStatus,
     this.createdBy,
+    this.eventOwnerId,
     List<String>? photoUrls,
     this.sourceCalendar,
   }) : invitedMemberIds = invitedMemberIds ?? const [],
@@ -49,6 +51,7 @@ class CalendarEvent {
         'invitedMemberIds': invitedMemberIds,
         'rsvpStatus': rsvpStatus,
         if (createdBy != null) 'createdBy': createdBy,
+        if (eventOwnerId != null) 'eventOwnerId': eventOwnerId,
         'photoUrls': photoUrls,
         if (sourceCalendar != null) 'sourceCalendar': sourceCalendar,
       };
@@ -75,6 +78,8 @@ class CalendarEvent {
       invitedMemberIds: List<String>.from(json['invitedMemberIds'] as List? ?? []),
       rsvpStatus: rsvpStatus,
       createdBy: json['createdBy'] as String?,
+      // If eventOwnerId is not set, derive it from createdBy (backward compatibility)
+      eventOwnerId: json['eventOwnerId'] as String? ?? json['createdBy'] as String?,
       photoUrls: List<String>.from(json['photoUrls'] as List? ?? []),
       sourceCalendar: json['sourceCalendar'] as String?,
     );
@@ -94,6 +99,7 @@ class CalendarEvent {
     List<String>? invitedMemberIds,
     Map<String, String>? rsvpStatus,
     String? createdBy,
+    String? eventOwnerId,
     List<String>? photoUrls,
     String? sourceCalendar,
   }) =>
@@ -111,6 +117,7 @@ class CalendarEvent {
         invitedMemberIds: invitedMemberIds ?? this.invitedMemberIds,
         rsvpStatus: rsvpStatus ?? this.rsvpStatus,
         createdBy: createdBy ?? this.createdBy,
+        eventOwnerId: eventOwnerId ?? this.eventOwnerId,
         photoUrls: photoUrls ?? this.photoUrls,
         sourceCalendar: sourceCalendar ?? this.sourceCalendar,
       );

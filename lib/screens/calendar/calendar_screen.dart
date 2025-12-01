@@ -11,6 +11,7 @@ import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
 import 'add_edit_event_screen.dart';
 import 'event_details_screen.dart';
+import 'gantt_chart_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -164,6 +165,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
               });
             },
             tooltip: 'Go to today',
+          ),
+          IconButton(
+            icon: const Icon(Icons.timeline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GanttChartScreen(initialDate: _selectedDay),
+                ),
+              );
+            },
+            tooltip: 'Day View (Gantt Chart)',
           ),
         ],
       ),

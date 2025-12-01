@@ -352,6 +352,34 @@ class NotificationService {
       Logger.error('Error sending notification', error: e, stackTrace: st, tag: 'NotificationService');
     }
   }
+
+  /// Send notification when a chess game challenge is created
+  Future<void> notifyChessChallenge({
+    required String invitedPlayerId,
+    required String challengerName,
+    required String gameId,
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'userId': invitedPlayerId,
+        'type': 'chess_challenge',
+        'gameId': gameId,
+        'challengerName': challengerName,
+        'title': 'Chess Challenge',
+        'body': '$challengerName challenged you to a game of chess!',
+        'message': '$challengerName challenged you to a game of chess!',
+        'read': false,
+        'createdAt': DateTime.now().toIso8601String(),
+        'data': {
+          'action': 'open_chess_game',
+          'gameId': gameId,
+        },
+      });
+      Logger.info('Chess challenge notification sent to $invitedPlayerId', tag: 'NotificationService');
+    } catch (e, st) {
+      Logger.error('Error sending chess challenge notification', error: e, stackTrace: st, tag: 'NotificationService');
+    }
+  }
 }
 
 // Background message handler (must be top-level function)

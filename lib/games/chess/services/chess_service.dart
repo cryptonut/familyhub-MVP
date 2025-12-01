@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/services/logger_service.dart';
 import '../../../core/errors/app_exceptions.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/notification_service.dart';
 import '../models/chess_game.dart';
 import '../models/chess_move.dart';
 
@@ -13,6 +14,7 @@ class ChessService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final AuthService _authService = AuthService();
+  final NotificationService _notificationService = NotificationService();
   final _uuid = const Uuid();
 
   /// Create a new solo game (vs AI)
@@ -72,6 +74,19 @@ class ChessService {
 
       await _firestore.collection('chess_games').doc(gameId).set(game.toJson());
       Logger.info('Created family chess game: $gameId (invited: $invitedPlayerId)', tag: 'ChessService');
+      
+      // Send notification to invited player
+      if (invitedPlayerId != null) {
+        _notificationService.notifyChessChallenge(
+          invitedPlayerId: invitedPlayerId,
+          challengerName: whitePlayerName,
+          gameId: gameId,
+        ).catchError((e, st) {
+          Logger.warning('Error sending chess challenge notification', error: e, stackTrace: st, tag: 'ChessService');
+          // Don't fail game creation if notification fails
+        });
+      }
+      
       return game;
     } catch (e, st) {
       Logger.error('Error creating family game', error: e, stackTrace: st, tag: 'ChessService');

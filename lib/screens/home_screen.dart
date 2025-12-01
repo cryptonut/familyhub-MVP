@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../core/services/logger_service.dart';
 import '../services/app_state.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
+import '../games/chess/services/chess_service.dart';
+import '../games/chess/models/chess_game.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'calendar/calendar_screen.dart';
 import 'tasks/tasks_screen.dart';
@@ -28,6 +31,64 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final ChessService _chessService = ChessService();
+  int _waitingChessChallenges = 0;
+  StreamSubscription<List<ChessGame>>? _waitingGamesSubscription;
+  String? _currentFamilyId;
+  String? _currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWaitingGames();
+  }
+
+  @override
+  void dispose() {
+    _waitingGamesSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadWaitingGames() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userModel = await authService.getCurrentUserModel();
+      final user = authService.currentUser;
+      _currentFamilyId = userModel?.familyId;
+      _currentUserId = user?.uid;
+
+      if (_currentFamilyId != null && _currentUserId != null) {
+        _waitingGamesSubscription?.cancel();
+        _waitingGamesSubscription = _chessService
+            .streamWaitingFamilyGames(_currentFamilyId!)
+            .listen((games) {
+          if (mounted) {
+            setState(() {
+              // Count games where current user is invited
+              _waitingChessChallenges = games
+                  .where((g) => g.invitedPlayerId == _currentUserId)
+                  .length;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading waiting chess games', error: e, tag: 'HomeScreen');
+    }
+  }
+
+  Widget _buildGamesIcon(IconData icon) {
+    if (_waitingChessChallenges > 0) {
+      return Badge(
+        label: Text(
+          _waitingChessChallenges > 9 ? '9+' : '$_waitingChessChallenges',
+          style: const TextStyle(fontSize: 10),
+        ),
+        child: Icon(icon),
+      );
+    }
+    return Icon(icon);
+  }
 
   Future<void> _showFixFamilyDialog(BuildContext context, AuthService authService) async {
     // Capture outer context before showing dialog to avoid using invalid context after pop
@@ -842,38 +903,38 @@ class _HomeScreenState extends State<HomeScreen> {
             onDestinationSelected: (index) {
               appState.setCurrentIndex(index);
             },
-            destinations: const [
-              NavigationDestination(
+            destinations: [
+              const NavigationDestination(
                 icon: Icon(Icons.dashboard_outlined),
                 selectedIcon: Icon(Icons.dashboard),
                 label: 'Dashboard',
               ),
-              NavigationDestination(
+              const NavigationDestination(
                 icon: Icon(Icons.calendar_today_outlined),
                 selectedIcon: Icon(Icons.calendar_today),
                 label: 'Calendar',
               ),
-              NavigationDestination(
+              const NavigationDestination(
                 icon: Icon(Icons.task_outlined),
                 selectedIcon: Icon(Icons.task),
                 label: 'Jobs',
               ),
-              NavigationDestination(
+              const NavigationDestination(
                 icon: Icon(Icons.chat_bubble_outline),
                 selectedIcon: Icon(Icons.chat_bubble),
                 label: 'Chat',
               ),
               NavigationDestination(
-                icon: Icon(Icons.sports_esports_outlined),
-                selectedIcon: Icon(Icons.sports_esports),
+                icon: _buildGamesIcon(Icons.sports_esports_outlined),
+                selectedIcon: _buildGamesIcon(Icons.sports_esports),
                 label: 'Games',
               ),
-              NavigationDestination(
+              const NavigationDestination(
                 icon: Icon(Icons.photo_library_outlined),
                 selectedIcon: Icon(Icons.photo_library),
                 label: 'Photos',
               ),
-              NavigationDestination(
+              const NavigationDestination(
                 icon: Icon(Icons.location_on_outlined),
                 selectedIcon: Icon(Icons.location_on),
                 label: 'Location',

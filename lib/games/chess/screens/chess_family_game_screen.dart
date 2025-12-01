@@ -184,17 +184,37 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Waiting games
+                    // Waiting games - Make more prominent
                     if (_waitingGames.isNotEmpty) ...[
-                      const Text(
-                        'Waiting for You',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.all(AppTheme.spacingMD),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          border: Border.all(color: Colors.orange.shade300, width: 2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.notifications_active, color: Colors.orange.shade700, size: 24),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Challenges Waiting (${_waitingGames.length})',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppTheme.spacingMD),
+                            ..._waitingGames.map((game) => _buildWaitingGameCard(game)),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: AppTheme.spacingMD),
-                      ..._waitingGames.map((game) => _buildWaitingGameCard(game)),
                       const SizedBox(height: AppTheme.spacingLG),
                     ],
 
@@ -231,36 +251,57 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
     final isInvited = game.invitedPlayerId == user?.uid;
     final challengerName = game.whitePlayerName ?? 'Unknown';
     
-    return ModernCard(
+    return Container(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
-      padding: const EdgeInsets.all(AppTheme.spacingMD),
-      onTap: () => _joinGame(game),
-      child: Row(
-        children: [
-          Icon(
+      decoration: BoxDecoration(
+        color: isInvited ? Colors.orange.shade100 : Colors.blue.shade50,
+        border: Border.all(
+          color: isInvited ? Colors.orange.shade400 : Colors.blue.shade300,
+          width: isInvited ? 2 : 1,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isInvited ? Colors.orange.shade200 : Colors.blue.shade200,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
             isInvited ? Icons.notifications_active : Icons.person_add,
-            color: isInvited ? Colors.orange : Colors.blue,
+            color: isInvited ? Colors.orange.shade900 : Colors.blue.shade900,
+            size: 24,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isInvited 
-                      ? '$challengerName challenged you!'
-                      : 'Game by $challengerName',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  isInvited ? 'Tap to join' : 'Tap to join as opponent',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-              ],
-            ),
+        ),
+        title: Text(
+          isInvited 
+              ? '$challengerName challenged you!'
+              : 'Game by $challengerName',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: isInvited ? Colors.orange.shade900 : Colors.blue.shade900,
           ),
-          const Icon(Icons.chevron_right),
-        ],
+        ),
+        subtitle: Text(
+          isInvited ? 'Tap to accept challenge' : 'Tap to join as opponent',
+          style: TextStyle(
+            color: isInvited ? Colors.orange.shade700 : Colors.blue.shade700,
+            fontSize: 12,
+          ),
+        ),
+        trailing: ElevatedButton.icon(
+          onPressed: () => _joinGame(game),
+          icon: const Icon(Icons.play_arrow, size: 18),
+          label: Text(isInvited ? 'Accept' : 'Join'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isInvited ? Colors.orange.shade700 : Colors.blue.shade700,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+        ),
+        onTap: () => _joinGame(game),
       ),
     );
   }

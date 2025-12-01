@@ -138,6 +138,11 @@ class CalendarService {
         data['createdBy'] = userId;
       }
       
+      // Set eventOwnerId from createdBy if not already set (initial owner is the creator)
+      if (data['eventOwnerId'] == null && data['createdBy'] != null) {
+        data['eventOwnerId'] = data['createdBy'];
+      }
+      
       // Set sourceCalendar if not already set (default to FamilyHub for manually created events)
       if (data['sourceCalendar'] == null) {
         data['sourceCalendar'] = sourceCalendar ?? 'Created in FamilyHub';
@@ -162,6 +167,22 @@ class CalendarService {
       Logger.error('addEvent error', error: e, tag: 'CalendarService');
       Logger.debug('Family ID: $familyId', tag: 'CalendarService');
       Logger.debug('Event ID: ${event.id}', tag: 'CalendarService');
+      rethrow;
+    }
+  }
+
+  /// Update event owner (can be done by current owner or admin)
+  Future<void> updateEventOwner(String eventId, String newOwnerId) async {
+    final familyId = await _familyId;
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
+    
+    try {
+      await _firestore
+          .collection('families/$familyId/events')
+          .doc(eventId)
+          .update({'eventOwnerId': newOwnerId});
+    } catch (e) {
+      Logger.error('Error updating event owner', error: e, tag: 'CalendarService');
       rethrow;
     }
   }

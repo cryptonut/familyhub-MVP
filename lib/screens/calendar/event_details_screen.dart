@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/calendar_event.dart';
+import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/calendar_service.dart';
 import '../../widgets/ui_components.dart';
@@ -61,8 +62,23 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     if (_currentEvent == null) return false;
     final userId = _auth.currentUser?.uid;
     if (userId == null) return false;
-    // User can edit if they're the creator or if createdBy is not set (legacy events)
-    return _currentEvent!.createdBy == null || _currentEvent!.createdBy == userId;
+    // User can edit if they're the event owner or if eventOwnerId is not set (legacy events)
+    final ownerId = _currentEvent!.eventOwnerId ?? _currentEvent!.createdBy;
+    return ownerId == null || ownerId == userId;
+  }
+
+  Future<bool> _isAdmin() async {
+    final userModel = await _authService.getCurrentUserModel();
+    return userModel?.isAdmin() ?? false;
+  }
+
+  bool _canChangeOwner() {
+    if (_currentEvent == null) return false;
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return false;
+    final ownerId = _currentEvent!.eventOwnerId ?? _currentEvent!.createdBy;
+    // Can change owner if user is the current owner (will be checked async for admin)
+    return ownerId == userId;
   }
 
   @override
@@ -211,7 +227,53 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                           ),
                           if (event.createdBy != null) const SizedBox(height: 8),
                         ],
-                        if (event.createdBy != null) ...[
+                        // Event Owner
+                        FutureBuilder<String?>(
+                          future: _getOwnerName(event),
+                          builder: (context, snapshot) {
+                            final ownerName = snapshot.data ?? 'Unknown';
+                            final ownerId = event.eventOwnerId ?? event.createdBy;
+                            return FutureBuilder<bool>(
+                              future: _isAdmin(),
+                              builder: (context, adminSnapshot) {
+                                final isAdmin = adminSnapshot.data ?? false;
+                                final canChange = _canChangeOwner() || isAdmin;
+                                
+                                return Row(
+                                  children: [
+                                    Icon(
+                                      Icons.person_outline,
+                                      size: 16,
+                                      color: Colors.grey[700],
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Event Owner: $ownerName',
+                                        style: TextStyle(
+                                          color: Colors.grey[700],
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    if (canChange && ownerId != null)
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, size: 16),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        onPressed: () => _changeEventOwner(event),
+                                        tooltip: 'Change Event Owner',
+                                      ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
+                        ),
+                        // Show creator separately if different from owner
+                        if (event.createdBy != null && 
+                            (event.eventOwnerId == null || event.createdBy != event.eventOwnerId)) ...[
+                          const SizedBox(height: 4),
                           FutureBuilder<String?>(
                             future: _getCreatorName(event.createdBy!),
                             builder: (context, snapshot) {
@@ -220,16 +282,17 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                                 children: [
                                   Icon(
                                     Icons.person,
-                                    size: 16,
-                                    color: Colors.grey[700],
+                                    size: 14,
+                                    color: Colors.grey[600],
                                   ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       'Created by $creatorName',
                                       style: TextStyle(
-                                        color: Colors.grey[700],
-                                        fontSize: 13,
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                        fontStyle: FontStyle.italic,
                                       ),
                                     ),
                                   ),
@@ -482,6 +545,93 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       return user?.displayName ?? 'Unknown';
     } catch (e) {
       return 'Unknown';
+    }
+  }
+
+  Future<String?> _getOwnerName(CalendarEvent event) async {
+    final ownerId = event.eventOwnerId ?? event.createdBy;
+    if (ownerId == null) return null;
+    try {
+      final user = await _authService.getUserById(ownerId);
+      return user?.displayName ?? 'Unknown';
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
+
+  Future<void> _changeEventOwner(CalendarEvent event) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    // Check if user is admin or current owner
+    final userModel = await _authService.getCurrentUserModel();
+    final isAdmin = userModel?.isAdmin() ?? false;
+    final ownerId = event.eventOwnerId ?? event.createdBy;
+    final isOwner = ownerId == userId;
+
+    if (!isAdmin && !isOwner) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only the Event Owner or an Admin can change the owner'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Get family members for selection
+    final familyMembers = await _authService.getFamilyMembers();
+    if (familyMembers.isEmpty) return;
+
+    // Show dialog to select new owner
+    final selectedMember = await showDialog<UserModel>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change Event Owner'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: familyMembers.length,
+            itemBuilder: (context, index) {
+              final member = familyMembers[index];
+              final isCurrentOwner = (event.eventOwnerId ?? event.createdBy) == member.uid;
+              return ListTile(
+                title: Text(member.displayName),
+                subtitle: Text(member.email),
+                trailing: isCurrentOwner
+                    ? const Icon(Icons.check, color: Colors.blue)
+                    : null,
+                onTap: () => Navigator.pop(context, member),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    if (selectedMember != null && selectedMember.uid != ownerId) {
+      try {
+        await _calendarService.updateEventOwner(event.id, selectedMember.uid);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Event Owner changed to ${selectedMember.displayName}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _loadEvent(); // Reload to show updated owner
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error changing event owner: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 }

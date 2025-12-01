@@ -91,8 +91,12 @@ service cloud.firestore {
            // Allow any family member to complete tasks that don't require claim
            (resource.data.requiresClaim == false || !('requiresClaim' in resource.data)) ||
            // Allow any family member to claim a job (set claimedBy and claimStatus)
+           // Permissive rule: allow if user is setting themselves as claimer
            (request.resource.data.claimedBy == request.auth.uid &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimedBy', 'claimStatus'])));
+            (request.resource.data.claimStatus == 'pending' ||
+             request.resource.data.claimStatus == 'approved' ||
+             request.resource.data.claimStatus == 'rejected' ||
+             !('claimStatus' in request.resource.data))));
         allow delete: if belongsToFamily(familyId) && 
           resource.data.createdBy == request.auth.uid;
       }
@@ -100,7 +104,17 @@ service cloud.firestore {
       // Calendar events subcollection
       match /events/{eventId} {
         allow read: if belongsToFamily(familyId);
-        allow write: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if belongsToFamily(familyId) && 
+          (resource.data.eventOwnerId == request.auth.uid ||
+           resource.data.createdBy == request.auth.uid ||
+           // Allow admin to update eventOwnerId
+           (isBankerOrAdmin() && 
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['eventOwnerId'])));
+        allow delete: if belongsToFamily(familyId) && 
+          (resource.data.eventOwnerId == request.auth.uid ||
+           resource.data.createdBy == request.auth.uid);
         
         // Event-specific chat messages subcollection
         match /chats/{messageId} {

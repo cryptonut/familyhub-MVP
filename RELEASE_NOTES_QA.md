@@ -1,7 +1,7 @@
-# FamilyHub MVP - QA Release Notes v2
+# FamilyHub MVP - QA Release Notes v2.1
 
 **Release Date:** December 1, 2025  
-**Version:** QA Build v2  
+**Version:** QA Build v2.1  
 **Branch:** `release/qa` (merged from `develop`)
 
 ---
@@ -73,6 +73,9 @@
 - ✅ Fixed calendar ID type mismatch (now uses verified calendar ID)
 - ✅ Fixed duplicate event creation (tracks by deviceEventId)
 - ✅ Fixed calendar selection showing event counts
+- ✅ Fixed calendar selection dialog showing "Unnamed Calendar" (now uses accountName fallback)
+- ✅ **CRITICAL FIX: Fixed calendar sync in release APK builds** - Added ProGuard rules to prevent R8 obfuscation from breaking device_calendar plugin
+- ✅ Fixed calendar names and event counts displaying correctly in release builds
 - ✅ Fixed real-time calendar updates (uses Firestore streams)
 - ✅ Fixed "last synced" timestamp display
 - ✅ Fixed calendar sync screen layout issues
@@ -140,6 +143,8 @@
 - Added Firebase Storage rules for event photos
 - Updated Firestore rules for event chats
 - Added calendar permissions to AndroidManifest.xml
+- **Added ProGuard/R8 rules** (`android/app/proguard-rules.pro`) to prevent code obfuscation issues in release builds
+- Enhanced logging for calendar sync debugging in release builds
 
 ---
 
@@ -239,5 +244,22 @@ For issues or questions, please contact the development team or create an issue 
 
 ---
 
-**Previous Release:** QA Build v1 (November 29, 2025)  
+---
+
+## 🔧 Build Configuration Changes
+
+### ProGuard/R8 Rules Added
+- **File:** `android/app/proguard-rules.pro`
+- **Purpose:** Prevent R8 code obfuscation from breaking `device_calendar` plugin in release builds
+- **Impact:** Calendar sync now works identically in debug and release builds
+- **Technical Details:** See `CALENDAR_SYNC_RELEASE_BUILD_FIX.md` for full explanation
+
+### Enhanced Logging
+- Added detailed logging for calendar object properties (name, accountName, id)
+- Better error diagnostics for release build issues
+- Warnings when calendar properties are null (indicates obfuscation issues)
+
+---
+
+**Previous Release:** QA Build v2 (December 1, 2025)  
 **Next Release:** Production (after QA validation)
