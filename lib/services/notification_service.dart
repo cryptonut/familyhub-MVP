@@ -1,15 +1,24 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:vibration/vibration.dart';
 import '../core/services/logger_service.dart';
 import '../core/errors/app_exceptions.dart';
 import 'auth_service.dart';
+import '../core/di/service_locator.dart';
+import '../games/chess/services/chess_service.dart';
+import '../games/chess/screens/chess_game_screen.dart';
+import '../games/chess/models/chess_game.dart';
 
 class NotificationService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final AuthService _authService = AuthService();
+  
+  // Global navigator key for deep linking (set from main.dart)
+  static GlobalKey<NavigatorState>? navigatorKey;
 
   // Initialize notifications
   Future<void> initialize() async {
@@ -46,6 +55,10 @@ class NotificationService {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       Logger.info('Got a message whilst in the foreground!', tag: 'NotificationService');
       Logger.debug('Message data: ${message.data}', tag: 'NotificationService');
+      
+      // Handle chess invite messages
+      _handleChessInviteMessage(message);
+      
       if (message.notification != null) {
         Logger.debug('Message also contained a notification: ${message.notification}', tag: 'NotificationService');
       }
@@ -380,10 +393,130 @@ class NotificationService {
       Logger.error('Error sending chess challenge notification', error: e, stackTrace: st, tag: 'NotificationService');
     }
   }
+
+  /// Handle chess invite FCM messages (foreground and background)
+  /// Shows snackbar/dialog with Accept/Decline buttons and deep-link navigation
+  Future<void> _handleChessInviteMessage(RemoteMessage message) async {
+    try {
+      final data = message.data;
+      final action = data['action'] as String?;
+      
+      if (action == 'chess_invite') {
+        final targetUser = data['targetUser'] as String?;
+        final currentUser = _auth.currentUser;
+        
+        // Only handle if message is for current user
+        if (targetUser == null || currentUser == null || targetUser != currentUser.uid) {
+          return;
+        }
+        
+        final roomId = data['roomId'] as String?;
+        final sender = data['sender'] as String?;
+        
+        if (roomId == null || sender == null) {
+          Logger.warning('Invalid chess invite message data', tag: 'NotificationService');
+          return;
+        }
+        
+        // Get sender name
+        final senderModel = await _authService.getUserModel(sender);
+        final senderName = senderModel?.displayName ?? 'Someone';
+        
+        // Show invite dialog/snackbar
+        if (navigatorKey?.currentContext != null) {
+          final context = navigatorKey!.currentContext!;
+          _showChessInviteDialog(context, roomId, senderName);
+        }
+      } else if (action == 'chess_start') {
+        final roomId = data['roomId'] as String?;
+        final players = data['players'] as List?;
+        final currentUser = _auth.currentUser;
+        
+        // Check if current user is a player
+        if (roomId == null || players == null || currentUser == null) {
+          return;
+        }
+        
+        if (!players.contains(currentUser.uid)) {
+          return;
+        }
+        
+        // Vibrate once
+        if (await Vibration.hasVibrator() ?? false) {
+          await Vibration.vibrate(duration: 100);
+        }
+        
+        // Navigate to game room
+        if (navigatorKey?.currentContext != null) {
+          final context = navigatorKey!.currentContext!;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChessGameScreen(gameId: roomId, mode: GameMode.family),
+            ),
+          );
+        }
+      }
+    } catch (e, st) {
+      Logger.error('Error handling chess invite message', error: e, stackTrace: st, tag: 'NotificationService');
+    }
+  }
+  
+  /// Show chess invite dialog with Accept/Decline buttons
+  void _showChessInviteDialog(BuildContext context, String roomId, String senderName) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Chess Challenge'),
+        content: Text('$senderName challenged you to a game of chess!'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                final chessService = getIt<ChessService>();
+                await chessService.declineInvite(roomId);
+              } catch (e) {
+                Logger.error('Error declining invite', error: e, tag: 'NotificationService');
+              }
+            },
+            child: const Text('Decline'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                final chessService = getIt<ChessService>();
+                await chessService.acceptInvite(roomId);
+                // Navigate to game room
+                if (navigatorKey?.currentContext != null) {
+                  Navigator.push(
+                    navigatorKey!.currentContext!,
+                    MaterialPageRoute(
+                      builder: (_) => ChessGameScreen(gameId: roomId, mode: GameMode.family),
+                    ),
+                  );
+                }
+              } catch (e) {
+                Logger.error('Error accepting invite', error: e, tag: 'NotificationService');
+                if (navigatorKey?.currentContext != null) {
+                  ScaffoldMessenger.of(navigatorKey!.currentContext!).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // Background message handler (must be top-level function)
 @pragma('vm:entry-point')
+
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   Logger.info('Handling a background message: ${message.messageId}', tag: 'NotificationService');
   Logger.debug('Message data: ${message.data}', tag: 'NotificationService');

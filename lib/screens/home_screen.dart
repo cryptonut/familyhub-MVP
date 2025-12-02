@@ -7,6 +7,9 @@ import '../services/auth_service.dart';
 import '../models/user_model.dart';
 import '../games/chess/services/chess_service.dart';
 import '../games/chess/models/chess_game.dart';
+import '../services/badge_service.dart';
+import '../widgets/ui_components.dart' hide Badge;
+import '../widgets/quick_actions_fab.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'calendar/calendar_screen.dart';
 import 'tasks/tasks_screen.dart';
@@ -32,20 +35,62 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ChessService _chessService = ChessService();
+  final BadgeService _badgeService = BadgeService();
   int _waitingChessChallenges = 0;
   StreamSubscription<List<ChessGame>>? _waitingGamesSubscription;
+  StreamSubscription<BadgeCounts>? _badgeCountsSubscription;
+  BadgeCounts _badgeCounts = BadgeCounts(
+    unreadMessages: 0,
+    pendingTasks: 0,
+    waitingGames: 0,
+    pendingApprovals: 0,
+  );
   String? _currentFamilyId;
   String? _currentUserId;
+  bool _isDeveloper = false;
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _loadWaitingGames();
+    _checkUserPermissions();
+    _loadBadgeCounts();
+  }
+
+  void _loadBadgeCounts() {
+    _badgeCountsSubscription = _badgeService.getAllBadgeCounts().listen(
+      (counts) {
+        if (mounted) {
+          setState(() {
+            _badgeCounts = counts;
+            _waitingChessChallenges = counts.waitingGames;
+          });
+        }
+      },
+      onError: (error) {
+        Logger.warning('Error loading badge counts', error: error, tag: 'HomeScreen');
+      },
+    );
+  }
+
+  Future<void> _checkUserPermissions() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUser = authService.currentUser;
+    final userModel = await authService.getCurrentUserModel();
+    
+    if (mounted) {
+      setState(() {
+        _isDeveloper = currentUser?.email == 'simoncase78@gmail.com';
+        _isAdmin = userModel?.isAdmin() ?? false;
+      });
+    }
   }
 
   @override
   void dispose() {
     _waitingGamesSubscription?.cancel();
+    _badgeCountsSubscription?.cancel();
     super.dispose();
   }
 
@@ -78,16 +123,280 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildGamesIcon(IconData icon) {
-    if (_waitingChessChallenges > 0) {
+    if (_badgeCounts.waitingGames > 0) {
       return Badge(
         label: Text(
-          _waitingChessChallenges > 9 ? '9+' : '$_waitingChessChallenges',
+          _badgeCounts.waitingGames > 9 ? '9+' : '${_badgeCounts.waitingGames}',
           style: const TextStyle(fontSize: 10),
         ),
         child: Icon(icon),
       );
     }
     return Icon(icon);
+  }
+
+  Widget _buildChatIcon(IconData icon) {
+    if (_badgeCounts.unreadMessages > 0) {
+      return Badge(
+        label: Text(
+          _badgeCounts.unreadMessages > 9 ? '9+' : '${_badgeCounts.unreadMessages}',
+          style: const TextStyle(fontSize: 10),
+        ),
+        child: Icon(icon),
+      );
+    }
+    return Icon(icon);
+  }
+
+  Widget _buildJobsIcon(IconData icon) {
+    final total = _badgeCounts.pendingTasks + _badgeCounts.pendingApprovals;
+    if (total > 0) {
+      return Badge(
+        label: Text(
+          total > 9 ? '9+' : '$total',
+          style: const TextStyle(fontSize: 10),
+        ),
+        child: Icon(icon),
+      );
+    }
+    return Icon(icon);
+  }
+
+  Future<void> _showDeveloperMenu(BuildContext context, AuthService authService) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.code, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Developer Menu'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.sync, color: Colors.blue),
+              title: const Text('Run Migration'),
+              onTap: () => Navigator.pop(context, 'migration'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.family_restroom, color: Colors.orange),
+              title: const Text('Fix Family Link'),
+              onTap: () => Navigator.pop(context, 'fix_family'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.bug_report, color: Colors.grey),
+              title: const Text('Debug User Info'),
+              onTap: () => Navigator.pop(context, 'debug'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == 'migration') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MigrationScreen(),
+        ),
+      );
+    } else if (result == 'fix_family') {
+      await _showFixFamilyDialog(context, authService);
+    } else if (result == 'debug') {
+      // Show debug information
+      final user = authService.currentUser;
+      if (user != null) {
+        UserModel? userModel;
+        try {
+          userModel = await authService.getCurrentUserModel();
+        } catch (e) {
+          Logger.warning('getCurrentUserModel failed (likely orphaned account)', error: e, tag: 'HomeScreen');
+        }
+        if (context.mounted) {
+          await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('User Debug Info'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('User ID: ${user.uid}'),
+                    const SizedBox(height: 8),
+                    Text('Email: ${user.email ?? "N/A"}'),
+                    const SizedBox(height: 8),
+                    Text('Firebase Auth Display Name: ${user.displayName ?? "N/A"}'),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text('User Document Exists: ${userModel != null ? "Yes" : "No"}'),
+                    if (userModel != null) ...[
+                      const SizedBox(height: 8),
+                      Text('Firestore Display Name: ${userModel.displayName}'),
+                      const SizedBox(height: 8),
+                      Text('Family ID: ${userModel.familyId ?? "None"}'),
+                      const SizedBox(height: 8),
+                      Text('Created At: ${userModel.createdAt}'),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          '⚠️ Orphaned Account: Auth account exists but Firestore document is missing.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await authService.forceInitializeFamilyId();
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('User document created/updated! Please refresh the app.'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        final errorMsg = e.toString();
+                        final isPermissionError = errorMsg.contains('permission-denied') || 
+                                                  errorMsg.contains('permission denied');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isPermissionError 
+                                ? 'Permission denied. Please ensure Firestore rules are published in Firebase Console.'
+                                : 'Error: $e'
+                            ),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 5),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Fix User Document'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showAdminMenu(BuildContext context, AuthService authService) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.admin_panel_settings, color: Colors.purple),
+            SizedBox(width: 8),
+            Text('Admin Menu'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings, color: Colors.blue),
+              title: const Text('Manage Roles'),
+              onTap: () => Navigator.pop(context, 'roles'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text('Reset Database', style: TextStyle(color: Colors.red)),
+              onTap: () => Navigator.pop(context, 'reset'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.family_restroom, color: Colors.orange),
+              title: const Text('Fix Family Link', style: TextStyle(color: Colors.orange)),
+              onTap: () => Navigator.pop(context, 'fix_family'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == 'roles') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const RoleManagementScreen(),
+        ),
+      );
+    } else if (result == 'reset') {
+      // Show warning before allowing database reset
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('⚠️ Warning'),
+          content: const Text(
+            'Database Reset will permanently delete your account and all data. '
+            'This is for development/testing only. Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      
+      if (confirm == true && context.mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const DatabaseResetScreen(),
+          ),
+        );
+      }
+    } else if (result == 'fix_family') {
+      await _showFixFamilyDialog(context, authService);
+    }
   }
 
   Future<void> _showFixFamilyDialog(BuildContext context, AuthService authService) async {
@@ -292,128 +601,125 @@ class _HomeScreenState extends State<HomeScreen> {
             actions: [
               PopupMenuButton(
                 icon: const Icon(Icons.more_vert),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'invite',
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_add, size: 20),
-                        SizedBox(width: 8),
-                        Text('Invite Family'),
-                      ],
+                itemBuilder: (context) {
+                  final items = <PopupMenuEntry>[
+                    const PopupMenuItem(
+                      value: 'invite',
+                      child: Row(
+                        children: [
+                          Icon(Icons.person_add, size: 20),
+                          SizedBox(width: 8),
+                          Text('Invite Family'),
+                        ],
+                      ),
                     ),
-                  ),
-        const PopupMenuItem(
-          value: 'join',
-          child: Row(
-            children: [
-              Icon(Icons.group_add, size: 20),
-              SizedBox(width: 8),
-              Text('Join Family'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'profile',
-          child: Row(
-            children: [
-              Icon(Icons.person, size: 20),
-              SizedBox(width: 8),
-              Text('Edit Profile'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'calendar_sync',
-          child: Row(
-            children: [
-              Icon(Icons.sync, size: 20),
-              SizedBox(width: 8),
-              Text('Calendar Sync'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'privacy',
-          child: Row(
-            children: [
-              Icon(Icons.privacy_tip, size: 20),
-              SizedBox(width: 8),
-              Text('Privacy Center'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'roles',
-          child: Row(
-            children: [
-              Icon(Icons.admin_panel_settings, size: 20),
-              SizedBox(width: 8),
-              Text('Manage Roles'),
-            ],
-          ),
-        ),
+                    const PopupMenuItem(
+                      value: 'join',
+                      child: Row(
+                        children: [
+                          Icon(Icons.group_add, size: 20),
+                          SizedBox(width: 8),
+                          Text('Join Family'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'profile',
+                      child: Row(
+                        children: [
+                          Icon(Icons.person, size: 20),
+                          SizedBox(width: 8),
+                          Text('Edit Profile'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'calendar_sync',
+                      child: Row(
+                        children: [
+                          Icon(Icons.sync, size: 20),
+                          SizedBox(width: 8),
+                          Text('Calendar Sync'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'privacy',
+                      child: Row(
+                        children: [
+                          Icon(Icons.privacy_tip, size: 20),
+                          SizedBox(width: 8),
+                          Text('Privacy Center'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                  ];
+                  
+                  // Admin Menu
+                  if (_isAdmin) {
+                    items.add(
                       const PopupMenuItem(
-                        value: 'migration',
+                        value: 'admin_menu',
                         child: Row(
                           children: [
-                            Icon(Icons.sync, size: 20),
+                            Icon(Icons.admin_panel_settings, size: 20, color: Colors.purple),
                             SizedBox(width: 8),
-                            Text('Run Migration'),
+                            Text('Admin Menu', style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
+                            SizedBox(width: 8),
+                            Icon(Icons.chevron_right, size: 16),
                           ],
                         ),
                       ),
+                    );
+                  }
+                  
+                  // Developer Menu
+                  if (_isDeveloper) {
+                    items.add(
                       const PopupMenuItem(
-                        value: 'reset',
+                        value: 'developer_menu',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_forever, size: 20, color: Colors.red),
+                            Icon(Icons.code, size: 20, color: Colors.orange),
                             SizedBox(width: 8),
-                            Text('Reset Database', style: TextStyle(color: Colors.red)),
+                            Text('Developer Menu', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                            SizedBox(width: 8),
+                            Icon(Icons.chevron_right, size: 16),
                           ],
                         ),
                       ),
-        const PopupMenuItem(
-          value: 'fix_family',
-          child: Row(
-            children: [
-              Icon(Icons.family_restroom, size: 20, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('Fix Family Link', style: TextStyle(color: Colors.orange)),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'force_signout',
-          child: Row(
-            children: [
-              Icon(Icons.refresh, size: 20, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('Refresh Session', style: TextStyle(color: Colors.blue)),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'debug',
-          child: Row(
-            children: [
-              Icon(Icons.bug_report, size: 20),
-              SizedBox(width: 8),
-              Text('Debug User Info'),
-            ],
-          ),
-        ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout, size: 20, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Logout', style: TextStyle(color: Colors.red)),
-                      ],
+                    );
+                  }
+                  
+                  items.add(
+                    const PopupMenuItem(
+                      value: 'force_signout',
+                      child: Row(
+                        children: [
+                          Icon(Icons.refresh, size: 20, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('Refresh Session', style: TextStyle(color: Colors.blue)),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  );
+                  
+                  items.add(
+                    const PopupMenuItem(
+                      value: 'logout',
+                      child: Row(
+                        children: [
+                          Icon(Icons.logout, size: 20, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Logout', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  );
+                  
+                  return items;
+                },
                 onSelected: (value) async {
                   if (value == 'invite') {
                     await Navigator.push(
@@ -459,85 +765,11 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (context) => const PrivacyCenterScreen(),
             ),
           );
-        } else if (value == 'roles') {
-          // Check if user is Admin before allowing role management
-          final userModel = await authService.getCurrentUserModel();
-          if (userModel != null && userModel.isAdmin()) {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const RoleManagementScreen(),
-              ),
-            );
-          } else {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Only Admins can manage roles'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          }
-        } else if (value == 'migration') {
-          // Check if user is Admin before allowing migration
-          final userModel = await authService.getCurrentUserModel();
-          if (userModel != null && userModel.isAdmin()) {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MigrationScreen(),
-              ),
-            );
-                        } else {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Only Admins can run migrations'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      } else if (value == 'reset') {
-                        // Show warning before allowing database reset
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('⚠️ Warning'),
-                            content: const Text(
-                              'Database Reset will permanently delete your account and all data. '
-                              'This is for development/testing only. Continue?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Continue'),
-                              ),
-                            ],
-                          ),
-                        );
-                        
-                        if (confirm == true && context.mounted) {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const DatabaseResetScreen(),
-                            ),
-                          );
-                        }
-                      } else if (value == 'fix_family') {
-                        // Quick fix to re-link to Kate's family
-                        await _showFixFamilyDialog(context, authService);
-                      } else if (value == 'force_signout') {
+        } else if (value == 'admin_menu') {
+          await _showAdminMenu(context, authService);
+        } else if (value == 'developer_menu') {
+          await _showDeveloperMenu(context, authService);
+        } else if (value == 'force_signout') {
                         // Force sign out to clear persisted session and refresh
                         final confirm = await showDialog<bool>(
                           context: context,
@@ -576,8 +808,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             );
                           }
                         }
-                      } else if (value == 'debug') {
-                        // Show debug information
+                      } else if (value == 'logout') {
                         final user = authService.currentUser;
                         if (user != null) {
                           UserModel? userModel;
@@ -880,7 +1111,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         }
                       } else if (value == 'logout') {
-                    await authService.signOut();
+                        await authService.signOut();
                   }
                 },
               ),
@@ -914,14 +1145,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 selectedIcon: Icon(Icons.calendar_today),
                 label: 'Calendar',
               ),
-              const NavigationDestination(
-                icon: Icon(Icons.task_outlined),
-                selectedIcon: Icon(Icons.task),
+              NavigationDestination(
+                icon: _buildJobsIcon(Icons.task_outlined),
+                selectedIcon: _buildJobsIcon(Icons.task),
                 label: 'Jobs',
               ),
-              const NavigationDestination(
-                icon: Icon(Icons.chat_bubble_outline),
-                selectedIcon: Icon(Icons.chat_bubble),
+              NavigationDestination(
+                icon: _buildChatIcon(Icons.chat_bubble_outline),
+                selectedIcon: _buildChatIcon(Icons.chat_bubble),
                 label: 'Chat',
               ),
               NavigationDestination(

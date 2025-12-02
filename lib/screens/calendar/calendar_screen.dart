@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../models/calendar_event.dart';
 import '../../services/calendar_service.dart';
@@ -9,6 +10,11 @@ import '../../core/services/logger_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
+import '../../widgets/skeletons/skeleton_widgets.dart';
+import '../../widgets/swipeable_list_item.dart';
+import '../../widgets/context_menu.dart';
+import '../../widgets/toast_notification.dart';
+import '../../services/undo_service.dart';
 import 'add_edit_event_screen.dart';
 import 'event_details_screen.dart';
 import 'gantt_chart_screen.dart';
@@ -24,6 +30,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   final CalendarService _calendarService = CalendarService();
   final CalendarSyncService _syncService = CalendarSyncService();
   final AuthService _authService = AuthService();
+  final UndoService _undoService = UndoService();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _searchController = TextEditingController();
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
@@ -343,10 +351,66 @@ class _CalendarScreenState extends State<CalendarScreen> {
       itemCount: eventsToShow.length,
       itemBuilder: (context, index) {
         final event = eventsToShow[index];
-        return ModernCard(
-          margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
-          padding: EdgeInsets.zero,
-          child: ListTile(
+        final currentUserId = _auth.currentUser?.uid;
+        final canEdit = event.eventOwnerId == currentUserId || 
+                       event.createdBy == currentUserId;
+        final canDelete = canEdit;
+        
+        // Swipe actions
+        final List<SwipeAction> leftActions = [];
+        final List<SwipeAction> rightActions = [];
+        
+        if (canDelete) {
+          leftActions.add(
+            SwipeAction(
+              label: 'Delete',
+              icon: Icons.delete,
+              color: Colors.red,
+              onTap: () => _deleteEventWithUndo(event),
+            ),
+          );
+        }
+        
+        if (canEdit) {
+          rightActions.add(
+            SwipeAction(
+              label: 'Edit',
+              icon: Icons.edit,
+              color: Colors.blue,
+              onTap: () => _editEvent(event),
+            ),
+          );
+        }
+        
+        return ContextMenu(
+          actions: [
+            if (canEdit)
+              ContextMenuAction(
+                label: 'Edit',
+                icon: Icons.edit,
+                onTap: () => _editEvent(event),
+              ),
+            if (canDelete)
+              ContextMenuAction(
+                label: 'Delete',
+                icon: Icons.delete,
+                color: Colors.red,
+                onTap: () => _deleteEventWithUndo(event),
+              ),
+            ContextMenuAction(
+              label: 'View Details',
+              icon: Icons.info,
+              onTap: () => _viewEventDetails(event),
+            ),
+          ],
+          child: SwipeableListItem(
+            leftActions: leftActions,
+            rightActions: rightActions,
+            onTap: () => _viewEventDetails(event),
+            child: ModernCard(
+              margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
+              padding: EdgeInsets.zero,
+              child: ListTile(
             leading: Container(
               width: 4,
               decoration: BoxDecoration(
@@ -411,59 +475,51 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             trailing: PopupMenuButton(
               itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 20),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
+                if (canEdit)
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 20),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
                   ),
-                ),
+                if (canDelete)
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 20, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
                 const PopupMenuItem(
-                  value: 'delete',
+                  value: 'details',
                   child: Row(
                     children: [
-                      Icon(Icons.delete, size: 20, color: Colors.red),
+                      Icon(Icons.info, size: 20),
                       SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
+                      Text('View Details'),
                     ],
                   ),
                 ),
               ],
               onSelected: (value) async {
                 if (value == 'edit') {
-                  final result = await Navigator.push(
-                    context,
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) =>
-                          AddEditEventScreen(event: event),
-                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(opacity: animation, child: child);
-                      },
-                    ),
-                  );
-                  // No need to manually reload - Firestore stream will automatically update
+                  _editEvent(event);
                 } else if (value == 'delete') {
-                  await _calendarService.deleteEvent(event.id);
-                  // No need to manually reload - Firestore stream will automatically update
+                  _deleteEventWithUndo(event);
+                } else if (value == 'details') {
+                  _viewEventDetails(event);
                 }
               },
             ),
-            onTap: () async {
-              await Navigator.push(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) =>
-                      EventDetailsScreen(event: event),
-                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-                ),
-              );
-              // No need to manually reload - Firestore stream will automatically update
-            },
+          ),
+          ),
           ),
         );
       },
@@ -490,6 +546,68 @@ class _CalendarScreenState extends State<CalendarScreen> {
         return 'Yearly';
       default:
         return rule;
+    }
+  }
+
+  Future<void> _editEvent(CalendarEvent event) async {
+    final result = await Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            AddEditEventScreen(event: event),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+    // No need to manually reload - Firestore stream will automatically update
+  }
+
+  Future<void> _viewEventDetails(CalendarEvent event) async {
+    await Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            EventDetailsScreen(event: event),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+    // No need to manually reload - Firestore stream will automatically update
+  }
+
+  Future<void> _deleteEventWithUndo(CalendarEvent event) async {
+    try {
+      // Store event data for undo
+      final eventData = event;
+      
+      // Delete the event
+      await _calendarService.deleteEvent(event.id);
+      
+      // Register undo action
+      _undoService.registerUndoableAction(
+        'delete_event_${event.id}',
+        () async {
+          try {
+            await _calendarService.addEvent(eventData);
+            ToastNotification.success(context, 'Event restored');
+          } catch (e) {
+            ToastNotification.error(context, 'Error restoring event: $e');
+          }
+        },
+      );
+      
+      // Show undo snackbar
+      _undoService.showUndoSnackbar(
+        context,
+        message: 'Event deleted',
+        actionId: 'delete_event_${event.id}',
+      );
+      
+      ToastNotification.success(context, 'Event deleted');
+    } catch (e) {
+      ToastNotification.error(context, 'Error deleting event: $e');
     }
   }
 }

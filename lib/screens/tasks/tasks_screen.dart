@@ -11,6 +11,12 @@ import '../../providers/user_data_provider.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
+import '../../widgets/skeletons/skeleton_widgets.dart';
+import '../../widgets/toast_notification.dart';
+import '../../widgets/swipeable_list_item.dart';
+import '../../widgets/context_menu.dart';
+import '../../services/undo_service.dart';
+import '../../services/task_dependency_service.dart';
 import 'add_edit_task_screen.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -26,6 +32,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
   final TaskService _taskService = TaskService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final UndoService _undoService = UndoService();
   late TabController _tabController;
   List<Task> _activeTasks = [];
   List<Task> _completedTasks = [];
@@ -211,12 +218,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     } catch (e) {
       Logger.error('_loadTasks error', error: e, tag: 'TasksScreen');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading tasks: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastNotification.error(context, 'Error loading tasks: $e');
       }
     }
   }
@@ -231,13 +233,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     // Check if job requires claim and hasn't been claimed
     if (task.requiresClaim && !task.isClaimed && !task.hasPendingClaim) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This job must be claimed before it can be completed'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        ToastNotification.warning(context, 'This job must be claimed before it can be completed');
       }
       return;
     }
@@ -1269,10 +1265,65 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         final isClaimer = task.claimedBy == currentUserId;
         final canClaim = !isCreator && !task.isClaimed && !task.hasPendingClaim;
         
-        return ModernCard(
-          margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
-          padding: EdgeInsets.zero,
-          child: ListTile(
+        // Determine swipe actions based on task state
+        final List<SwipeAction> leftActions = [];
+        final List<SwipeAction> rightActions = [];
+        
+        if (!isCompleted && !task.requiresClaim) {
+          // Swipe right to complete
+          rightActions.add(
+            SwipeAction(
+              label: 'Complete',
+              icon: Icons.check_circle,
+              color: Colors.green,
+              onTap: () => _toggleTask(task),
+            ),
+          );
+        }
+        
+        if (isCreator) {
+          // Swipe left to delete
+          leftActions.add(
+            SwipeAction(
+              label: 'Delete',
+              icon: Icons.delete,
+              color: Colors.red,
+              onTap: () => _deleteTask(task.id),
+            ),
+          );
+        }
+        
+        return ContextMenu(
+          actions: [
+            if (!isCompleted)
+              ContextMenuAction(
+                label: 'Edit',
+                icon: Icons.edit,
+                onTap: () => _editTask(task),
+              ),
+            if (isCreator)
+              ContextMenuAction(
+                label: 'Delete',
+                icon: Icons.delete,
+                color: Colors.red,
+                onTap: () => _deleteTaskWithUndo(task),
+              ),
+            ContextMenuAction(
+              label: 'View Details',
+              icon: Icons.info,
+              onTap: () => _viewTaskDetails(task),
+            ),
+          ],
+          child: SwipeableListItem(
+            leftActions: leftActions,
+            rightActions: rightActions,
+            onTap: isCompleted
+                ? null
+                : () => _editTask(task),
+            child: ModernCard(
+            margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
+            padding: EdgeInsets.zero,
+            child: ListTile(
             leading: _buildLeadingWidget(task, isCompleted),
             title: Text(
               task.title,
@@ -1802,26 +1853,98 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                 }
               },
             ),
-            onTap: isCompleted
-                ? null
-                : () async {
-                    final result = await Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (context, animation, secondaryAnimation) =>
-                            AddEditTaskScreen(task: task),
-                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                          return FadeTransition(opacity: animation, child: child);
-                        },
-                      ),
-                    );
-                    if (result == true) {
-                      _loadTasks();
-                    }
-                  },
+          ),
+          ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _editTask(Task task) async {
+    final result = await Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            AddEditTaskScreen(task: task),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+    if (result == true) {
+      _loadTasks();
+    }
+  }
+
+  Future<void> _viewTaskDetails(Task task) async {
+    // For now, just edit the task. Can create a details screen later
+    await _editTask(task);
+  }
+
+  Future<void> _deleteTaskWithUndo(Task task) async {
+    try {
+      // Store task data for undo
+      final taskData = task;
+      
+      // Delete the task
+      await _taskService.deleteTask(task.id);
+      await _loadTasks();
+      
+      // Register undo action
+      _undoService.registerUndoableAction(
+        'delete_task_${task.id}',
+        () async {
+          try {
+            // Recreate task - would need a method to add task from Task object
+            // For now, just show error
+            ToastNotification.warning(context, 'Task restore not yet implemented');
+          } catch (e) {
+            ToastNotification.error(context, 'Error restoring task: $e');
+          }
+        },
+      );
+      
+      // Show undo snackbar
+      _undoService.showUndoSnackbar(
+        context,
+        message: 'Task deleted',
+        actionId: 'delete_task_${task.id}',
+      );
+      
+      ToastNotification.success(context, 'Task deleted');
+    } catch (e) {
+      ToastNotification.error(context, 'Error deleting task: $e');
+    }
+  }
+
+  Future<bool> _isTaskBlocked(Task task) async {
+    if (task.dependencies == null || task.dependencies!.isEmpty) {
+      return false;
+    }
+    
+    try {
+      // Check if any dependency is incomplete
+      final allTasks = await _taskService.getTasks();
+      for (final depId in task.dependencies!) {
+        final depTask = allTasks.firstWhere(
+          (t) => t.id == depId,
+          orElse: () => Task(
+            id: depId,
+            title: 'Unknown',
+            description: '',
+            createdAt: DateTime.now(),
+            isCompleted: false,
+          ),
+        );
+        if (!depTask.isCompleted) {
+          return true; // Task is blocked
+        }
+      }
+      return false; // All dependencies completed
+    } catch (e) {
+      Logger.error('Error checking task dependencies', error: e, tag: 'TasksScreen');
+      return false;
+    }
   }
 }

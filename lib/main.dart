@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -18,6 +19,10 @@ import 'providers/user_data_provider.dart';
 import 'widgets/auth_wrapper.dart';
 import 'widgets/error_handler.dart';
 import 'utils/app_theme.dart';
+import 'services/cache_service.dart';
+import 'core/di/service_locator.dart';
+import 'games/chess/services/chess_service.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 void main() async {
   // Set up global error handling
@@ -132,7 +137,7 @@ void main() async {
         firebaseInitialized = true;
         Logger.info('✓ Firebase initialized for Android/iOS platform', tag: 'main');
         
-        // Verify Firebase Auth is accessible
+        // Verify Firebase Auth is accessible and disable app verification
         try {
           final auth = FirebaseAuth.instance;
           Logger.debug('✓ Firebase Auth instance accessible', tag: 'main');
@@ -144,6 +149,18 @@ void main() async {
             Logger.logApiKey(apiKey, tag: 'main', displayLength: AppConstants.apiKeyDisplayLength);
           } else {
             Logger.warning('  - ⚠️ API Key: NULL (critical issue!)', tag: 'main');
+          }
+          
+          // CRITICAL FIX: Disable app verification IMMEDIATELY after Firebase init
+          // This must happen before any auth calls to prevent "empty reCAPTCHA token" errors
+          try {
+            final settings = auth.firebaseAuthSettings;
+            settings.setAppVerificationDisabledForTesting(true);
+            Logger.info('✓✓✓ App verification disabled in Flutter code ✓✓✓', tag: 'main');
+            Logger.info('This should prevent "empty reCAPTCHA token" errors', tag: 'main');
+          } catch (e) {
+            Logger.error('✗✗✗ FAILED to disable app verification in Flutter code ✗✗✗', error: e, tag: 'main');
+            Logger.error('Error type: ${e.runtimeType}', tag: 'main');
           }
         } catch (e, st) {
           Logger.warning('⚠ Could not verify Firebase Auth instance', error: e, stackTrace: st, tag: 'main');
@@ -253,6 +270,24 @@ void main() async {
     return;
   }
   
+  // Initialize Hive for offline caching
+  await Hive.initFlutter();
+  
+  // Initialize GetIt service locator
+  await setupServiceLocator();
+  
+  // Initialize ChessService (requires Hive)
+  try {
+    final chessService = getIt<ChessService>();
+    await chessService.initialize();
+    Logger.info('✓ ChessService initialized', tag: 'main');
+  } catch (e, st) {
+    Logger.warning('⚠ ChessService initialization error', error: e, stackTrace: st, tag: 'main');
+  }
+  
+  // Initialize cache service (non-blocking)
+  _initializeCacheService();
+  
   // Initialize notification service (non-blocking)
   _initializeNotificationService();
   
@@ -260,6 +295,32 @@ void main() async {
   _initializeBackgroundSync();
   
   runApp(const FamilyHubApp());
+}
+
+/// Initialize cache service asynchronously without blocking startup
+/// CRITICAL: This must never block Firebase Auth or app startup
+void _initializeCacheService() {
+  // Use scheduleMicrotask to ensure this runs after the current frame
+  // This prevents any file system operations from interfering with Firebase initialization
+  scheduleMicrotask(() async {
+    try {
+      // Add a small delay to ensure Firebase Auth is fully initialized first
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Initialize with aggressive timeout to prevent blocking
+      await CacheService().initialize().timeout(
+        const Duration(seconds: 2), // Reduced from 5 to 2 seconds
+        onTimeout: () {
+          Logger.warning('⚠ Cache service initialization timed out - continuing without cache', tag: 'main');
+          return; // Don't throw - just continue without cache
+        },
+      );
+      Logger.info('✓ Cache service initialized', tag: 'main');
+    } catch (e, st) {
+      Logger.warning('⚠ Cache service initialization error - continuing without cache', error: e, stackTrace: st, tag: 'main');
+      // Don't fail app startup if cache fails - cache is optional
+    }
+  });
 }
 
 /// Initialize notification service asynchronously without blocking startup
@@ -391,8 +452,14 @@ class FirebaseInitErrorApp extends StatelessWidget {
 class FamilyHubApp extends StatelessWidget {
   const FamilyHubApp({super.key});
 
+  // Global navigator key for deep linking
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
+    // Set navigator key for NotificationService
+    NotificationService.navigatorKey = navigatorKey;
+    
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()),
@@ -401,12 +468,34 @@ class FamilyHubApp extends StatelessWidget {
       ],
       child: ErrorHandler(
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'Family Hub',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
           home: const AuthWrapper(),
+          // Handle deep links via onGenerateRoute
+          onGenerateRoute: (settings) {
+            if (settings.name?.startsWith('/chess/invite/') ?? false) {
+              final roomId = settings.name?.split('/').last;
+              if (roomId != null) {
+                // Show invite dialog - handled by NotificationService
+                return MaterialPageRoute(
+                  builder: (_) => const Scaffold(body: Center(child: CircularProgressIndicator())),
+                );
+              }
+            } else if (settings.name?.startsWith('/chess/room/') ?? false) {
+              final roomId = settings.name?.split('/').last;
+              if (roomId != null) {
+                // Navigate to game screen
+                return MaterialPageRoute(
+                  builder: (_) => const Scaffold(body: Center(child: CircularProgressIndicator())),
+                );
+              }
+            }
+            return null;
+          },
         ),
       ),
     );

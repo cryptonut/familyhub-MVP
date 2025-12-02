@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:async' show StreamSubscription, Timer;
 import 'package:chess/chess.dart' as chess_lib;
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../../../core/services/logger_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/video_call_service.dart';
 import '../../../widgets/ui_components.dart';
 import '../../../utils/app_theme.dart';
 import '../models/chess_game.dart';
@@ -28,6 +32,7 @@ class ChessGameScreen extends StatefulWidget {
 class _ChessGameScreenState extends State<ChessGameScreen> {
   final ChessService _chessService = ChessService();
   final AuthService _authService = AuthService();
+  final VideoCallService? _videoCallService = VideoCallService();
   
   ChessGame? _game;
   chess_lib.Chess? _chessEngine;
@@ -37,10 +42,31 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
   Timer? _timer;
   int _whiteTimeRemaining = 600000;
   int _blackTimeRemaining = 600000;
+  
+  // WebSocket connection state
+  IO.Socket? _socket;
+  bool _isWebSocketConnected = false;
+  bool _showConnectionBanner = false;
+  int _reconnectAttempt = 0;
+  Timer? _reconnectTimer;
+  
+  // Exponential backoff intervals: 2s, 4s, 8s, 16s, 32s, 60s
+  static const List<Duration> _backoffIntervals = [
+    Duration(seconds: 2),
+    Duration(seconds: 4),
+    Duration(seconds: 8),
+    Duration(seconds: 16),
+    Duration(seconds: 32),
+    Duration(seconds: 60),
+  ];
+  
+  // Agora engine reference (if video call is active)
+  RtcEngine? _agoraEngine;
 
   @override
   void initState() {
     super.initState();
+    _initializeAgoraMuting();
     if (widget.gameId != null) {
       _loadGame(widget.gameId!);
     } else if (widget.mode == GameMode.open) {
@@ -52,7 +78,142 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
   void dispose() {
     _gameSubscription?.cancel();
     _timer?.cancel();
+    _reconnectTimer?.cancel();
+    _disconnectWebSocket();
+    _unmuteAgora();
     super.dispose();
+  }
+  
+  /// Initialize Agora video muting during chess game
+  /// Mutes local video stream to conserve battery
+  Future<void> _initializeAgoraMuting() async {
+    try {
+      if (_videoCallService != null) {
+        await _videoCallService!.initialize();
+        _agoraEngine = _videoCallService!.engine;
+        if (_agoraEngine != null) {
+          await _agoraEngine!.muteLocalVideoStream(true);
+          Logger.info('Agora video muted for chess game', tag: 'ChessGameScreen');
+        }
+      }
+    } catch (e, st) {
+      Logger.warning('Error muting Agora video', error: e, stackTrace: st, tag: 'ChessGameScreen');
+      FirebaseCrashlytics.instance.recordError(e, st, reason: 'Agora mute failed');
+    }
+  }
+  
+  /// Unmute Agora video when exiting game
+  Future<void> _unmuteAgora() async {
+    try {
+      if (_agoraEngine != null) {
+        await _agoraEngine!.muteLocalVideoStream(false);
+        Logger.info('Agora video unmuted after chess game', tag: 'ChessGameScreen');
+      }
+    } catch (e, st) {
+      Logger.warning('Error unmuting Agora video', error: e, stackTrace: st, tag: 'ChessGameScreen');
+    }
+  }
+  
+  /// Connect to WebSocket for real-time game updates
+  /// Implements exponential backoff retry on connection failure
+  Future<void> _connectWebSocket(String gameId) async {
+    if (_socket != null && _socket!.connected) {
+      return; // Already connected
+    }
+    
+    try {
+      // WebSocket URL - adjust based on your backend
+      final socketUrl = 'wss://your-backend.com/chess'; // TODO: Replace with actual WebSocket URL
+      
+      _socket = IO.io(socketUrl, <String, dynamic>{
+        'transports': ['websocket'],
+        'autoConnect': false,
+      });
+      
+      _socket!.onConnect((_) {
+        setState(() {
+          _isWebSocketConnected = true;
+          _showConnectionBanner = false;
+          _reconnectAttempt = 0;
+        });
+        Logger.info('WebSocket connected for game $gameId', tag: 'ChessGameScreen');
+        
+        // Join game room
+        _socket!.emit('join_game', {'gameId': gameId});
+      });
+      
+      _socket!.onDisconnect((_) {
+        setState(() {
+          _isWebSocketConnected = false;
+          _showConnectionBanner = true;
+        });
+        Logger.warning('WebSocket disconnected for game $gameId', tag: 'ChessGameScreen');
+        _scheduleReconnect(gameId);
+      });
+      
+      _socket!.onError((error) {
+        Logger.error('WebSocket error', error: error, tag: 'ChessGameScreen');
+        FirebaseCrashlytics.instance.recordError(error, StackTrace.current, reason: 'WebSocket error');
+        _scheduleReconnect(gameId);
+      });
+      
+      _socket!.on('game_update', (data) {
+        // Handle real-time game updates from WebSocket
+        Logger.debug('WebSocket game update: $data', tag: 'ChessGameScreen');
+        // Refresh game state from Firestore
+        _loadGame(gameId);
+      });
+      
+      _socket!.connect();
+    } catch (e, st) {
+      Logger.error('Error connecting WebSocket', error: e, stackTrace: st, tag: 'ChessGameScreen');
+      FirebaseCrashlytics.instance.recordError(e, st, reason: 'WebSocket connection failed');
+      _scheduleReconnect(gameId);
+    }
+  }
+  
+  /// Schedule WebSocket reconnection with exponential backoff
+  /// Retry intervals: 2s, 4s, 8s, 16s, 32s, 60s
+  void _scheduleReconnect(String gameId) {
+    _reconnectTimer?.cancel();
+    
+    if (_reconnectAttempt >= _backoffIntervals.length) {
+      // Max retries reached - show manual retry button
+      setState(() {
+        _showConnectionBanner = true;
+      });
+      return;
+    }
+    
+    final delay = _backoffIntervals[_reconnectAttempt];
+    _reconnectAttempt++;
+    
+    Logger.info('Scheduling WebSocket reconnect in ${delay.inSeconds}s (attempt $_reconnectAttempt)', tag: 'ChessGameScreen');
+    
+    _reconnectTimer = Timer(delay, () {
+      if (mounted && widget.gameId != null) {
+        _connectWebSocket(gameId);
+      }
+    });
+  }
+  
+  /// Disconnect WebSocket
+  void _disconnectWebSocket() {
+    _reconnectTimer?.cancel();
+    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
+    _isWebSocketConnected = false;
+  }
+  
+  /// Manual retry WebSocket connection
+  void _retryWebSocketConnection() {
+    if (widget.gameId != null) {
+      setState(() {
+        _reconnectAttempt = 0;
+      });
+      _connectWebSocket(widget.gameId!);
+    }
   }
 
   Future<void> _joinMatchmaking() async {
@@ -124,7 +285,10 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
         _isLoading = false;
       });
 
-      // Listen for game updates
+      // Connect WebSocket for real-time updates
+      _connectWebSocket(gameId);
+      
+      // Listen for game updates (Firestore fallback)
       _gameSubscription?.cancel();
       _gameSubscription = _chessService.streamGame(gameId).listen((updatedGame) {
         if (updatedGame != null && mounted) {
@@ -312,8 +476,57 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
+  /// Build connection lost banner with retry button
+  Widget _buildConnectionBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: Colors.orange.shade700,
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Connection lost, rejoining...',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+            TextButton(
+              onPressed: _retryWebSocketConnection,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          _buildMainContent(context),
+          // Connection lost banner
+          if (_showConnectionBanner)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _buildConnectionBanner(),
+            ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildMainContent(BuildContext context) {
     if (_isLoading || _game == null || _chessEngine == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Chess')),

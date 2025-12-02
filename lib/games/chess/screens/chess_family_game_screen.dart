@@ -95,7 +95,8 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
         return;
       }
 
-      final game = await _chessService.createFamilyGame(
+      // Create game invite
+      await _chessService.createFamilyGame(
         whitePlayerId: user.uid,
         whitePlayerName: userModel?.displayName ?? 'Player',
         familyId: userModel!.familyId!,
@@ -103,24 +104,10 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
         invitedPlayerName: opponent.displayName,
       );
       
-      // Show message that game was created and opponent needs to join
+      // Immediately exit modal/dialog and navigate back to home
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Game created! ${opponent.displayName} will see it in their waiting games.'),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-
-      // Navigate to game screen
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChessGameScreen(gameId: game.id, mode: GameMode.family),
-          ),
-        );
+        Navigator.pop(context); // Exit any modal/dialog
+        Navigator.pop(context); // Navigate back to home_screen
       }
     } catch (e) {
       Logger.error('Error creating family game', error: e, tag: 'ChessFamilyGameScreen');

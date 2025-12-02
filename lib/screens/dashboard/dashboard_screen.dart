@@ -21,9 +21,12 @@ import '../chat/private_chat_screen.dart';
 import '../hubs/my_hubs_screen.dart';
 import '../tasks/add_edit_task_screen.dart';
 import '../tasks/refund_notification_dialog.dart';
+import '../calendar/add_edit_event_screen.dart';
 import '../wallet/approve_payout_dialog.dart';
 import '../../widgets/relationship_dialog.dart';
 import '../../widgets/ui_components.dart';
+import '../../widgets/skeletons/skeleton_widgets.dart';
+import '../../widgets/quick_actions_fab.dart';
 import '../../utils/app_theme.dart';
 import '../../services/payout_service.dart';
 import '../../models/payout_request.dart';
@@ -321,12 +324,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
         
         // If we have cached user data, show dashboard immediately (even if dashboard data is still loading)
-        return _buildDashboardContent(
-          currentUserModel: currentUserModel,
-          familyMembers: familyMembers,
-          familyCreator: familyCreator,
+        return Scaffold(
+          body: _buildDashboardContent(
+            currentUserModel: currentUserModel,
+            familyMembers: familyMembers,
+            familyCreator: familyCreator,
+          ),
+          floatingActionButton: _buildQuickActionsFAB(),
         );
       },
+    );
+  }
+
+  Widget _buildQuickActionsFAB() {
+    final appState = Provider.of<AppState>(context, listen: false);
+    
+    return QuickActionsFAB(
+      actions: [
+        QuickAction(
+          label: 'Event',
+          icon: Icons.event,
+          onTap: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddEditEventScreen(),
+              ),
+            );
+            if (result == true) {
+              _loadDashboardData(showCachedFirst: false);
+            }
+          },
+        ),
+        QuickAction(
+          label: 'Job',
+          icon: Icons.task,
+          onTap: () async {
+            appState.setCurrentIndex(2); // Switch to Tasks tab
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AddEditTaskScreen(),
+              ),
+            );
+            if (result == true) {
+              _loadDashboardData(showCachedFirst: false);
+            }
+          },
+        ),
+      ],
     );
   }
   
@@ -336,7 +382,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required UserModel? familyCreator,
   }) {
     if (_isLoadingDashboardData && currentUserModel == null) {
-      return const LoadingIndicator(message: 'Loading dashboard...');
+      return const SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            SkeletonStatCard(),
+            SkeletonStatCard(),
+            SkeletonEventCard(),
+            SkeletonEventCard(),
+            SkeletonTaskCard(),
+            SkeletonTaskCard(),
+          ],
+        ),
+      );
     }
 
     return RefreshIndicator(

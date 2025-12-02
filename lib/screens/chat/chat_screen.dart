@@ -8,6 +8,12 @@ import '../../services/voice_recording_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
+import '../../widgets/skeletons/skeleton_widgets.dart';
+import '../../widgets/toast_notification.dart';
+import '../../widgets/message_reaction_widget.dart';
+import '../../services/message_reaction_service.dart';
+import '../../services/message_thread_service.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/voice_player_widget.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -19,6 +25,9 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
+  final MessageReactionService _reactionService = MessageReactionService();
+  final MessageThreadService _threadService = MessageThreadService();
+  final AuthService _authService = AuthService();
   VoiceRecordingService? _voiceService;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -26,6 +35,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Timer? _recordingTimer;
   bool _isRecording = false;
   Duration _recordingDuration = Duration.zero;
+  String? _familyId;
   
   VoiceRecordingService get voiceService {
     _voiceService ??= VoiceRecordingService();
@@ -69,12 +79,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (currentUserId == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You must be logged in to send messages'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ToastNotification.error(context, 'You must be logged in to send messages');
       return;
     }
 
@@ -93,12 +98,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sending message: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastNotification.error(context, 'Error sending message: $e');
       }
     }
   }
@@ -406,19 +406,218 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 const SizedBox(height: AppTheme.spacingXS),
-                Text(
-                  app_date_utils.AppDateUtils.formatTime(message.timestamp),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: isCurrentUser
-                        ? Colors.white.withValues(alpha: 0.7)
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      app_date_utils.AppDateUtils.formatTime(message.timestamp),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: isCurrentUser
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    if (_familyId != null)
+                      MessageReactionButton(
+                        messageId: message.id,
+                        familyId: _familyId!,
+                      ),
+                  ],
                 ),
+                if (message.reactions.isNotEmpty && _familyId != null) ...[
+                  const SizedBox(height: AppTheme.spacingXS),
+                  MessageReactionWidget(
+                    messageId: message.id,
+                    familyId: _familyId!,
+                    reactions: message.reactions,
+                  ),
+                ],
+                // Reply button and thread indicator
+                if (_familyId != null) ...[
+                  const SizedBox(height: AppTheme.spacingXS),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (message.replyCount > 0)
+                        TextButton.icon(
+                          icon: const Icon(Icons.reply, size: 16),
+                          label: Text('${message.replyCount} ${message.replyCount == 1 ? 'reply' : 'replies'}'),
+                          onPressed: () => _showThreadReplies(message),
+                        ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.reply, size: 16),
+                        label: const Text('Reply'),
+                        onPressed: () => _replyToMessage(message),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Future<void> _replyToMessage(ChatMessage message) async {
+    if (_familyId == null) return;
+    
+    final textController = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reply to Message'),
+        content: TextField(
+          controller: textController,
+          decoration: const InputDecoration(
+            hintText: 'Type your reply...',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true && textController.text.trim().isNotEmpty) {
+      try {
+        await _threadService.replyToMessage(
+          message.id,
+          textController.text.trim(),
+          _familyId!,
+        );
+        ToastNotification.success(context, 'Reply sent');
+      } catch (e) {
+        ToastNotification.error(context, 'Error sending reply: $e');
+      }
+    }
+  }
+
+  Future<void> _showThreadReplies(ChatMessage message) async {
+    if (_familyId == null) return;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                    color: Theme.of(context).dividerColor,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Text(
+                    'Thread Replies',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<List<ChatMessage>>(
+                stream: _threadService.watchThreadReplies(
+                  message.id,
+                  _familyId!,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error: ${snapshot.error}'),
+                    );
+                  }
+                  
+                  final replies = snapshot.data ?? [];
+                  
+                  if (replies.isEmpty) {
+                    return const Center(
+                      child: Text('No replies yet'),
+                    );
+                  }
+                  
+                  return ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(8),
+                    itemCount: replies.length,
+                    itemBuilder: (context, index) {
+                      final reply = replies[index];
+                      final isCurrentUser = _isCurrentUser(reply.senderId);
+                      return _buildMessageBubble(reply, isCurrentUser);
+                    },
+                  );
+                },
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).dividerColor,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: TextEditingController(),
+                      decoration: const InputDecoration(
+                        hintText: 'Add a reply...',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      onSubmitted: (text) {
+                        if (text.trim().isNotEmpty) {
+                          _threadService.replyToMessage(
+                            message.id,
+                            text.trim(),
+                            _familyId!,
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -1,3 +1,5 @@
+import 'task_dependency.dart';
+
 class Task {
   final String id;
   final String title;
@@ -8,6 +10,8 @@ class Task {
   final String assignedTo;
   final DateTime createdAt;
   final DateTime? completedAt;
+  final List<String> dependencies; // Task IDs this depends on
+  final TaskStatus status; // pending, blocked, inProgress, completed
   
   // Reward and claiming fields
   final double? reward; // Reward amount in AUD
@@ -33,6 +37,8 @@ class Task {
     this.assignedTo = '',
     required this.createdAt,
     this.completedAt,
+    this.dependencies = const [],
+    this.status = TaskStatus.pending,
     this.reward,
     this.claimedBy,
     this.claimStatus,
@@ -69,6 +75,8 @@ class Task {
         'refundReason': refundReason,
         'refundNote': refundNote,
         'refundedAt': refundedAt?.toIso8601String(),
+        'dependencies': dependencies,
+        'status': status.name,
       };
 
   factory Task.fromJson(Map<String, dynamic> json) {
@@ -127,6 +135,13 @@ class Task {
                 ? DateTime.parse(json['refundedAt'] as String)
                 : json['refundedAt'] as DateTime?)
             : null,
+        dependencies: (json['dependencies'] as List<dynamic>?)?.cast<String>() ?? [],
+        status: json['status'] != null
+            ? TaskStatus.values.firstWhere(
+                (e) => e.name == json['status'],
+                orElse: () => TaskStatus.pending,
+              )
+            : TaskStatus.pending,
       );
     } catch (e) {
       // If parsing fails completely, return a default task with the ID
@@ -162,6 +177,8 @@ class Task {
     String? refundReason,
     String? refundNote,
     DateTime? refundedAt,
+    List<String>? dependencies,
+    TaskStatus? status,
   }) =>
       Task(
         id: id ?? this.id,
@@ -185,6 +202,8 @@ class Task {
         refundReason: refundReason ?? this.refundReason,
         refundNote: refundNote ?? this.refundNote,
         refundedAt: refundedAt ?? this.refundedAt,
+        dependencies: dependencies ?? this.dependencies,
+        status: status ?? this.status,
       );
   
   // Helper getters

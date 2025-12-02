@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../models/user_model.dart';
@@ -13,6 +14,10 @@ import '../core/errors/app_exceptions.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  
+  // FCM topic for chess invites
+  static const String _chessTopic = 'family-chess';
 
   // Get current user stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -896,6 +901,9 @@ class AuthService {
         'familyId': cleanFamilyId,
       });
       
+      // Subscribe to FCM topic for chess invites
+      await _subscribeToChessTopic();
+      
       Logger.info('Successfully joined family: $cleanFamilyId', tag: 'AuthService');
     } catch (e) {
       if (e.toString().contains('Invalid family invitation code') || 
@@ -1104,6 +1112,9 @@ class AuthService {
       Logger.debug('  ✓ Found family with user: ${foundData['email'] ?? foundUser.id}', tag: 'AuthService');
     }
 
+    // Subscribe to FCM topic for chess invites
+    await _subscribeToChessTopic();
+    
     // Update the familyId
     await _firestore.collection('users').doc(user.uid).update({
       'familyId': cleanFamilyId,
@@ -1805,6 +1816,29 @@ class AuthService {
       return AuthException(error.toString(), originalError: error);
     }
     return AuthException(error.toString(), originalError: error);
+  }
+  
+  /// Subscribe to FCM topic 'family-chess' for receiving chess invites
+  /// Called when user joins a family
+  Future<void> _subscribeToChessTopic() async {
+    try {
+      await _messaging.subscribeToTopic(_chessTopic);
+      Logger.info('Subscribed to FCM topic: $_chessTopic', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.warning('Error subscribing to chess topic', error: e, stackTrace: st, tag: 'AuthService');
+      // Don't throw - topic subscription failure shouldn't block family join
+    }
+  }
+  
+  /// Unsubscribe from FCM topic 'family-chess'
+  /// Called when user leaves family or app closes
+  Future<void> unsubscribeFromChessTopic() async {
+    try {
+      await _messaging.unsubscribeFromTopic(_chessTopic);
+      Logger.info('Unsubscribed from FCM topic: $_chessTopic', tag: 'AuthService');
+    } catch (e, st) {
+      Logger.warning('Error unsubscribing from chess topic', error: e, stackTrace: st, tag: 'AuthService');
+    }
   }
 }
 

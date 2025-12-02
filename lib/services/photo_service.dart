@@ -10,6 +10,7 @@ import '../core/errors/app_exceptions.dart';
 import '../models/family_photo.dart';
 import '../models/photo_album.dart';
 import '../models/photo_comment.dart';
+import '../services/image_compression_service.dart';
 import 'auth_service.dart';
 
 /// Service for managing family photos and albums
@@ -18,6 +19,7 @@ class PhotoService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final AuthService _authService = AuthService();
+  final ImageCompressionService _compressionService = ImageCompressionService();
   final Uuid _uuid = const Uuid();
 
   String? get _currentUserId => _auth.currentUser?.uid;

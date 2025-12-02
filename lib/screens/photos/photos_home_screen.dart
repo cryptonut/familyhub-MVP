@@ -14,6 +14,7 @@ import 'upload_photo_dialog.dart';
 import 'create_album_dialog.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
+import '../../widgets/skeletons/skeleton_widgets.dart';
 
 class PhotosHomeScreen extends StatefulWidget {
   const PhotosHomeScreen({super.key});
@@ -96,8 +97,17 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+          ),
+          itemCount: 9,
+          itemBuilder: (context, index) => const SkeletonPhotoGridItem(),
+        ),
       );
     }
 

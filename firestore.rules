@@ -99,6 +99,14 @@ service cloud.firestore {
              !('claimStatus' in request.resource.data))));
         allow delete: if belongsToFamily(familyId) && 
           resource.data.createdBy == request.auth.uid;
+        
+        // Task dependencies subcollection
+        match /dependencies/{dependencyId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId);
+          allow update: if belongsToFamily(familyId);
+          allow delete: if belongsToFamily(familyId);
+        }
       }
       
       // Calendar events subcollection
@@ -165,6 +173,28 @@ service cloud.firestore {
           resource.data.senderId == request.auth.uid;
         allow delete: if belongsToFamily(familyId) && 
           resource.data.senderId == request.auth.uid;
+        
+        // Message reactions subcollection
+        match /reactions/{reactionId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId) && 
+            request.resource.data.userId == request.auth.uid;
+          allow update: if belongsToFamily(familyId) && 
+            resource.data.userId == request.auth.uid;
+          allow delete: if belongsToFamily(familyId) && 
+            resource.data.userId == request.auth.uid;
+        }
+        
+        // Message replies subcollection (for threading)
+        match /replies/{replyId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId) && 
+            request.resource.data.senderId == request.auth.uid;
+          allow update: if belongsToFamily(familyId) && 
+            resource.data.senderId == request.auth.uid;
+          allow delete: if belongsToFamily(familyId) && 
+            resource.data.senderId == request.auth.uid;
+        }
       }
       
       // Private messages subcollection
@@ -339,6 +369,17 @@ service cloud.firestore {
         allow create: if belongsToFamily(familyId);
         allow update: if belongsToFamily(familyId);
         allow delete: if belongsToFamily(familyId);
+      }
+      
+      // Event templates subcollection
+      match /eventTemplates/{templateId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if belongsToFamily(familyId) && 
+          resource.data.createdBy == request.auth.uid;
+        allow delete: if belongsToFamily(familyId) && 
+          resource.data.createdBy == request.auth.uid;
       }
     }
     

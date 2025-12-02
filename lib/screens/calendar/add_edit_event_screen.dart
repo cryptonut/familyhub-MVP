@@ -10,7 +10,13 @@ import '../../models/calendar_event.dart';
 import '../../models/user_model.dart';
 import '../../services/calendar_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/event_template_service.dart';
+import '../../models/event_template.dart';
+import '../../widgets/toast_notification.dart';
 import '../../services/calendar_sync_service.dart';
+import '../../services/event_template_service.dart';
+import '../../models/event_template.dart';
+import '../../widgets/toast_notification.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 
 class AddEditEventScreen extends StatefulWidget {
@@ -35,6 +41,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
   final _calendarService = CalendarService();
   final _authService = AuthService();
   final _syncService = CalendarSyncService();
+  final _templateService = EventTemplateService();
   final _auth = FirebaseAuth.instance;
   
   DateTime _startTime = DateTime.now();
@@ -345,6 +352,12 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
       appBar: AppBar(
         title: Text(widget.event != null ? 'Edit Event' : 'New Event'),
         actions: [
+          if (widget.event == null)
+            IconButton(
+              icon: const Icon(Icons.bookmark),
+              tooltip: 'Use Template',
+              onPressed: () => _showTemplatePicker(),
+            ),
           TextButton(
             onPressed: _saveEvent,
             child: const Text('Save'),
@@ -909,6 +922,66 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
       return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
     } catch (e) {
       return Colors.blue;
+    }
+  }
+
+  Future<void> _showTemplatePicker() async {
+    try {
+      final userModel = await _authService.getCurrentUserModel();
+      if (userModel?.familyId == null) {
+        ToastNotification.error(context, 'No family found');
+        return;
+      }
+
+      final templates = await _templateService.getTemplates();
+      
+      if (templates.isEmpty) {
+        ToastNotification.info(context, 'No templates available');
+        return;
+      }
+
+      final selected = await showDialog<EventTemplate>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Select Template'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: templates.length,
+              itemBuilder: (context, index) {
+                final template = templates[index];
+                return ListTile(
+                  title: Text(template.name),
+                  subtitle: Text(template.title),
+                  onTap: () => Navigator.pop(context, template),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      if (selected != null) {
+        final event = await _templateService.createEventFromTemplate(
+          selected.id,
+          _startTime,
+        );
+        
+        // Populate form with template data
+        _titleController.text = event.title;
+        _descriptionController.text = event.description;
+        _locationController.text = event.location ?? '';
+        _selectedColor = event.color;
+        _isRecurring = event.isRecurring;
+        _selectedRecurrenceRule = event.recurrenceRule;
+        _selectedInvitees = event.invitedMemberIds;
+        
+        setState(() {});
+        ToastNotification.success(context, 'Template applied');
+      }
+    } catch (e) {
+      ToastNotification.error(context, 'Error loading template: $e');
     }
   }
 }

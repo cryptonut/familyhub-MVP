@@ -1,11 +1,17 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:chess/chess.dart' as chess_lib;
 import 'package:uuid/uuid.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../core/services/logger_service.dart';
 import '../../../core/errors/app_exceptions.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../services/chat_service.dart';
+import '../../../models/chat_message.dart';
 import '../models/chess_game.dart';
 import '../models/chess_move.dart';
 
@@ -13,9 +19,72 @@ import '../models/chess_move.dart';
 class ChessService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final AuthService _authService = AuthService();
   final NotificationService _notificationService = NotificationService();
+  final ChatService _chatService = ChatService();
+  final Connectivity _connectivity = Connectivity();
   final _uuid = const Uuid();
+  
+  // FCM topic for chess invites
+  static const String _chessTopic = 'family-chess';
+  
+  // Timeout duration for invites (2 minutes)
+  static const Duration _inviteTimeout = Duration(minutes: 2);
+  
+  // Map of roomId -> Timer for timeout handling
+  final Map<String, Timer> _inviteTimers = {};
+  
+  // Hive box for offline caching
+  static const String _inviteCacheBox = 'chess_invites_cache';
+  Box? _inviteCacheBoxInstance;
+  
+  /// Initialize the service (call this after Hive is initialized)
+  Future<void> initialize() async {
+    try {
+      _inviteCacheBoxInstance = await Hive.openBox(_inviteCacheBox);
+      _retryCachedInvites();
+      _setupConnectivityListener();
+    } catch (e, st) {
+      Logger.error('Error initializing ChessService', error: e, stackTrace: st, tag: 'ChessService');
+    }
+  }
+  
+  /// Set up connectivity listener to retry cached invites on reconnect
+  void _setupConnectivityListener() {
+    _connectivity.onConnectivityChanged.listen((result) {
+      if (result != ConnectivityResult.none) {
+        _retryCachedInvites();
+      }
+    });
+  }
+  
+  /// Retry sending cached invites when connectivity is restored
+  Future<void> _retryCachedInvites() async {
+    if (_inviteCacheBoxInstance == null) return;
+    
+    try {
+      final cachedInvites = _inviteCacheBoxInstance!.values.toList();
+      for (var inviteData in cachedInvites) {
+        if (inviteData is Map) {
+          try {
+            await _sendFCMInvite(
+              roomId: inviteData['roomId'] as String,
+              sender: inviteData['sender'] as String,
+              targetUser: inviteData['targetUser'] as String,
+              timestamp: inviteData['timestamp'] as int,
+            );
+            // Remove from cache on success
+            await _inviteCacheBoxInstance!.delete(inviteData['roomId'] as String);
+          } catch (e) {
+            Logger.warning('Failed to retry cached invite', error: e, tag: 'ChessService');
+          }
+        }
+      }
+    } catch (e, st) {
+      Logger.error('Error retrying cached invites', error: e, stackTrace: st, tag: 'ChessService');
+    }
+  }
 
   /// Create a new solo game (vs AI)
   Future<ChessGame> createSoloGame({
@@ -49,6 +118,7 @@ class ChessService {
   /// Create a family game (invite family member)
   /// When inviting a specific opponent, the game is created in "waiting" status
   /// The opponent must join via joinFamilyGame to start the game
+  /// Sends FCM topic-based invite and sets up 2-minute timeout
   Future<ChessGame> createFamilyGame({
     required String whitePlayerId,
     required String whitePlayerName,
@@ -75,22 +145,238 @@ class ChessService {
       await _firestore.collection('chess_games').doc(gameId).set(game.toJson());
       Logger.info('Created family chess game: $gameId (invited: $invitedPlayerId)', tag: 'ChessService');
       
-      // Send notification to invited player
+      // Create invite document in Firestore
       if (invitedPlayerId != null) {
-        _notificationService.notifyChessChallenge(
-          invitedPlayerId: invitedPlayerId,
-          challengerName: whitePlayerName,
-          gameId: gameId,
-        ).catchError((e, st) {
-          Logger.warning('Error sending chess challenge notification', error: e, stackTrace: st, tag: 'ChessService');
-          // Don't fail game creation if notification fails
-        });
+        final inviteData = {
+          'roomId': gameId,
+          'sender': whitePlayerId,
+          'targetUser': invitedPlayerId,
+          'status': 'pending',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'createdAt': DateTime.now().toIso8601String(),
+        };
+        
+        await _firestore.collection('invites').doc(gameId).set(inviteData);
+        
+        // Send FCM invite via topic
+        try {
+          await _sendFCMInvite(
+            roomId: gameId,
+            sender: whitePlayerId,
+            targetUser: invitedPlayerId,
+            timestamp: inviteData['timestamp'] as int,
+          );
+        } catch (e, st) {
+          Logger.warning('FCM send failed, caching invite for retry', error: e, stackTrace: st, tag: 'ChessService');
+          // Cache invite for offline retry
+          if (_inviteCacheBoxInstance != null) {
+            await _inviteCacheBoxInstance!.put(gameId, inviteData);
+          }
+        }
+        
+        // Set up 2-minute timeout
+        _startInviteTimeout(gameId, whitePlayerId, invitedPlayerId, invitedPlayerName ?? 'Player');
       }
       
       return game;
     } catch (e, st) {
       Logger.error('Error creating family game', error: e, stackTrace: st, tag: 'ChessService');
       throw FirestoreException('Failed to create game: ${e.toString()}');
+    }
+  }
+  
+  /// Send FCM data-only message to 'family-chess' topic
+  /// Payload: {action: 'chess_invite', sender, roomId, timestamp, targetUser}
+  Future<void> _sendFCMInvite({
+    required String roomId,
+    required String sender,
+    required String targetUser,
+    required int timestamp,
+  }) async {
+    try {
+      // Note: FCM topic messaging from client requires Cloud Functions
+      // For now, we'll use Firestore to trigger Cloud Function or use HTTP API
+      // This is a placeholder - in production, use Cloud Functions to send FCM
+      Logger.info('Sending FCM invite for room $roomId', tag: 'ChessService');
+      
+      // Store FCM message data in Firestore for Cloud Function to process
+      await _firestore.collection('fcm_messages').add({
+        'topic': _chessTopic,
+        'data': {
+          'action': 'chess_invite',
+          'sender': sender,
+          'roomId': roomId,
+          'timestamp': timestamp,
+          'targetUser': targetUser,
+        },
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e, st) {
+      Logger.error('Error sending FCM invite', error: e, stackTrace: st, tag: 'ChessService');
+      rethrow;
+    }
+  }
+  
+  /// Start 2-minute timeout timer for invite
+  /// If no accept/decline in 120 seconds, cancel invite and notify challenger
+  void _startInviteTimeout(String roomId, String challengerId, String invitedUserId, String invitedUserName) {
+    // Cancel existing timer if any
+    _inviteTimers[roomId]?.cancel();
+    
+    _inviteTimers[roomId] = Timer(_inviteTimeout, () async {
+      try {
+        // Check if invite still exists and is pending
+        final inviteDoc = await _firestore.collection('invites').doc(roomId).get();
+        if (!inviteDoc.exists) {
+          _inviteTimers.remove(roomId);
+          return;
+        }
+        
+        final inviteData = inviteDoc.data();
+        if (inviteData?['status'] != 'pending') {
+          _inviteTimers.remove(roomId);
+          return;
+        }
+        
+        // Timeout expired - cancel invite
+        await _firestore.collection('invites').doc(roomId).delete();
+        
+        // Delete game if still waiting
+        final gameDoc = await _firestore.collection('chess_games').doc(roomId).get();
+        if (gameDoc.exists) {
+          final gameData = gameDoc.data();
+          if (gameData?['status'] == 'waiting') {
+            await _firestore.collection('chess_games').doc(roomId).delete();
+          }
+        }
+        
+        // Send chat message to challenger
+        final userModel = await _authService.getUserModel(invitedUserId);
+        final invitedName = userModel?.displayName ?? invitedUserName;
+        
+        await _chatService.sendMessage(
+          ChatMessage(
+            id: _uuid.v4(),
+            senderId: 'system',
+            senderName: 'System',
+            content: 'Challenge to $invitedName expired.',
+            timestamp: DateTime.now(),
+          ),
+        );
+        
+        Logger.info('Invite $roomId expired and cancelled', tag: 'ChessService');
+        _inviteTimers.remove(roomId);
+      } catch (e, st) {
+        Logger.error('Error handling invite timeout', error: e, stackTrace: st, tag: 'ChessService');
+        _inviteTimers.remove(roomId);
+      }
+    });
+  }
+  
+  /// Accept a chess invite
+  /// Updates invite status and publishes 'chess_start' to FCM topic
+  Future<void> acceptInvite(String roomId) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw AuthException('User not logged in', code: 'not-authenticated');
+      
+      final inviteDoc = await _firestore.collection('invites').doc(roomId).get();
+      if (!inviteDoc.exists) {
+        throw FirestoreException('Invite not found', code: 'not-found');
+      }
+      
+      final inviteData = inviteDoc.data()!;
+      if (inviteData['status'] != 'pending') {
+        throw ValidationException('Invite has already been ${inviteData['status']}');
+      }
+      
+      if (inviteData['targetUser'] != currentUser.uid) {
+        throw ValidationException('This invite is not for you');
+      }
+      
+      // Update invite status
+      await _firestore.collection('invites').doc(roomId).update({'status': 'accepted'});
+      
+      // Cancel timeout timer
+      _inviteTimers[roomId]?.cancel();
+      _inviteTimers.remove(roomId);
+      
+      // Get game to find players
+      final gameDoc = await _firestore.collection('chess_games').doc(roomId).get();
+      if (!gameDoc.exists) {
+        throw FirestoreException('Game not found', code: 'not-found');
+      }
+      
+      final gameData = gameDoc.data()!;
+      final senderId = inviteData['sender'] as String;
+      
+      // Publish 'chess_start' to FCM topic
+      await _firestore.collection('fcm_messages').add({
+        'topic': _chessTopic,
+        'data': {
+          'action': 'chess_start',
+          'roomId': roomId,
+          'players': [senderId, currentUser.uid],
+        },
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+      
+      Logger.info('Invite $roomId accepted', tag: 'ChessService');
+    } catch (e, st) {
+      Logger.error('Error accepting invite', error: e, stackTrace: st, tag: 'ChessService');
+      rethrow;
+    }
+  }
+  
+  /// Decline a chess invite
+  /// Updates invite status and sends chat message to challenger
+  Future<void> declineInvite(String roomId) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) throw AuthException('User not logged in', code: 'not-authenticated');
+      
+      final inviteDoc = await _firestore.collection('invites').doc(roomId).get();
+      if (!inviteDoc.exists) {
+        throw FirestoreException('Invite not found', code: 'not-found');
+      }
+      
+      final inviteData = inviteDoc.data()!;
+      if (inviteData['status'] != 'pending') {
+        throw ValidationException('Invite has already been ${inviteData['status']}');
+      }
+      
+      if (inviteData['targetUser'] != currentUser.uid) {
+        throw ValidationException('This invite is not for you');
+      }
+      
+      // Update invite status
+      await _firestore.collection('invites').doc(roomId).update({'status': 'declined'});
+      
+      // Cancel timeout timer
+      _inviteTimers[roomId]?.cancel();
+      _inviteTimers.remove(roomId);
+      
+      // Delete game
+      await _firestore.collection('chess_games').doc(roomId).delete();
+      
+      // Send chat message to challenger
+      final userModel = await _authService.getCurrentUserModel();
+      final userName = userModel?.displayName ?? 'Player';
+      
+      await _chatService.sendMessage(
+        ChatMessage(
+          id: _uuid.v4(),
+          senderId: 'system',
+          senderName: 'System',
+          content: '$userName passed on the chess challenge.',
+          timestamp: DateTime.now(),
+        ),
+      );
+      
+      Logger.info('Invite $roomId declined', tag: 'ChessService');
+    } catch (e, st) {
+      Logger.error('Error declining invite', error: e, stackTrace: st, tag: 'ChessService');
+      rethrow;
     }
   }
 
