@@ -1,8 +1,8 @@
 package com.example.familyhub_mvp
 
+import android.app.Application
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
-import io.flutter.app.FlutterApplication
 
 /**
  * Custom Application class to disable app verification BEFORE MainActivity runs.
@@ -13,7 +13,7 @@ import io.flutter.app.FlutterApplication
  * By disabling app verification in Application.onCreate(), we catch Firebase Auth
  * before it can initialize reCAPTCHA, preventing "empty reCAPTCHA token" errors.
  */
-class MyApplication : FlutterApplication() {
+class MyApplication : Application() {
     private val TAG = "MyApplication"
     private var appVerificationDisabled = false
 
