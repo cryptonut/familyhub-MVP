@@ -1839,7 +1839,14 @@ class AuthService {
   Future<void> _subscribeToChessTopic() async {
     try {
       // Get messaging instance (lazy initialization)
-      final fcmMessaging = messaging;
+      // Wrap in try-catch to handle initialization errors gracefully
+      FirebaseMessaging fcmMessaging;
+      try {
+        fcmMessaging = messaging;
+      } catch (e) {
+        Logger.debug('FirebaseMessaging not available, skipping subscription', error: e, tag: 'AuthService');
+        return;
+      }
       
       // Add timeout to prevent hanging if FCM isn't ready
       await fcmMessaging.subscribeToTopic(_chessTopic)
@@ -1867,11 +1874,18 @@ class AuthService {
   /// Called when user leaves family or app closes
   Future<void> unsubscribeFromChessTopic() async {
     try {
-      if (_messaging == null) {
-        Logger.debug('FCM not initialized, skipping unsubscription', tag: 'AuthService');
+      // Get messaging instance (lazy initialization)
+      // Wrap in try-catch to handle initialization errors gracefully
+      FirebaseMessaging fcmMessaging;
+      try {
+        fcmMessaging = messaging;
+      } catch (e) {
+        Logger.debug('FirebaseMessaging not available, skipping unsubscription', error: e, tag: 'AuthService');
         return;
       }
-      await messaging.unsubscribeFromTopic(_chessTopic)
+      
+      // Add timeout to prevent hanging if FCM isn't ready
+      await fcmMessaging.unsubscribeFromTopic(_chessTopic)
           .timeout(
             const Duration(seconds: 5),
             onTimeout: () {
@@ -1888,6 +1902,7 @@ class AuthService {
       } else {
         Logger.warning('Error unsubscribing from chess topic', error: e, stackTrace: st, tag: 'AuthService');
       }
+      // Don't throw - unsubscription failure shouldn't block other operations
     }
   }
 }
