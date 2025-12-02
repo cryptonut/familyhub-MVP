@@ -151,17 +151,11 @@ void main() async {
             Logger.warning('  - ⚠️ API Key: NULL (critical issue!)', tag: 'main');
           }
           
-          // CRITICAL FIX: Disable app verification IMMEDIATELY after Firebase init
-          // This must happen before any auth calls to prevent "empty reCAPTCHA token" errors
-          try {
-            final settings = auth.firebaseAuthSettings;
-            settings.setAppVerificationDisabledForTesting(true);
-            Logger.info('✓✓✓ App verification disabled in Flutter code ✓✓✓', tag: 'main');
-            Logger.info('This should prevent "empty reCAPTCHA token" errors', tag: 'main');
-          } catch (e) {
-            Logger.error('✗✗✗ FAILED to disable app verification in Flutter code ✗✗✗', error: e, tag: 'main');
-            Logger.error('Error type: ${e.runtimeType}', tag: 'main');
-          }
+          // NOTE: App verification should be disabled in Firebase Console, not in code
+          // The setAppVerificationDisabledForTesting() method is unreliable and doesn't work
+          // consistently. Instead, disable reCAPTCHA in Firebase Console:
+          // Firebase Console > Authentication > Settings > reCAPTCHA provider > DISABLE
+          Logger.info('Firebase Auth initialized - ensure reCAPTCHA is disabled in Firebase Console', tag: 'main');
         } catch (e, st) {
           Logger.warning('⚠ Could not verify Firebase Auth instance', error: e, stackTrace: st, tag: 'main');
         }
