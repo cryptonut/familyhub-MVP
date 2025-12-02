@@ -14,35 +14,38 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate() called - starting app verification disable process")
+        Log.d(TAG, "NOTE: MyApplication should have already attempted to disable app verification")
 
         // CRITICAL FIX: Disable app verification to prevent "empty reCAPTCHA token" issue
         // Firebase Auth on Android tries to use reCAPTCHA even when it's not configured in Firebase Console
         // This causes "empty reCAPTCHA token" errors and 30-second timeouts
+        // 
+        // We try in BOTH Application.onCreate() (earlier) and MainActivity.onCreate() (redundancy)
 
-        // Try immediately
+        // Try immediately - even if Application already tried, this is a backup
         disableAppVerification()
 
-        // Retry after delays to ensure Firebase is initialized
-        Handler(Looper.getMainLooper()).postDelayed({
-            Log.d(TAG, "Retry 1 (500ms): Attempting to disable app verification")
+        // More aggressive retries with shorter intervals to catch Firebase Auth initialization
+        // Retry immediately on next frame
+        Handler(Looper.getMainLooper()).post {
             if (!appVerificationDisabled) {
+                Log.d(TAG, "Retry 0 (immediate): Attempting to disable app verification")
                 disableAppVerification()
             }
-        }, 500)
+        }
 
-        Handler(Looper.getMainLooper()).postDelayed({
-            Log.d(TAG, "Retry 2 (1500ms): Attempting to disable app verification")
-            if (!appVerificationDisabled) {
-                disableAppVerification()
-            }
-        }, 1500)
-
-        Handler(Looper.getMainLooper()).postDelayed({
-            Log.d(TAG, "Retry 3 (3000ms): Attempting to disable app verification")
-            if (!appVerificationDisabled) {
-                disableAppVerification()
-            }
-        }, 3000)
+        // Retry with multiple short intervals to catch Firebase Auth as soon as it's ready
+        val retryDelays = listOf(50L, 100L, 200L, 300L, 500L, 750L, 1000L, 1500L, 2000L, 3000L)
+        retryDelays.forEachIndexed { index, delay ->
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (!appVerificationDisabled) {
+                    Log.d(TAG, "Retry ${index + 1} (${delay}ms): Attempting to disable app verification")
+                    disableAppVerification()
+                } else {
+                    Log.d(TAG, "App verification already disabled, skipping retry ${index + 1}")
+                }
+            }, delay)
+        }
     }
 
     override fun onResume() {
