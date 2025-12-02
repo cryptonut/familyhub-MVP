@@ -14,10 +14,21 @@ import '../core/errors/app_exceptions.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _messaging;
   
   // FCM topic for chess invites
   static const String _chessTopic = 'family-chess';
+  
+  // Lazy getter for Firebase Messaging to avoid initialization issues
+  FirebaseMessaging get messaging {
+    try {
+      _messaging ??= FirebaseMessaging.instance;
+      return _messaging!;
+    } catch (e) {
+      Logger.warning('FirebaseMessaging not available', error: e, tag: 'AuthService');
+      rethrow;
+    }
+  }
 
   // Get current user stream
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -901,8 +912,10 @@ class AuthService {
         'familyId': cleanFamilyId,
       });
       
-      // Subscribe to FCM topic for chess invites
-      await _subscribeToChessTopic();
+      // Subscribe to FCM topic for chess invites (non-blocking)
+      _subscribeToChessTopic().catchError((e) {
+        Logger.warning('Failed to subscribe to chess topic (non-blocking)', error: e, tag: 'AuthService');
+      });
       
       Logger.info('Successfully joined family: $cleanFamilyId', tag: 'AuthService');
     } catch (e) {
@@ -1112,8 +1125,10 @@ class AuthService {
       Logger.debug('  ✓ Found family with user: ${foundData['email'] ?? foundUser.id}', tag: 'AuthService');
     }
 
-    // Subscribe to FCM topic for chess invites
-    await _subscribeToChessTopic();
+    // Subscribe to FCM topic for chess invites (non-blocking)
+    _subscribeToChessTopic().catchError((e) {
+      Logger.warning('Failed to subscribe to chess topic (non-blocking)', error: e, tag: 'AuthService');
+    });
     
     // Update the familyId
     await _firestore.collection('users').doc(user.uid).update({
@@ -1820,12 +1835,30 @@ class AuthService {
   
   /// Subscribe to FCM topic 'family-chess' for receiving chess invites
   /// Called when user joins a family
+  /// This is non-blocking and won't affect auth operations if it fails
   Future<void> _subscribeToChessTopic() async {
     try {
-      await _messaging.subscribeToTopic(_chessTopic);
+      // Get messaging instance (lazy initialization)
+      final fcmMessaging = messaging;
+      
+      // Add timeout to prevent hanging if FCM isn't ready
+      await fcmMessaging.subscribeToTopic(_chessTopic)
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              Logger.warning('FCM topic subscription timed out', tag: 'AuthService');
+              return;
+            },
+          );
       Logger.info('Subscribed to FCM topic: $_chessTopic', tag: 'AuthService');
     } catch (e, st) {
-      Logger.warning('Error subscribing to chess topic', error: e, stackTrace: st, tag: 'AuthService');
+      // Check if it's a platform support issue
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('not supported') || errorStr.contains('not available')) {
+        Logger.debug('FCM not supported on this platform', tag: 'AuthService');
+      } else {
+        Logger.warning('Error subscribing to chess topic', error: e, stackTrace: st, tag: 'AuthService');
+      }
       // Don't throw - topic subscription failure shouldn't block family join
     }
   }
@@ -1834,10 +1867,27 @@ class AuthService {
   /// Called when user leaves family or app closes
   Future<void> unsubscribeFromChessTopic() async {
     try {
-      await _messaging.unsubscribeFromTopic(_chessTopic);
+      if (_messaging == null) {
+        Logger.debug('FCM not initialized, skipping unsubscription', tag: 'AuthService');
+        return;
+      }
+      await messaging.unsubscribeFromTopic(_chessTopic)
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              Logger.warning('FCM topic unsubscription timed out', tag: 'AuthService');
+              return;
+            },
+          );
       Logger.info('Unsubscribed from FCM topic: $_chessTopic', tag: 'AuthService');
     } catch (e, st) {
-      Logger.warning('Error unsubscribing from chess topic', error: e, stackTrace: st, tag: 'AuthService');
+      // Check if it's a platform support issue
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('not supported') || errorStr.contains('not available')) {
+        Logger.debug('FCM not supported on this platform', tag: 'AuthService');
+      } else {
+        Logger.warning('Error unsubscribing from chess topic', error: e, stackTrace: st, tag: 'AuthService');
+      }
     }
   }
 }
