@@ -1,265 +1,103 @@
-# FamilyHub MVP - QA Release Notes v2.1
+# Family Hub - QA Release Notes
 
-**Release Date:** December 1, 2025  
-**Version:** QA Build v2.1  
-**Branch:** `release/qa` (merged from `develop`)
-
----
+**Version:** 1.0.0-test  
+**Release Date:** $(date)  
+**Branch:** release/qa
 
 ## 🎉 Major Features
 
-### 📅 Calendar Sync - Complete Implementation
-**Two-way synchronization between FamilyHub and device calendars (Google, Apple, Outlook)**
+### Dashboard & UI Improvements
+- **Hub Selector**: Replaced profile avatars in app bar with family/hub dropdown selector
+  - Default shows "Case Family" (or current family name)
+  - Allows switching between different hubs/families
+  - Clean, modern dropdown design matching app theme
 
-**Key Features:**
-- ✅ Pull events from device calendars into FamilyHub
-- ✅ Push FamilyHub events to device calendars
-- ✅ Automatic duplicate prevention (tracks by deviceEventId)
-- ✅ Real-time calendar updates via Firestore streams
-- ✅ Event origin tracking (shows "Synced from [Calendar Name]")
-- ✅ Creator tracking (shows "Created by [User Name]")
-- ✅ Calendar selection with event count indicators
-- ✅ Last synced timestamp display
-- ✅ Manual sync and cleanup tools
+- **Dashboard Redesign**: 
+  - Circular profile avatars with names displayed below
+  - Removed data breach alerts section
+  - Clean, minimal design matching modern family app aesthetics
+  - Profile photo management: Click your own avatar to update photo/bitmoji
+  - Admin features: Long-press other members' avatars to edit relationships
 
-**Technical Implementation:**
-- Uses `device_calendar` plugin for cross-platform calendar access
-- Firestore-based sync state management
-- Background sync support via `BackgroundSyncService`
-- Comprehensive error handling and logging
-- Permission management for Android/iOS
+- **Profile Photo Management**:
+  - Upload photos from camera or gallery
+  - Enter Bitmoji URL directly
+  - QR code scanning for Bitmoji URLs
+  - Remove profile photos
+  - New ProfilePhotoService for centralized photo management
 
-### 📸 Photo Attachments in Events
-**Secure photo uploads directly within calendar events**
+### Chat Improvements
+- **Chat Tabs Screen**: New tabbed interface for chat
+  - "All" tab for family group chat (default)
+  - Individual tabs for each family member for one-on-one chats
+  - Horizontal tab bar with profile avatars
 
-**Key Features:**
-- ✅ Multi-photo upload support
-- ✅ 10MB file size limit with validation
-- ✅ Real-time photo display in event details
-- ✅ Photo deletion capability
-- ✅ Firebase Storage integration with proper security rules
-- ✅ Cross-platform support (mobile and web)
+### Chess Game Enhancements
+- **Complete Challenge Flow**:
+  - Challenger can create a challenge and exit to wait
+  - Challenger receives notification when challenge is accepted
+  - Challenger can join game or return to lobby
+  - Challenger can cancel pending challenges
+  - Invited player sees challenges clearly with accept/decline options
+  - Real-time challenge status updates
 
-### 💬 Event-Specific Chats
-**Discussion threads scoped to individual calendar events**
+### Calendar Features
+- **Duplicate Detection & Merging**:
+  - Automatically detects duplicate calendar events
+  - Merges duplicates based on title, time, and location
+  - Preserves best event data (photos, participants, RSVP status)
+  - Manual cleanup option in calendar sync settings
+  - Prevents importing duplicates from device calendars
 
-**Key Features:**
-- ✅ Real-time chat via Firestore streams
-- ✅ Access control (only event participants can chat)
-- ✅ Message display with sender names
-- ✅ Integrated into event details screen
+### Bug Fixes
+- **Location Services**: Fixed context disposal error when updating location
+  - Proper mounted checks before using context
+  - Safe dialog navigation handling
+  - No more "deactivated widget" errors
 
-### ♟️ Chess Game - PvP Fixes
-**Fixed player vs player functionality for family games**
+- **Calendar Sync**: Fixed "Not synced yet" label persistence
+  - Clears user model cache after sync updates
+  - UI immediately reflects sync status
 
-**Key Features:**
-- ✅ Proper game invitation flow (waiting status)
-- ✅ Real-time waiting games list via Firestore streams
-- ✅ Opponent validation on join
-- ✅ "Waiting for opponent" UI with join button
-- ✅ Fixed game creation to not set opponent ID prematurely
+- **Firestore Rules**: Updated security rules for:
+  - Calendar event updates (duplicate cleanup)
+  - Chess game invites
+  - FCM message creation
 
-**Technical Fixes:**
-- Games now created in "waiting" status
-- Added `invitedPlayerId` field to track intended opponent
-- Real-time stream for waiting games
-- Proper join validation
+## 🔧 Technical Improvements
 
----
+- Added `ProfilePhotoService` for centralized photo management
+- Added `ChatTabsScreen` for improved chat navigation
+- Improved error handling in location services
+- Enhanced calendar sync with duplicate prevention
+- Updated Firestore security rules for new features
 
-## 🐛 Bug Fixes
+## 📱 Testing Notes
 
-### Calendar Sync
-- ✅ Fixed calendar ID type mismatch (now uses verified calendar ID)
-- ✅ Fixed duplicate event creation (tracks by deviceEventId)
-- ✅ Fixed calendar selection showing event counts
-- ✅ Fixed calendar selection dialog showing "Unnamed Calendar" (now uses accountName fallback)
-- ✅ **CRITICAL FIX: Fixed calendar sync in release APK builds** - Added ProGuard rules to prevent R8 obfuscation from breaking device_calendar plugin
-- ✅ Fixed calendar names and event counts displaying correctly in release builds
-- ✅ Fixed real-time calendar updates (uses Firestore streams)
-- ✅ Fixed "last synced" timestamp display
-- ✅ Fixed calendar sync screen layout issues
-- ✅ Fixed event import not setting `createdBy` field
-- ✅ Fixed sync not importing events (wider date range for first sync)
-- ✅ Fixed `lastSyncedAt` updating even when no events imported
+### Test on Multiple Devices
+- Verify hub selector works correctly
+- Test profile photo upload/update/removal
+- Test Bitmoji URL entry and QR scanning
+- Verify chess challenge flow end-to-end
+- Test calendar duplicate detection and merging
+- Verify location updates work without errors
 
-### Calendar Screen
-- ✅ Fixed persistent "BOTTOM OVERFLOWED" error (using SingleChildScrollView)
-- ✅ Fixed search functionality (now shows all filtered events)
-- ✅ Fixed search text readability (proper theme colors)
-- ✅ Fixed search bar auto-hide when cleared
-- ✅ Fixed calendar events not refreshing after sync (real-time streams)
+### Known Limitations
+- Hub switching logic is logged but not yet fully implemented (UI ready)
+- Snapchat-style QR code sharing deferred for future release
 
-### Event Details
-- ✅ Added event source display ("Synced from [Calendar]" or "Created in FamilyHub")
-- ✅ Added creator display ("Created by [User Name]")
-- ✅ Fixed event details screen navigation
+## 🚀 Build Information
 
-### Chess Game
-- ✅ Fixed PvP invitation flow (games now properly wait for opponent)
-- ✅ Fixed opponent not actually joining (proper join validation)
-- ✅ Fixed waiting games not updating in real-time
-- ✅ Fixed game screen not handling waiting status
+- **Flavor:** QA (test)
+- **Application ID:** com.example.familyhub_mvp.test
+- **Build Type:** Release
+- **APK Location:** `build/app/outputs/flutter-apk/app-qa-release.apk`
 
-### UI/UX
-- ✅ Fixed tasks screen layout (collapsible filters)
-- ✅ Fixed calendar sync settings screen layout
-- ✅ Fixed widget lifecycle errors (mounted checks)
-- ✅ Fixed photo upload UI updates
+## 📝 Next Steps
+
+After QA testing, merge approved changes to `main` branch for production release.
 
 ---
 
-## 🔧 Technical Changes
-
-### New Files
-- `lib/models/event_chat_message.dart` - Event chat message model
-- `lib/services/event_chat_service.dart` - Event chat service
-- `lib/screens/chat/event_chat_widget.dart` - Event chat UI widget
-- `lib/screens/calendar/event_details_screen.dart` - Dedicated event details screen
-- `scripts/clean_synced_events.dart` - Utility script for cleaning synced events
-- `scripts/README_CLEAN_SYNCED_EVENTS.md` - Script documentation
-
-### Updated Services
-- `CalendarService` - Added photo upload methods (mobile & web), 10MB limit
-- `CalendarSyncService` - Complete rewrite with duplicate prevention, verified calendar IDs, diagnostic logging
-- `EventChatService` - New service for event-specific chats
-- `ChessService` - Fixed PvP flow, added waiting games queries and streams
-- `AuthService` - Added `getUserById` method
-
-### Updated Models
-- `CalendarEvent` - Added `createdBy`, `photoUrls`, `sourceCalendar` fields
-- `ChessGame` - Added `invitedPlayerId` field for proper invitation tracking
-
-### Updated Screens
-- `CalendarScreen` - Real-time Firestore streams, fixed overflow, improved search
-- `AddEditEventScreen` - Photo upload integration, proper state management
-- `EventDetailsScreen` - New dedicated screen with photos, chat, source/creator info
-- `CalendarSyncSettingsScreen` - Improved layout, event count indicators, last synced timestamp
-- `ChessFamilyGameScreen` - Real-time waiting games, proper invitation flow
-- `ChessGameScreen` - Waiting status handling, join button for invited players
-
-### Infrastructure
-- Updated `.gitignore` to exclude `*.logcat` and `*.log` files
-- Added Firebase Storage rules for event photos
-- Updated Firestore rules for event chats
-- Added calendar permissions to AndroidManifest.xml
-- **Added ProGuard/R8 rules** (`android/app/proguard-rules.pro`) to prevent code obfuscation issues in release builds
-- Enhanced logging for calendar sync debugging in release builds
-
----
-
-## 📋 Testing Checklist
-
-### Calendar Sync
-- [ ] Grant calendar permissions
-- [ ] Select calendar with events
-- [ ] Verify events import correctly
-- [ ] Verify events show source and creator
-- [ ] Verify duplicate prevention (sync twice, no duplicates)
-- [ ] Verify real-time updates (events appear immediately)
-- [ ] Test manual sync
-- [ ] Test cleanup tool (remove all synced events)
-
-### Photo Attachments
-- [ ] Upload photo to new event
-- [ ] Upload photo to existing event
-- [ ] Upload multiple photos
-- [ ] Verify 10MB limit enforcement
-- [ ] Delete photos
-- [ ] Verify photos display in event details
-
-### Event Chats
-- [ ] Send message in event chat
-- [ ] Verify real-time updates
-- [ ] Verify access control (non-participants can't access)
-
-### Chess PvP
-- [ ] Create game invitation
-- [ ] Verify game appears in opponent's waiting list
-- [ ] Verify opponent can join
-- [ ] Verify game starts after join
-- [ ] Verify moves sync in real-time
-
----
-
-## 🚀 Installation & Testing
-
-### Building the QA APK
-```bash
-flutter build apk --flavor qa --dart-define=FLAVOR=qa
-```
-
-The APK will be located at:
-```
-build/app/outputs/flutter-apk/app-qa-release.apk
-```
-
----
-
-## 📝 Notes for Testers
-
-1. **Calendar Sync**: 
-   - First sync looks back 90 days to catch existing events
-   - Subsequent syncs only get new events since last sync
-   - If sync shows "0 events imported", check the calendar selection - some calendars may be empty
-   - Use the calendar selection dialog to see which calendars have events
-
-2. **Photo Uploads**: 
-   - 10MB size limit per photo
-   - Photos upload immediately when selected
-   - Photos appear in event details screen
-
-3. **Chess PvP**: 
-   - When you invite someone, the game is created in "waiting" status
-   - The opponent must see the game in their waiting list and tap to join
-   - Game only starts after both players have joined
-
-4. **Real-time Updates**: 
-   - Calendar events update automatically via Firestore streams
-   - No need to refresh or log out/login to see new events
-
----
-
-## 🔄 Migration Notes
-
-### Database Changes
-- New Firestore collection: `families/{familyId}/events/{eventId}/chats`
-- New Firestore field: `events.photoUrls` (array of strings)
-- New Firestore field: `events.createdBy` (string)
-- New Firestore field: `events.sourceCalendar` (string)
-- New Firestore field: `events.deviceEventId` (string, for duplicate prevention)
-- New Firestore field: `events.importedFromDevice` (boolean)
-- New Firestore field: `chess_games.invitedPlayerId` (string)
-
-### Required Actions
-1. **Firebase Storage Rules**: Deploy the updated rules from `FIREBASE_STORAGE_RULES_COMPLETE.md`
-2. **Firestore Rules**: Deploy the updated rules (includes event chats)
-3. **Calendar Permissions**: Users must grant calendar permissions in device settings
-
----
-
-## 📞 Support
-
-For issues or questions, please contact the development team or create an issue in the repository.
-
----
-
----
-
-## 🔧 Build Configuration Changes
-
-### ProGuard/R8 Rules Added
-- **File:** `android/app/proguard-rules.pro`
-- **Purpose:** Prevent R8 code obfuscation from breaking `device_calendar` plugin in release builds
-- **Impact:** Calendar sync now works identically in debug and release builds
-- **Technical Details:** See `CALENDAR_SYNC_RELEASE_BUILD_FIX.md` for full explanation
-
-### Enhanced Logging
-- Added detailed logging for calendar object properties (name, accountName, id)
-- Better error diagnostics for release build issues
-- Warnings when calendar properties are null (indicates obfuscation issues)
-
----
-
-**Previous Release:** QA Build v2 (December 1, 2025)  
-**Next Release:** Production (after QA validation)
+**Commit:** ecd520e  
+**Branch:** release/qa
