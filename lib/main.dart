@@ -208,11 +208,15 @@ void main() async {
     firebaseInitError = 'Firebase initialization error: $e';
     Logger.error('=== FIREBASE INITIALIZATION ERROR ===', error: e, stackTrace: stackTrace, tag: 'main');
     Logger.error('Common causes:', tag: 'main');
-    Logger.error('  - Missing google-services.json in android/app/', tag: 'main');
+    Logger.error('  - Missing google-services.json in android/app/src/{flavor}/', tag: 'main');
     Logger.error('  - DEVELOPER_ERROR - OAuth client or SHA-1 fingerprint mismatch', tag: 'main');
-    Logger.error('  - Incorrect API key restrictions in Google Cloud Console', tag: 'main');
+    Logger.error('  - API key restrictions blocking Firestore API (MOST COMMON)', tag: 'main');
+    Logger.error('  - Cloud Firestore API not enabled in Google Cloud Console', tag: 'main');
     Logger.error('  - Missing or invalid firebase_options.dart', tag: 'main');
     Logger.error('  - Network connectivity issues', tag: 'main');
+    Logger.error('', tag: 'main');
+    Logger.error('REQUIRED FIX: See ROOT_CAUSE_FIX_API_KEY_RESTRICTIONS.md', tag: 'main');
+    Logger.error('This is a CONFIGURATION issue requiring changes in Google Cloud Console', tag: 'main');
   }
 
   if (firebaseInitialized) {
@@ -238,6 +242,11 @@ void main() async {
           Logger.warning('  - ⚠️ API Key: NULL (critical issue!)', tag: 'main');
         }
         Logger.debug('  - Using default Firestore settings to prevent gRPC channel issues', tag: 'main');
+        Logger.info('  - ⚠️ IMPORTANT: If you see "unavailable" errors, check API key restrictions:', tag: 'main');
+        Logger.info('    1. Enable "Cloud Firestore API" in Google Cloud Console', tag: 'main');
+        Logger.info('    2. Add "Cloud Firestore API" to API key restrictions', tag: 'main');
+        Logger.info('    3. Verify application restrictions match package + SHA-1', tag: 'main');
+        Logger.info('    See ROOT_CAUSE_FIX_API_KEY_RESTRICTIONS.md for details', tag: 'main');
       } catch (e, st) {
         Logger.warning('⚠ Firestore instance error', error: e, stackTrace: st, tag: 'main');
       }

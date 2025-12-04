@@ -150,12 +150,24 @@ class AuthService {
         
         if (errorStr.contains('unavailable') || errorCode == 'unavailable') {
           Logger.warning('Firestore unavailable error detected', tag: 'AuthService');
-          Logger.debug('  Possible causes:', tag: 'AuthService');
-          Logger.debug('    - API key restrictions blocking Firestore API', tag: 'AuthService');
-          Logger.debug('    - Firestore API not enabled in Google Cloud Console', tag: 'AuthService');
-          Logger.debug('    - Network connectivity issues', tag: 'AuthService');
-          Logger.debug('    - App Check enforcement blocking requests', tag: 'AuthService');
-          Logger.debug('    - Firestore service temporarily down', tag: 'AuthService');
+          Logger.error('=== ROOT CAUSE DIAGNOSIS ===', tag: 'AuthService');
+          Logger.error('This error indicates API key configuration issues in Google Cloud Console', tag: 'AuthService');
+          Logger.error('', tag: 'AuthService');
+          Logger.error('REQUIRED FIXES (in Google Cloud Console):', tag: 'AuthService');
+          Logger.error('1. Enable Cloud Firestore API:', tag: 'AuthService');
+          Logger.error('   APIs & Services > Library > Search "Cloud Firestore API" > ENABLE', tag: 'AuthService');
+          Logger.error('', tag: 'AuthService');
+          Logger.error('2. Fix API Key Restrictions:', tag: 'AuthService');
+          Logger.error('   APIs & Services > Credentials > Find API key from google-services.json', tag: 'AuthService');
+          Logger.error('   API Restrictions: Add "Cloud Firestore API" to allowed APIs', tag: 'AuthService');
+          Logger.error('   Application Restrictions: Set to "None" (dev) or add package + SHA-1', tag: 'AuthService');
+          Logger.error('', tag: 'AuthService');
+          Logger.error('3. Verify OAuth Client:', tag: 'AuthService');
+          Logger.error('   Package: com.example.familyhub_mvp.dev', tag: 'AuthService');
+          Logger.error('   SHA-1: BB:7A:6A:5F:57:F1:DD:0D:ED:14:2A:5C:6F:26:14:FD:54:C3:C7:1C', tag: 'AuthService');
+          Logger.error('', tag: 'AuthService');
+          Logger.error('See ROOT_CAUSE_FIX_API_KEY_RESTRICTIONS.md for detailed instructions', tag: 'AuthService');
+          Logger.error('=== END DIAGNOSIS ===', tag: 'AuthService');
           
           if (attempt < maxRetries - 1) {
             Logger.debug('Will retry (attempt ${attempt + 1}/$maxRetries) after ${attempt + 1}s delay...', tag: 'AuthService');
@@ -166,6 +178,7 @@ class AuthService {
             }
           } else {
             Logger.error('All retries exhausted - Firestore unavailable', error: e, stackTrace: stackTrace, tag: 'AuthService');
+            Logger.error('This is a CONFIGURATION issue, not a code issue. Fix API key restrictions in Google Cloud Console.', tag: 'AuthService');
             return null;
           }
         } else {
@@ -295,13 +308,21 @@ class AuthService {
         
         // Handle specific Android platform exceptions
         if (e.code == 'DEVELOPER_ERROR' || e.message?.contains('DEVELOPER_ERROR') == true) {
-          Logger.warning('⚠️ DEVELOPER_ERROR detected - this usually means:', tag: 'AuthService');
-          Logger.debug('  1. OAuth client not configured in google-services.json', tag: 'AuthService');
-          Logger.debug('  2. SHA-1 fingerprint mismatch', tag: 'AuthService');
-          Logger.debug('  3. Package name mismatch', tag: 'AuthService');
-          Logger.debug('  4. Need to wait 2-3 minutes after adding SHA-1 to Firebase Console', tag: 'AuthService');
+          Logger.error('=== DEVELOPER_ERROR DETECTED ===', tag: 'AuthService');
+          Logger.error('This indicates a CONFIGURATION issue in Google Cloud Console', tag: 'AuthService');
+          Logger.error('', tag: 'AuthService');
+          Logger.error('Most common causes:', tag: 'AuthService');
+          Logger.error('  1. API key restrictions blocking Firestore API (MOST COMMON)', tag: 'AuthService');
+          Logger.error('  2. Cloud Firestore API not enabled in Google Cloud Console', tag: 'AuthService');
+          Logger.error('  3. OAuth client not configured or SHA-1 fingerprint mismatch', tag: 'AuthService');
+          Logger.error('  4. Package name mismatch between app and OAuth client', tag: 'AuthService');
+          Logger.error('  5. Application restrictions on API key don\'t match app', tag: 'AuthService');
+          Logger.error('', tag: 'AuthService');
+          Logger.error('REQUIRED FIX: See ROOT_CAUSE_FIX_API_KEY_RESTRICTIONS.md', tag: 'AuthService');
+          Logger.error('This requires changes in Google Cloud Console, not code changes', tag: 'AuthService');
+          Logger.error('=== END DEVELOPER_ERROR DIAGNOSIS ===', tag: 'AuthService');
           throw AuthException(
-            'Firebase configuration error. Please verify OAuth client and SHA-1 fingerprint in Firebase Console.',
+            'Firebase configuration error. Check API key restrictions and enable Cloud Firestore API in Google Cloud Console. See ROOT_CAUSE_FIX_API_KEY_RESTRICTIONS.md',
             code: 'DEVELOPER_ERROR',
           );
         }
