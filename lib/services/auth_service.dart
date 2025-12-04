@@ -38,6 +38,15 @@ class AuthService {
 
   // Track if we're currently in the registration process to prevent auto-creation conflicts
   static final Set<String> _registeringUserIds = <String>{};
+  
+  // CRITICAL FIX: Prevent race conditions from multiple simultaneous Firestore queries
+  // Multiple widgets calling getCurrentUserModel() simultaneously causes gRPC channel reset loops
+  // The gRPC channel resets (initChannel -> shutdownNow) when multiple queries start before channel is ready
+  static final Map<String, Future<UserModel?>> _pendingUserModelQueries = <String, Future<UserModel?>>{};
+  static UserModel? _cachedUserModel;
+  static String? _cachedUserId;
+  static bool _isInitializingChannel = false;
+  static DateTime? _lastChannelInitTime;
 
   // Get current user model
   // Returns null if user doesn't exist or document is missing
@@ -46,11 +55,46 @@ class AuthService {
     final user = _auth.currentUser;
     if (user == null) {
       Logger.debug('No Firebase Auth user - returning null', tag: 'AuthService');
+      _cachedUserModel = null;
+      _cachedUserId = null;
       return null;
     }
     
-    Logger.debug('Firebase Auth user exists: ${user.uid} (${user.email})', tag: 'AuthService');
-    Logger.debug('Attempting to load user document from Firestore...', tag: 'AuthService');
+    // CRITICAL FIX: Return cached result if available and user hasn't changed
+    if (_cachedUserModel != null && _cachedUserId == user.uid) {
+      Logger.debug('Returning cached user model for ${user.uid}', tag: 'AuthService');
+      return _cachedUserModel;
+    }
+    
+    // CRITICAL FIX: If a query is already in progress for this user, wait for it instead of starting a new one
+    // This prevents multiple simultaneous queries that cause gRPC channel reset loops
+    if (_pendingUserModelQueries.containsKey(user.uid)) {
+      Logger.debug('Query already in progress for ${user.uid}, waiting for existing query...', tag: 'AuthService');
+      return await _pendingUserModelQueries[user.uid]!;
+    }
+    
+    // Start new query and track it
+    final queryFuture = _getCurrentUserModelInternal(user);
+    _pendingUserModelQueries[user.uid] = queryFuture;
+    
+    // Clean up after query completes
+    queryFuture.then((result) {
+      _pendingUserModelQueries.remove(user.uid);
+      if (result != null) {
+        _cachedUserModel = result;
+        _cachedUserId = user.uid;
+      }
+    }).catchError((e) {
+      _pendingUserModelQueries.remove(user.uid);
+    });
+    
+    return await queryFuture;
+  }
+  
+  // Internal method that actually performs the Firestore query
+  // Separated to allow proper synchronization and caching
+  Future<UserModel?> _getCurrentUserModelInternal(User user) async {
+    Logger.debug('Loading user document from Firestore for ${user.uid}', tag: 'AuthService');
 
     // If user is currently registering, wait briefly then try again
     if (_registeringUserIds.contains(user.uid)) {
@@ -84,21 +128,47 @@ class AuthService {
         // CRITICAL FIX: Wait for gRPC channel to initialize before querying
         // The channel reset loop (initChannel -> shutdownNow) happens when queries
         // are made before the gRPC channel is ready. Wait on first attempt.
+        // Use a global flag to ensure only ONE query initializes the channel at a time
         DocumentSnapshot userDoc;
         
         // Wait for gRPC channel to initialize on first attempt (Android only)
         if (attempt == 0 && !kIsWeb) {
-          Logger.debug('Waiting for gRPC channel to initialize...', tag: 'AuthService');
-          await Future.delayed(AppConstants.gRPCChannelInitDelay);
+          // CRITICAL: Ensure only one query initializes the channel at a time
+          // If channel is already being initialized, wait for it to complete
+          if (_isInitializingChannel) {
+            Logger.debug('gRPC channel initialization in progress, waiting...', tag: 'AuthService');
+            // Wait up to 5 seconds for channel initialization
+            int waitCount = 0;
+            while (_isInitializingChannel && waitCount < 50) {
+              await Future.delayed(const Duration(milliseconds: 100));
+              waitCount++;
+            }
+          } else {
+            // Check if channel was recently initialized (within last 2 seconds)
+            // If so, don't wait again to avoid unnecessary delays
+            final now = DateTime.now();
+            if (_lastChannelInitTime == null || 
+                now.difference(_lastChannelInitTime!).inSeconds > 2) {
+              Logger.debug('Waiting for gRPC channel to initialize...', tag: 'AuthService');
+              _isInitializingChannel = true;
+              _lastChannelInitTime = now;
+              await Future.delayed(AppConstants.gRPCChannelInitDelay);
+              _isInitializingChannel = false;
+            } else {
+              Logger.debug('gRPC channel recently initialized, skipping wait', tag: 'AuthService');
+            }
+          }
         }
         
-        // Use server source to ensure fresh data and prevent cache-related channel issues
-        // Increased timeout to allow for initial gRPC channel establishment
+        // Use server source to ensure fresh data
         userDoc = await userRef
             .get(GetOptions(source: Source.server))
             .timeout(AppConstants.firestoreQueryTimeout);
         
         final elapsed = DateTime.now().difference(startTime);
+        if (kDebugMode) {
+          Logger.debug('Query completed in ${elapsed.inMilliseconds}ms', tag: 'AuthService');
+        }
         
         // If doc doesn't exist, create minimal user doc to satisfy Firestore rules
         if (!userDoc.exists) {
@@ -137,7 +207,7 @@ class AuthService {
         final elapsed = startTime != null ? DateTime.now().difference(startTime!) : const Duration(seconds: 0);
         Logger.warning('Firestore query timeout after ${elapsed.inMilliseconds}ms (attempt ${attempt + 1})', tag: 'AuthService');
         if (attempt == maxRetries - 1) {
-          Logger.error('ALL RETRY ATTEMPTS FAILED - TIMEOUT', tag: 'AuthService');
+          Logger.error('All retry attempts failed - timeout', tag: 'AuthService');
           return null;
         }
       } catch (e, stackTrace) {
@@ -150,20 +220,9 @@ class AuthService {
         
         if (errorStr.contains('unavailable') || errorCode == 'unavailable') {
           Logger.warning('Firestore unavailable error detected', tag: 'AuthService');
-          Logger.debug('  Possible causes:', tag: 'AuthService');
-          Logger.debug('    - API key restrictions blocking Firestore API', tag: 'AuthService');
-          Logger.debug('    - Firestore API not enabled in Google Cloud Console', tag: 'AuthService');
-          Logger.debug('    - Network connectivity issues', tag: 'AuthService');
-          Logger.debug('    - App Check enforcement blocking requests', tag: 'AuthService');
-          Logger.debug('    - Firestore service temporarily down', tag: 'AuthService');
           
           if (attempt < maxRetries - 1) {
-            Logger.debug('Will retry (attempt ${attempt + 1}/$maxRetries) after ${attempt + 1}s delay...', tag: 'AuthService');
-            // On last retry before giving up, try forcing server source to bypass cache
-            // This applies to Android/iOS where cache can cause issues, not a Chrome workaround
-            if (attempt == maxRetries - 2 && !kIsWeb) {
-              Logger.debug('Last retry - will try forcing server source to bypass cache issues (Android/iOS)', tag: 'AuthService');
-            }
+            Logger.debug('Will retry (attempt ${attempt + 1}/$maxRetries)', tag: 'AuthService');
           } else {
             Logger.error('All retries exhausted - Firestore unavailable', error: e, stackTrace: stackTrace, tag: 'AuthService');
             return null;
@@ -181,53 +240,16 @@ class AuthService {
   }
 
   // Sign in with email and password
-  // Rebuild: Clean, simple sign-in with timeout protection
   Future<UserModel?> signInWithEmailAndPassword(
     String email,
     String password,
   ) async {
     try {
-      Logger.info('=== SIGN IN START ===', tag: 'AuthService');
-      Logger.debug('Email: $email', tag: 'AuthService');
-      Logger.debug('Current user before sign in: ${_auth.currentUser?.uid ?? "null"}', tag: 'AuthService');
-      Logger.debug('Firebase Auth instance: ${_auth.app.name}', tag: 'AuthService');
-      Logger.debug('Firebase project ID: ${_auth.app.options.projectId}', tag: 'AuthService');
+      Logger.info('Sign in started', tag: 'AuthService');
       
-      // IMPORTANT: Do NOT call signOut() before signIn() - this can cause race conditions
-      // Firebase Auth handles existing sessions automatically
-      // Do NOT add network connectivity tests - Firebase SDK handles this internally
-      // Platform-specific workarounds are NOT needed - Firebase Auth works consistently across platforms
-      
-      Logger.debug('Calling Firebase signInWithEmailAndPassword...', tag: 'AuthService');
-      Logger.debug('Email (trimmed): "${email.trim()}"', tag: 'AuthService');
-      Logger.debug('Password length: ${password.length}', tag: 'AuthService');
-      
-      // Check Firebase Auth settings
-      Logger.debug('Firebase Auth settings:', tag: 'AuthService');
-      Logger.debug('  - App name: ${_auth.app.name}', tag: 'AuthService');
-      Logger.debug('  - Project ID: ${_auth.app.options.projectId}', tag: 'AuthService');
-      final apiKey = _auth.app.options.apiKey ?? '';
-      if (apiKey.isNotEmpty) {
-        Logger.logApiKey(apiKey, tag: 'AuthService');
-        Logger.debug('  - NOTE: This is the ANDROID API key (different from web key)', tag: 'AuthService');
-        Logger.debug('  - If this times out, check restrictions for THIS key in Google Cloud Console', tag: 'AuthService');
-      } else {
-        Logger.warning('API Key: NULL (this is a problem!)', tag: 'AuthService');
-      }
-      
-      // Direct call to Firebase Auth - let it throw actual errors
-      Logger.debug('Calling Firebase signInWithEmailAndPassword...', tag: 'AuthService');
       final startTime = DateTime.now();
       
       try {
-        // Call Firebase Auth directly with a reasonable timeout
-        // CRITICAL: The "empty reCAPTCHA token" error indicates Firebase Auth is trying to use reCAPTCHA
-        // but can't get a token. This is typically caused by:
-        // 1. reCAPTCHA enabled in Firebase Console but not properly configured
-        // 2. Network issues preventing reCAPTCHA from loading
-        // 3. API key restrictions blocking reCAPTCHA endpoints
-        // 4. OAuth client/SHA-1 fingerprint mismatch
-        Logger.debug('About to call signInWithEmailAndPassword - this may trigger reCAPTCHA on Android', tag: 'AuthService');
         final userCredential = await _auth.signInWithEmailAndPassword(
           email: email.trim(),
           password: password,
@@ -235,52 +257,16 @@ class AuthService {
           AppConstants.authOperationTimeout,
           onTimeout: () {
             throw TimeoutException(
-              'Firebase Auth sign-in timed out after ${AppConstants.authOperationTimeout.inSeconds} seconds.\n\n'
-              'CRITICAL: Logcat shows "empty reCAPTCHA token" - this indicates:\n'
-              '1. reCAPTCHA is enabled in Firebase Console but token generation is failing\n'
-              '2. Go to Firebase Console > Authentication > Settings > reCAPTCHA provider\n'
-              '3. DISABLE reCAPTCHA for email/password authentication\n'
-              '4. Verify API key restrictions include "Identity Toolkit API"\n'
-              '5. Verify OAuth client and SHA-1 fingerprint are correct\n'
-              '6. Check network connectivity to reCAPTCHA endpoints',
-              AppConstants.authOperationTimeout,
+              'Firebase Auth sign-in timed out after ${AppConstants.authOperationTimeout.inSeconds} seconds',
             );
           },
         );
         
         final elapsed = DateTime.now().difference(startTime);
-        Logger.info('✓ Firebase Auth succeeded in ${elapsed.inMilliseconds}ms', tag: 'AuthService');
+        Logger.info('Firebase Auth succeeded in ${elapsed.inMilliseconds}ms', tag: 'AuthService');
         return _handleSignInSuccess(userCredential);
       } on TimeoutException catch (e) {
-        Logger.error('=== TIMEOUT: Firebase Auth hung ===', error: e, tag: 'AuthService');
-        Logger.warning('⚠️ CRITICAL: If logcat shows "empty reCAPTCHA token", this is the root cause!', tag: 'AuthService');
-        Logger.debug('   The authentication is hanging because Firebase Auth cannot get a reCAPTCHA token.', tag: 'AuthService');
-        Logger.debug('   IMMEDIATE FIX REQUIRED:', tag: 'AuthService');
-        Logger.debug('   1. Go to Firebase Console > Authentication > Settings (gear icon)', tag: 'AuthService');
-        Logger.debug('   2. Scroll to "reCAPTCHA provider" section', tag: 'AuthService');
-        Logger.debug('   3. DISABLE reCAPTCHA for email/password authentication', tag: 'AuthService');
-        Logger.debug('   4. Save and wait 1-2 minutes for changes to propagate', tag: 'AuthService');
-        Logger.debug('   5. Rebuild app: flutter clean && flutter run', tag: 'AuthService');
-        
-        // Check if Firebase is actually initialized
-        try {
-          final app = _auth.app;
-          Logger.debug('Firebase app name: ${app.name}', tag: 'AuthService');
-          Logger.debug('Firebase project ID: ${app.options.projectId}', tag: 'AuthService');
-          final apiKey = app.options.apiKey;
-          if (apiKey != null && apiKey.isNotEmpty) {
-            Logger.logApiKey(apiKey, tag: 'AuthService');
-            Logger.debug('⚠️ Also verify this API key in Google Cloud Console:', tag: 'AuthService');
-            Logger.debug('  1. Verify API restrictions include "Identity Toolkit API"', tag: 'AuthService');
-            Logger.debug('  2. Verify application restrictions allow Android app', tag: 'AuthService');
-            Logger.debug('  3. Verify OAuth client is configured in google-services.json', tag: 'AuthService');
-            Logger.debug('  4. Ensure reCAPTCHA API is not blocked by restrictions', tag: 'AuthService');
-          } else {
-            Logger.error('Firebase API key: NULL (this is a critical problem!)', tag: 'AuthService');
-          }
-        } catch (err, st) {
-          Logger.error('Cannot access Firebase app', error: err, stackTrace: st, tag: 'AuthService');
-        }
+        Logger.error('Firebase Auth timeout', error: e, tag: 'AuthService');
         rethrow;
       } on FirebaseAuthException catch (e) {
         Logger.error('Firebase Auth error', error: e, tag: 'AuthService');
@@ -295,13 +281,9 @@ class AuthService {
         
         // Handle specific Android platform exceptions
         if (e.code == 'DEVELOPER_ERROR' || e.message?.contains('DEVELOPER_ERROR') == true) {
-          Logger.warning('⚠️ DEVELOPER_ERROR detected - this usually means:', tag: 'AuthService');
-          Logger.debug('  1. OAuth client not configured in google-services.json', tag: 'AuthService');
-          Logger.debug('  2. SHA-1 fingerprint mismatch', tag: 'AuthService');
-          Logger.debug('  3. Package name mismatch', tag: 'AuthService');
-          Logger.debug('  4. Need to wait 2-3 minutes after adding SHA-1 to Firebase Console', tag: 'AuthService');
+          Logger.error('DEVELOPER_ERROR detected - configuration issue in Google Cloud Console', tag: 'AuthService');
           throw AuthException(
-            'Firebase configuration error. Please verify OAuth client and SHA-1 fingerprint in Firebase Console.',
+            'Firebase configuration error. Check API key restrictions and enable Cloud Firestore API in Google Cloud Console.',
             code: 'DEVELOPER_ERROR',
           );
         }
@@ -337,9 +319,7 @@ class AuthService {
       throw AuthException('Sign in succeeded but no user returned', code: 'no-user');
     }
     
-    Logger.info('SIGN IN SUCCESS', tag: 'AuthService');
-    Logger.debug('User ID: ${userCredential.user!.uid}', tag: 'AuthService');
-    Logger.debug('Email: ${userCredential.user!.email}', tag: 'AuthService');
+    Logger.info('Sign in success', tag: 'AuthService');
     
     // Return null - app screens will load user model as needed
     return null;
@@ -798,20 +778,39 @@ class AuthService {
     }
   }
 
-  // Sign out - ensure complete cleanup
+  // Sign out
   Future<void> signOut() async {
+    // Clear cached user model on sign out
+    _cachedUserModel = null;
+    _cachedUserId = null;
+    _pendingUserModelQueries.clear();
+    
     try {
       Logger.info('Signing out user', tag: 'AuthService');
-      await _auth.signOut();
+      
+      await _auth.signOut().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          throw TimeoutException('Sign out timed out');
+        },
+      );
+      
       Logger.info('Sign out complete', tag: 'AuthService');
+      
       // Give Firebase a moment to update auth state
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 200));
+      
+      // Verify sign out worked
+      if (_auth.currentUser != null) {
+        await _auth.signOut();
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
     } catch (e, st) {
       Logger.error('Error during sign out', error: e, stackTrace: st, tag: 'AuthService');
       // Force sign out even if there's an error
       try {
         await _auth.signOut();
-      } catch (_) {
+      } catch (forceError) {
         // Ignore secondary errors
       }
     }
@@ -1844,7 +1843,7 @@ class AuthService {
       try {
         fcmMessaging = messaging;
       } catch (e) {
-        Logger.debug('FirebaseMessaging not available, skipping subscription', error: e, tag: 'AuthService');
+        Logger.debug('FirebaseMessaging not available, skipping subscription: $e', tag: 'AuthService');
         return;
       }
       
@@ -1880,7 +1879,7 @@ class AuthService {
       try {
         fcmMessaging = messaging;
       } catch (e) {
-        Logger.debug('FirebaseMessaging not available, skipping unsubscription', error: e, tag: 'AuthService');
+        Logger.debug('FirebaseMessaging not available, skipping unsubscription: $e', tag: 'AuthService');
         return;
       }
       

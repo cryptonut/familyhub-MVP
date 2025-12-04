@@ -48,6 +48,11 @@ dependencies:
   uuid: ^4.2.1
   path_provider: ^2.1.1
   url_launcher: ^6.3.1
+  get_it: ^7.6.4
+  connectivity_plus: ^5.0.2
+  image: ^4.1.7
+  vibration: ^3.1.4
+  firebase_crashlytics: ^4.1.3
   
   # Calendar Sync
   device_calendar: ^4.3.0
