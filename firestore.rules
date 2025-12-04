@@ -114,15 +114,14 @@ service cloud.firestore {
         allow read: if belongsToFamily(familyId);
         allow create: if belongsToFamily(familyId) && 
           request.resource.data.createdBy == request.auth.uid;
-        allow update: if belongsToFamily(familyId) && 
-          (resource.data.eventOwnerId == request.auth.uid ||
-           resource.data.createdBy == request.auth.uid ||
-           // Allow admin to update eventOwnerId
-           (isBankerOrAdmin() && 
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['eventOwnerId'])));
+        // Allow any family member to update events (for collaboration and duplicate cleanup)
+        // Ownership checks are handled at the application level
+        allow update: if belongsToFamily(familyId);
         allow delete: if belongsToFamily(familyId) && 
           (resource.data.eventOwnerId == request.auth.uid ||
-           resource.data.createdBy == request.auth.uid);
+           resource.data.createdBy == request.auth.uid ||
+           // Allow admin/banker to delete events for duplicate cleanup operations
+           isBankerOrAdmin());
         
         // Event-specific chat messages subcollection
         match /chats/{messageId} {
@@ -462,6 +461,35 @@ service cloud.firestore {
       // Users can delete their own queue entry
       allow delete: if isAuthenticated() && 
         resource.data.userId == request.auth.uid;
+    }
+    
+    // Chess invites collection (for family chess challenges)
+    match /invites/{inviteId} {
+      // Users can read invites sent to them or sent by them
+      allow read: if isAuthenticated() && 
+        (resource.data.targetUser == request.auth.uid ||
+         resource.data.sender == request.auth.uid);
+      
+      // Users can create invites (when challenging someone)
+      allow create: if isAuthenticated() && 
+        request.resource.data.sender == request.auth.uid;
+      
+      // Users can update invites they sent or received
+      allow update: if isAuthenticated() && 
+        (resource.data.sender == request.auth.uid ||
+         resource.data.targetUser == request.auth.uid);
+      
+      // Users can delete invites they sent
+      allow delete: if isAuthenticated() && 
+        resource.data.sender == request.auth.uid;
+    }
+    
+    // FCM messages collection (for triggering Cloud Functions)
+    match /fcm_messages/{messageId} {
+      // Allow authenticated users to create FCM message triggers
+      allow create: if isAuthenticated();
+      // Cloud Functions will handle reading and deleting
+      allow read, update, delete: if false;
     }
   }
 }

@@ -10,10 +10,13 @@ import '../games/chess/models/chess_game.dart';
 import '../services/badge_service.dart';
 import '../widgets/ui_components.dart' hide Badge;
 import '../widgets/quick_actions_fab.dart';
+import '../providers/user_data_provider.dart';
+import '../services/hub_service.dart';
+import '../models/hub.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'calendar/calendar_screen.dart';
 import 'tasks/tasks_screen.dart';
-import 'chat/chat_screen.dart';
+import 'chat/chat_tabs_screen.dart';
 import 'location/location_screen.dart';
 import 'family/family_invitation_screen.dart';
 import 'family/join_family_screen.dart';
@@ -36,6 +39,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ChessService _chessService = ChessService();
   final BadgeService _badgeService = BadgeService();
+  final HubService _hubService = HubService();
   int _waitingChessChallenges = 0;
   StreamSubscription<List<ChessGame>>? _waitingGamesSubscription;
   StreamSubscription<BadgeCounts>? _badgeCountsSubscription;
@@ -49,6 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _currentUserId;
   bool _isDeveloper = false;
   bool _isAdmin = false;
+  List<Hub> _availableHubs = [];
+  String? _selectedHubId;
+  String? _currentFamilyName;
+  bool _hubsLoaded = false;
 
   @override
   void initState() {
@@ -56,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadWaitingGames();
     _checkUserPermissions();
     _loadBadgeCounts();
+    _loadHubsAndFamily();
   }
 
   void _loadBadgeCounts() {
@@ -92,6 +101,52 @@ class _HomeScreenState extends State<HomeScreen> {
     _waitingGamesSubscription?.cancel();
     _badgeCountsSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadHubsAndFamily() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userModel = await authService.getCurrentUserModel();
+      _currentFamilyId = userModel?.familyId;
+      
+      // Get family name - default to "Case Family" or derive from familyId
+      if (_currentFamilyId != null) {
+        // Try to get family name from hubs first, otherwise use default
+        _currentFamilyName = 'Case Family'; // Default name
+      }
+      
+      // Load all hubs
+      final hubs = await _hubService.getUserHubs();
+      
+      // Add current family as a hub option if not already in hubs
+      if (_currentFamilyId != null && !hubs.any((h) => h.id == _currentFamilyId)) {
+        // Create a virtual hub for the current family
+        final familyHub = Hub(
+          id: _currentFamilyId!,
+          name: _currentFamilyName ?? 'Case Family',
+          description: 'Your family hub',
+          creatorId: userModel?.uid ?? '',
+          memberIds: [],
+          createdAt: DateTime.now(),
+        );
+        hubs.insert(0, familyHub);
+      }
+      
+      if (mounted) {
+        setState(() {
+          _availableHubs = hubs;
+          _selectedHubId = _currentFamilyId; // Default to current family
+          _hubsLoaded = true;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading hubs and family', error: e, tag: 'HomeScreen');
+      if (mounted) {
+        setState(() {
+          _hubsLoaded = true;
+        });
+      }
+    }
   }
 
   Future<void> _loadWaitingGames() async {
@@ -146,6 +201,73 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     return Icon(icon);
+  }
+
+  Widget _buildHubDropdown() {
+    if (_availableHubs.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'Family Hub',
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    final selectedHub = _availableHubs.firstWhere(
+      (hub) => hub.id == _selectedHubId,
+      orElse: () => _availableHubs.first,
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButton<Hub>(
+        value: selectedHub,
+        isDense: true,
+        underline: const SizedBox.shrink(),
+        icon: const Icon(Icons.arrow_drop_down, color: Colors.black87, size: 20),
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+        items: _availableHubs.map((hub) {
+          return DropdownMenuItem<Hub>(
+            value: hub,
+            child: Text(
+              hub.name,
+              style: const TextStyle(color: Colors.black87),
+            ),
+          );
+        }).toList(),
+        onChanged: (Hub? newHub) {
+          if (newHub != null && newHub.id != _selectedHubId) {
+            setState(() {
+              _selectedHubId = newHub.id;
+            });
+            
+            // If switching to a different hub, update the family context
+            // For now, we'll just log it - actual switching logic can be added later
+            Logger.info('Switched to hub: ${newHub.name} (${newHub.id})', tag: 'HomeScreen');
+            
+            // TODO: Implement hub switching logic if needed
+            // This might involve updating the user's active hub/family context
+          }
+        },
+      ),
+    );
   }
 
   Widget _buildJobsIcon(IconData icon) {
@@ -591,13 +713,13 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, appState, _) {
         return Scaffold(
           appBar: AppBar(
-            title: GestureDetector(
-              onTap: () {
-                // Navigate to dashboard (index 0)
-                appState.setCurrentIndex(0);
-              },
-              child: const Text('Family Hub'),
-            ),
+            title: _hubsLoaded
+                ? _buildHubDropdown()
+                : const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
             actions: [
               PopupMenuButton(
                 icon: const Icon(Icons.more_vert),
@@ -830,7 +952,7 @@ class _HomeScreenState extends State<HomeScreen> {
               DashboardScreen(),
               CalendarScreen(),
               TasksScreen(),
-              ChatScreen(),
+              const ChatTabsScreen(),
               GamesHomeScreen(),
               PhotosHomeScreen(),
               LocationScreen(),

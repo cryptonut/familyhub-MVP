@@ -761,6 +761,30 @@ class ChessService {
     }
   }
 
+  /// Delete a chess game (used for cancelling challenges)
+  Future<void> deleteGame(String gameId) async {
+    try {
+      // Cancel any invite timeout timer
+      _inviteTimers[gameId]?.cancel();
+      _inviteTimers.remove(gameId);
+      
+      // Delete the invite document if it exists
+      try {
+        await _firestore.collection('invites').doc(gameId).delete();
+      } catch (e) {
+        // Invite might not exist, that's okay
+        Logger.debug('No invite document to delete for game $gameId', tag: 'ChessService');
+      }
+      
+      // Delete the game
+      await _firestore.collection('chess_games').doc(gameId).delete();
+      Logger.info('Deleted chess game: $gameId', tag: 'ChessService');
+    } catch (e, st) {
+      Logger.error('Error deleting chess game', error: e, stackTrace: st, tag: 'ChessService');
+      rethrow;
+    }
+  }
+
   /// Stream waiting family games for real-time updates
   Stream<List<ChessGame>> streamWaitingFamilyGames(String familyId) {
     return _firestore

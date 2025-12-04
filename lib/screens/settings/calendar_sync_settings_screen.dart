@@ -5,6 +5,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../../services/calendar_sync_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/background_sync_service.dart';
+import '../../services/calendar_service.dart';
 import '../../models/user_model.dart';
 import '../../core/services/logger_service.dart';
 import 'package:intl/intl.dart';
@@ -19,6 +20,7 @@ class CalendarSyncSettingsScreen extends StatefulWidget {
 class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen> {
   final _syncService = CalendarSyncService();
   final _authService = AuthService();
+  final _calendarService = CalendarService();
 
   UserModel? _currentUser;
   bool _isLoading = true;
@@ -359,6 +361,61 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
       if (mounted) {
         setState(() {
           _isSyncing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _cleanupDuplicates() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final mergedCount = await _calendarService.mergeDuplicateEvents();
+      
+      if (mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                mergedCount > 0
+                    ? 'Successfully merged $mergedCount duplicate events'
+                    : 'No duplicate events found',
+              ),
+              backgroundColor: mergedCount > 0 ? Colors.green : Colors.blue,
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
+      }
+    } catch (e) {
+      String errorMsg = e.toString();
+      if (errorMsg.contains('deactivated widget') || errorMsg.contains('Looking up')) {
+        errorMsg = 'Failed to cleanup duplicates. Please try again.';
+      }
+      setState(() {
+        _errorMessage = 'Error: $errorMsg';
+      });
+      
+      if (mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $errorMsg'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
         });
       }
     }
@@ -735,6 +792,18 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
               label: Text(_isSyncing ? 'Syncing...' : 'Sync Now'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Cleanup Duplicates Button
+            OutlinedButton.icon(
+              onPressed: _isLoading ? null : _cleanupDuplicates,
+              icon: const Icon(Icons.merge_type),
+              label: const Text('Cleanup Duplicate Events'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                foregroundColor: Colors.blue,
               ),
             ),
             const SizedBox(height: 16),

@@ -211,6 +211,9 @@ class CalendarSyncService {
     await _firestore.collection('users').doc(user.uid).update({
       'lastSyncedAt': DateTime.now().toIso8601String(),
     });
+    
+    // Clear user model cache so the updated lastSyncedAt is reflected immediately
+    AuthService.clearUserModelCache();
   }
 
   /// Extract FamilyHub event ID from event description
@@ -699,6 +702,22 @@ class CalendarSyncService {
           Logger.warning('Failed to convert device event to FamilyHub: ${deviceEvent.title}', tag: 'CalendarSyncService');
           continue;
         }
+
+        // Check for duplicate events (same title, start time, end time, location)
+        // This prevents importing events that were already created in FamilyHub
+        CalendarEvent? duplicateEvent;
+        if (existingEventId == null) {
+          // Only check for duplicates if this is a new import (not an update)
+          duplicateEvent = await _calendarService.findDuplicateEvent(fhEvent);
+          if (duplicateEvent != null) {
+            Logger.info(
+              'Skipping duplicate event: "${fhEvent.title}" (${fhEvent.startTime}) - already exists as "${duplicateEvent.id}"',
+              tag: 'CalendarSyncService',
+            );
+            skippedFamilyHubCount++;
+            continue;
+          }
+        }
         
         final isUpdate = existingEventId != null;
         Logger.debug(
@@ -741,6 +760,16 @@ class CalendarSyncService {
         );
         // Only update lastSyncedAt if we actually imported or updated events
         await updateLastSyncedAt();
+        
+        // Run duplicate cleanup after sync to catch any duplicates that may have been created
+        try {
+          final mergedCount = await _calendarService.mergeDuplicateEvents();
+          if (mergedCount > 0) {
+            Logger.info('Merged $mergedCount duplicate events after sync', tag: 'CalendarSyncService');
+          }
+        } catch (e) {
+          Logger.warning('Error merging duplicates after sync (non-fatal)', error: e, tag: 'CalendarSyncService');
+        }
       } else {
         Logger.warning(
           'No events imported or updated. Total: ${deviceEvents.length}, Skipped (FamilyHub): $skippedFamilyHubCount, Failed conversion: $failedConversionCount',

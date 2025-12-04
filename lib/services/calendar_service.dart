@@ -395,4 +395,235 @@ class CalendarService {
       rethrow;
     }
   }
+
+  /// Check if two events are duplicates based on title, start time, end time, and location
+  /// Allows for small time differences (up to 1 minute) to account for timezone/rounding issues
+  bool _areEventsDuplicates(CalendarEvent event1, CalendarEvent event2) {
+    // Must have same title (case-insensitive, trimmed)
+    if (event1.title.trim().toLowerCase() != event2.title.trim().toLowerCase()) {
+      return false;
+    }
+
+    // Must have same start time (within 1 minute tolerance)
+    final startDiff = event1.startTime.difference(event2.startTime).abs();
+    if (startDiff.inMinutes > 1) {
+      return false;
+    }
+
+    // Must have same end time (within 1 minute tolerance)
+    final endDiff = event1.endTime.difference(event2.endTime).abs();
+    if (endDiff.inMinutes > 1) {
+      return false;
+    }
+
+    // Must have same location (both null or both same, case-insensitive)
+    final loc1 = (event1.location ?? '').trim().toLowerCase();
+    final loc2 = (event2.location ?? '').trim().toLowerCase();
+    if (loc1 != loc2) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Find all duplicate events grouped by their matching characteristics
+  /// Returns a map where each key is a "signature" and value is list of duplicate event IDs
+  Future<Map<String, List<String>>> findDuplicateEvents() async {
+    final familyId = await _familyId;
+    if (familyId == null) return {};
+
+    try {
+      final allEvents = await getEvents();
+      final duplicateGroups = <String, List<String>>{};
+
+      // Compare all events pairwise
+      for (int i = 0; i < allEvents.length; i++) {
+        for (int j = i + 1; j < allEvents.length; j++) {
+          final event1 = allEvents[i];
+          final event2 = allEvents[j];
+
+          if (_areEventsDuplicates(event1, event2)) {
+            // Create a signature key for this duplicate group
+            final signature = '${event1.title.trim().toLowerCase()}_'
+                '${event1.startTime.toIso8601String()}_'
+                '${event1.endTime.toIso8601String()}_'
+                '${(event1.location ?? '').trim().toLowerCase()}';
+
+            if (!duplicateGroups.containsKey(signature)) {
+              duplicateGroups[signature] = [];
+            }
+
+            // Add both event IDs if not already in the list
+            if (!duplicateGroups[signature]!.contains(event1.id)) {
+              duplicateGroups[signature]!.add(event1.id);
+            }
+            if (!duplicateGroups[signature]!.contains(event2.id)) {
+              duplicateGroups[signature]!.add(event2.id);
+            }
+          }
+        }
+      }
+
+      return duplicateGroups;
+    } catch (e) {
+      Logger.error('Error finding duplicate events', error: e, tag: 'CalendarService');
+      rethrow;
+    }
+  }
+
+  /// Determine which event to keep when merging duplicates
+  /// Priority: 1) Not imported from device, 2) Has more data (photos, participants), 3) Older created date
+  String _selectBestEvent(List<CalendarEvent> duplicates) {
+    if (duplicates.isEmpty) throw ArgumentError('Cannot select from empty list');
+
+    // Sort by priority
+    duplicates.sort((a, b) {
+      // Priority 1: Prefer events NOT imported from device (FamilyHub-created)
+      final aIsImported = a.sourceCalendar?.toLowerCase().contains('synced') ?? false;
+      final bIsImported = b.sourceCalendar?.toLowerCase().contains('synced') ?? false;
+      if (aIsImported != bIsImported) {
+        return aIsImported ? 1 : -1; // Non-imported comes first
+      }
+
+      // Priority 2: Prefer events with more data (photos, participants, description)
+      final aDataScore = (a.photoUrls.length * 10) +
+          (a.participants.length * 5) +
+          (a.invitedMemberIds.length * 3) +
+          ((a.description.isNotEmpty) ? 2 : 0);
+      final bDataScore = (b.photoUrls.length * 10) +
+          (b.participants.length * 5) +
+          (b.invitedMemberIds.length * 3) +
+          ((b.description.isNotEmpty) ? 2 : 0);
+      if (aDataScore != bDataScore) {
+        return bDataScore.compareTo(aDataScore); // Higher score first
+      }
+
+      // Priority 3: Prefer older event (earlier createdBy timestamp if available)
+      // Since we don't have created timestamp, use event ID (UUIDs are time-based-ish)
+      // Actually, just keep the first one in the list as a tiebreaker
+      return 0;
+    });
+
+    return duplicates.first.id;
+  }
+
+  /// Merge duplicate events by keeping the best one and merging data from others
+  /// Returns the number of events merged/deleted
+  Future<int> mergeDuplicateEvents() async {
+    final familyId = await _familyId;
+    if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
+
+    try {
+      final duplicateGroups = await findDuplicateEvents();
+      if (duplicateGroups.isEmpty) {
+        Logger.info('No duplicate events found', tag: 'CalendarService');
+        return 0;
+      }
+
+      Logger.info('Found ${duplicateGroups.length} duplicate groups', tag: 'CalendarService');
+
+      final allEvents = await getEvents();
+      final eventsMap = {for (var e in allEvents) e.id: e};
+
+      int mergedCount = 0;
+      final batch = _firestore.batch();
+
+      for (var duplicateIds in duplicateGroups.values) {
+        if (duplicateIds.length < 2) continue; // Need at least 2 to merge
+
+        // Get the actual events
+        final duplicates = duplicateIds
+            .map((id) => eventsMap[id])
+            .where((e) => e != null)
+            .cast<CalendarEvent>()
+            .toList();
+
+        if (duplicates.length < 2) continue;
+
+        // Select the best event to keep
+        final keepEventId = _selectBestEvent(duplicates);
+        final keepEvent = eventsMap[keepEventId]!;
+        final eventsToDelete = duplicates.where((e) => e.id != keepEventId).toList();
+
+        // Merge data from duplicates into the kept event
+        final mergedEvent = keepEvent.copyWith(
+          // Merge photo URLs (unique)
+          photoUrls: [
+            ...keepEvent.photoUrls,
+            ...eventsToDelete.expand((e) => e.photoUrls),
+          ].toSet().toList(),
+          // Merge participants (unique)
+          participants: [
+            ...keepEvent.participants,
+            ...eventsToDelete.expand((e) => e.participants),
+          ].toSet().toList(),
+          // Merge invited member IDs (unique)
+          invitedMemberIds: [
+            ...keepEvent.invitedMemberIds,
+            ...eventsToDelete.expand((e) => e.invitedMemberIds),
+          ].toSet().toList(),
+          // Merge RSVP status (keep most recent/conflicting values from kept event)
+          rsvpStatus: Map.fromEntries([
+            ...eventsToDelete.expand((e) => e.rsvpStatus.entries),
+            ...keepEvent.rsvpStatus.entries,
+          ]),
+          // Use description from kept event (or first non-empty)
+          description: keepEvent.description.isNotEmpty
+              ? keepEvent.description
+              : eventsToDelete.firstWhere((e) => e.description.isNotEmpty,
+                      orElse: () => keepEvent)
+                  .description,
+        );
+
+        // Update the kept event with merged data
+        final keepEventRef = _firestore
+            .collection('families/$familyId/events')
+            .doc(keepEventId);
+        final keepEventData = mergedEvent.toJson();
+        keepEventData.remove('id');
+        batch.set(keepEventRef, keepEventData, SetOptions(merge: true));
+
+        // Delete duplicate events
+        for (var eventToDelete in eventsToDelete) {
+          final deleteRef = _firestore
+              .collection('families/$familyId/events')
+              .doc(eventToDelete.id);
+          batch.delete(deleteRef);
+          mergedCount++;
+        }
+
+        Logger.info(
+          'Merging ${eventsToDelete.length} duplicates into event "${keepEvent.title}" (${keepEvent.id})',
+          tag: 'CalendarService',
+        );
+      }
+
+      if (mergedCount > 0) {
+        await batch.commit();
+        Logger.info('Successfully merged $mergedCount duplicate events', tag: 'CalendarService');
+      }
+
+      return mergedCount;
+    } catch (e, st) {
+      Logger.error('Error merging duplicate events', error: e, stackTrace: st, tag: 'CalendarService');
+      rethrow;
+    }
+  }
+
+  /// Check if an event is a duplicate of any existing event
+  /// Used during sync to prevent importing duplicates
+  Future<CalendarEvent?> findDuplicateEvent(CalendarEvent newEvent) async {
+    try {
+      final allEvents = await getEvents();
+      for (var existingEvent in allEvents) {
+        if (_areEventsDuplicates(newEvent, existingEvent)) {
+          return existingEvent;
+        }
+      }
+      return null;
+    } catch (e) {
+      Logger.warning('Error checking for duplicate event', error: e, tag: 'CalendarService');
+      return null;
+    }
+  }
 }

@@ -9,6 +9,7 @@ import 'auth_service.dart';
 import '../core/di/service_locator.dart';
 import '../games/chess/services/chess_service.dart';
 import '../games/chess/screens/chess_game_screen.dart';
+import '../games/chess/screens/chess_lobby_screen.dart';
 import '../games/chess/models/chess_game.dart';
 
 class NotificationService {
@@ -446,15 +447,50 @@ class NotificationService {
           await Vibration.vibrate(duration: 100);
         }
         
-        // Navigate to game room
+        // Get opponent's name for the dialog
+        final opponentId = players.firstWhere((id) => id != currentUser.uid, orElse: () => '');
+        String opponentName = 'Your opponent';
+        if (opponentId.isNotEmpty) {
+          try {
+            final opponentModel = await _authService.getUserModel(opponentId);
+            opponentName = opponentModel?.displayName ?? 'Your opponent';
+          } catch (e) {
+            Logger.warning('Could not get opponent name', error: e, tag: 'NotificationService');
+          }
+        }
+        
+        // Show snackbar notification first
         if (navigatorKey?.currentContext != null) {
           final context = navigatorKey!.currentContext!;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChessGameScreen(gameId: roomId, mode: GameMode.family),
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('$opponentName accepted your chess challenge!'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'View',
+                textColor: Colors.white,
+                onPressed: () {
+                  _showChallengeAcceptedDialog(context, roomId, opponentName);
+                },
+              ),
             ),
           );
+          
+          // Also show dialog after a brief delay
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (navigatorKey?.currentContext != null) {
+              _showChallengeAcceptedDialog(navigatorKey!.currentContext!, roomId, opponentName);
+            }
+          });
         }
       }
     } catch (e, st) {
@@ -507,6 +543,68 @@ class NotificationService {
               }
             },
             child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show dialog when challenger's challenge is accepted
+  /// Gives options to join game or go to lobby
+  void _showChallengeAcceptedDialog(BuildContext context, String roomId, String opponentName) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 28),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Challenge Accepted!')),
+          ],
+        ),
+        content: Text('$opponentName accepted your chess challenge!'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              // Navigate to chess lobby
+              try {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ChessLobbyScreen(),
+                  ),
+                );
+              } catch (e) {
+                Logger.error('Error navigating to lobby', error: e, tag: 'NotificationService');
+              }
+            },
+            child: const Text('Go to Lobby'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              // Navigate to game room
+              try {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChessGameScreen(gameId: roomId, mode: GameMode.family),
+                  ),
+                );
+              } catch (e) {
+                Logger.error('Error navigating to game', error: e, tag: 'NotificationService');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Join Game'),
           ),
         ],
       ),

@@ -778,6 +778,13 @@ class AuthService {
     }
   }
 
+  /// Clear the cached user model (useful after updates to user data)
+  static void clearUserModelCache() {
+    _cachedUserModel = null;
+    _cachedUserId = null;
+    Logger.debug('User model cache cleared', tag: 'AuthService');
+  }
+
   // Sign out
   Future<void> signOut() async {
     // Clear cached user model on sign out

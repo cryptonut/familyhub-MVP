@@ -35,29 +35,41 @@ class _LocationScreenState extends State<LocationScreen> {
   }
 
   Future<void> _updateMyLocation() async {
+    if (!mounted) return;
+    
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      _showErrorDialog('Please sign in to update your location');
+      if (mounted) {
+        _showErrorDialog('Please sign in to update your location');
+      }
       return;
     }
 
-    // Show loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
+    // Show loading dialog and store its navigator context
+    NavigatorState? dialogNavigator;
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          dialogNavigator = Navigator.of(dialogContext);
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+    }
 
     try {
       // Check and request location permissions
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        Navigator.pop(context); // Close loading dialog
-        _showErrorDialog(
-          'Location services are disabled. Please enable location services in your device settings.',
-        );
+        if (mounted && dialogNavigator != null) {
+          dialogNavigator!.pop(); // Close loading dialog
+          _showErrorDialog(
+            'Location services are disabled. Please enable location services in your device settings.',
+          );
+        }
         return;
       }
 
@@ -65,19 +77,23 @@ class _LocationScreenState extends State<LocationScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          Navigator.pop(context); // Close loading dialog
-          _showErrorDialog(
-            'Location permissions are denied. Please enable location permissions in app settings.',
-          );
+          if (mounted && dialogNavigator != null) {
+            dialogNavigator!.pop(); // Close loading dialog
+            _showErrorDialog(
+              'Location permissions are denied. Please enable location permissions in app settings.',
+            );
+          }
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        Navigator.pop(context); // Close loading dialog
-        _showErrorDialog(
-          'Location permissions are permanently denied. Please enable them in app settings.',
-        );
+        if (mounted && dialogNavigator != null) {
+          dialogNavigator!.pop(); // Close loading dialog
+          _showErrorDialog(
+            'Location permissions are permanently denied. Please enable them in app settings.',
+          );
+        }
         return;
       }
 
@@ -114,7 +130,10 @@ class _LocationScreenState extends State<LocationScreen> {
         position.longitude,
       );
 
-      Navigator.pop(context); // Close loading dialog
+      // Close loading dialog if still mounted
+      if (mounted && dialogNavigator != null) {
+        dialogNavigator!.pop();
+      }
 
       // Show success message
       if (mounted) {
@@ -130,9 +149,16 @@ class _LocationScreenState extends State<LocationScreen> {
       }
 
       // Refresh family members list
-      _loadFamilyMembers();
+      if (mounted) {
+        _loadFamilyMembers();
+      }
     } catch (e) {
-      Navigator.pop(context); // Close loading dialog
+      // Close loading dialog if still mounted
+      if (mounted && dialogNavigator != null) {
+        dialogNavigator!.pop();
+      }
+      
+      if (!mounted) return;
       
       // Provide more helpful error messages
       String errorMessage;

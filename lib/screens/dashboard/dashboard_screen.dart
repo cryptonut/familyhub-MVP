@@ -31,8 +31,13 @@ import '../../utils/app_theme.dart';
 import '../../services/payout_service.dart';
 import '../../models/payout_request.dart';
 import '../../services/birthday_service.dart';
+import '../../services/profile_photo_service.dart';
 import '../../screens/profile/edit_profile_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart' hide CalendarEvent;
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -48,6 +53,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final FamilyWalletService _familyWalletService = FamilyWalletService();
   final PayoutService _payoutService = PayoutService();
   final BirthdayService _birthdayService = BirthdayService();
+  final ProfilePhotoService _profilePhotoService = ProfilePhotoService();
+  final ImagePicker _imagePicker = ImagePicker();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -606,221 +613,396 @@ class _DashboardScreenState extends State<DashboardScreen> {
               )
             else
               Wrap(
-                spacing: 12,
-                runSpacing: 12,
+                spacing: 16,
+                runSpacing: 16,
+                alignment: WrapAlignment.start,
                 children: familyMembers.map((member) {
                   final isCurrentUser = member.uid == currentUserId;
                   final hasUnread = _unreadMessages[member.uid] == true;
                   
-                  // Calculate relationship from current user's perspective
-                  String? relationshipLabel;
-                  if (currentUserModel != null && familyCreator != null) {
-                    final relationship = RelationshipUtils.getRelationshipFromPerspective(
-                      viewer: currentUserModel,
-                      target: member,
-                      creator: familyCreator,
-                      allMembers: familyMembers,
-                    );
-                    relationshipLabel = relationship != null 
-                        ? RelationshipUtils.getRelationshipLabel(relationship)
-                        : null;
-                  }
+                  // Extract first name only
+                  String firstName = member.displayName.isNotEmpty
+                      ? member.displayName.split(' ').first
+                      : member.email.split('@')[0];
                   
-                  // Check if current user can edit relationships
+                  // Check if current user can edit relationships (admin only)
                   final canEditRelationship = currentUserModel != null && 
                       familyCreator != null &&
                       (familyCreator.uid == currentUserModel.uid || currentUserModel.isAdmin());
                   
-                  return InkWell(
-                    onTap: isCurrentUser ? () {
-                      // Navigate to My Hubs page
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MyHubsScreen(),
-                        ),
-                      );
-                    } : () async {
-                      // Navigate to chat and wait for return
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PrivateChatScreen(
-                            recipientId: member.uid,
-                            recipientName: member.displayName,
-                          ),
-                        ),
-                      );
-                      // Refresh dashboard data when returning from chat
-                      // This updates the unread message indicators
-                      if (mounted) {
-                        _loadDashboardData();
-                      }
-                    },
-                    onLongPress: canEditRelationship && !isCurrentUser ? () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => RelationshipDialog(
-                          user: member,
-                          currentUser: currentUserModel,
-                          familyCreator: familyCreator,
-                          onUpdated: () {
-                            _loadDashboardData(showCachedFirst: false);
-                          },
-                        ),
-                      );
-                    } : null,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Opacity(
-                      opacity: isCurrentUser ? 0.7 : 1.0,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isCurrentUser 
-                              ? Colors.purple.shade100 
-                              : Colors.purple.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.purple.shade200,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                  return GestureDetector(
+                    onTap: isCurrentUser
+                        ? () => _showProfilePhotoMenu(context, member, currentUserModel)
+                        : null,
+                    onLongPress: isCurrentUser
+                        ? null
+                        : canEditRelationship
+                            ? () => _showRelationshipMenu(context, member, currentUserModel, familyCreator)
+                            : null,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Stack(
                           children: [
-                            Stack(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: Colors.purple.shade700,
-                                  radius: 20,
-                                  child: Text(
-                                    member.displayName.isNotEmpty
-                                        ? member.displayName[0].toUpperCase()
-                                        : member.email[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                if (hasUnread && !isCurrentUser)
-                                  Positioned(
-                                    right: 0,
-                                    top: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.notifications,
+                            CircleAvatar(
+                              radius: 32,
+                              backgroundColor: Colors.purple.shade700,
+                              backgroundImage: member.photoUrl != null && member.photoUrl!.isNotEmpty
+                                  ? NetworkImage(member.photoUrl!)
+                                  : null,
+                              child: member.photoUrl == null || member.photoUrl!.isEmpty
+                                  ? Text(
+                                      firstName.isNotEmpty
+                                          ? firstName[0].toUpperCase()
+                                          : member.email.isNotEmpty
+                                              ? member.email[0].toUpperCase()
+                                              : '?',
+                                      style: const TextStyle(
                                         color: Colors.white,
-                                        size: 12,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      member.displayName.isNotEmpty
-                                          ? member.displayName
-                                          : member.email.split('@')[0],
-                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: Colors.purple.shade900,
+                                        fontSize: 28,
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (isCurrentUser) ...[
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '(You)',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey[600],
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                if (relationshipLabel != null)
-                                  Text(
-                                    relationshipLabel,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.purple.shade700,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                if (member.roles.isNotEmpty)
-                                  Text(
-                                    member.roles.join(', ').toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.purple.shade600,
-                                    ),
-                                  ),
-                              ],
+                                    )
+                                  : null,
                             ),
-                            if (!isCurrentUser) ...[
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.chat_bubble_outline,
-                                size: 16,
-                                color: Colors.purple.shade700,
-                              ),
-                            ],
-                            if (canEditRelationship && !isCurrentUser) ...[
-                              const SizedBox(width: 4),
-                              Tooltip(
-                                message: 'Tap to edit relationship',
-                                child: InkWell(
-                                  onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => RelationshipDialog(
-                                        user: member,
-                                        currentUser: currentUserModel,
-                                        familyCreator: familyCreator,
-                                        onUpdated: () {
-                                          _loadDashboardData(showCachedFirst: false);
-                                        },
-                                      ),
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(4),
-                                    child: Icon(
-                                      Icons.edit,
-                                      size: 16,
-                                      color: Colors.purple.shade700,
-                                    ),
+                            if (hasUnread && !isCurrentUser)
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.notifications,
+                                    color: Colors.white,
+                                    size: 12,
                                   ),
                                 ),
                               ),
-                            ],
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Text(
+                          firstName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                            color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87,
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 }).toList(),
               ),
           ],
         ),
+    );
+  }
+
+  /// Extract first name from display name
+  String _getFirstName(String displayName, String email) {
+    if (displayName.isNotEmpty) {
+      return displayName.split(' ').first;
+    }
+    return email.split('@')[0];
+  }
+
+  /// Show menu for profile photo (current user only)
+  Future<void> _showProfilePhotoMenu(BuildContext context, UserModel member, UserModel? currentUser) async {
+    if (currentUser == null || member.uid != currentUser.uid) return;
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(context, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('Enter Bitmoji URL'),
+              onTap: () => Navigator.pop(context, 'bitmoji'),
+            ),
+            if (member.photoUrl != null && member.photoUrl!.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
+                onTap: () => Navigator.pop(context, 'delete'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.cancel),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    try {
+      if (result == 'delete') {
+        await _profilePhotoService.deleteProfilePhoto();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Photo removed'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _loadDashboardData(showCachedFirst: false);
+        }
+      } else if (result == 'bitmoji') {
+        // Show dialog with options: scan QR or enter URL
+        final bitmojiChoice = await showModalBottomSheet<String>(
+          context: context,
+          builder: (context) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.qr_code_scanner),
+                  title: const Text('Scan QR Code'),
+                  onTap: () => Navigator.pop(context, 'scan'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.link),
+                  title: const Text('Enter URL'),
+                  onTap: () => Navigator.pop(context, 'enter'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cancel),
+                  title: const Text('Cancel'),
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        );
+
+        if (bitmojiChoice == null || !mounted) return;
+
+        String? url;
+
+        if (bitmojiChoice == 'scan') {
+          // Scan QR code
+          final scannedUrl = await _scanQRCode(context);
+          if (scannedUrl != null && mounted) {
+            url = scannedUrl;
+          } else {
+            return; // User cancelled or error
+          }
+        } else if (bitmojiChoice == 'enter') {
+          // Enter URL manually
+          final urlController = TextEditingController();
+          bool dialogClosed = false;
+          
+          try {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Enter Bitmoji URL'),
+                content: TextField(
+                  controller: urlController,
+                  decoration: const InputDecoration(
+                    hintText: 'https://sdk.bitmoji.com/...',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      dialogClosed = true;
+                      Navigator.pop(context, false);
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      dialogClosed = true;
+                      Navigator.pop(context, true);
+                    },
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            );
+
+            if (confirmed == true && urlController.text.trim().isNotEmpty && mounted) {
+              url = urlController.text.trim();
+            }
+          } catch (e) {
+            Logger.error('Error in bitmoji URL dialog', error: e, tag: 'DashboardScreen');
+          } finally {
+            // Only dispose if dialog was actually shown and closed
+            if (dialogClosed) {
+              urlController.dispose();
+            } else {
+              // If dialog never opened, dispose immediately
+              urlController.dispose();
+            }
+          }
+        }
+
+        // Save the URL if we have one
+        if (url != null && url.isNotEmpty && mounted) {
+          try {
+            // Validate URL
+            final uri = Uri.tryParse(url);
+            if (uri != null && (uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https'))) {
+              await _profilePhotoService.updatePhotoUrl(url);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Bitmoji URL saved'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                _loadDashboardData(showCachedFirst: false);
+              }
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Invalid URL. Please enter a valid http or https URL.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error saving URL: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        }
+      } else if (result == 'camera' || result == 'gallery') {
+        final source = result == 'camera' ? ImageSource.camera : ImageSource.gallery;
+        final pickedFile = await _imagePicker.pickImage(
+          source: source,
+          maxWidth: 800,
+          maxHeight: 800,
+          imageQuality: 85,
+        );
+
+        if (pickedFile != null && mounted) {
+          if (kIsWeb) {
+            final bytes = await pickedFile.readAsBytes();
+            await _profilePhotoService.uploadProfilePhotoWeb(bytes, pickedFile.name);
+          } else {
+            final file = File(pickedFile.path);
+            await _profilePhotoService.uploadProfilePhoto(file);
+          }
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Photo updated successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            _loadDashboardData(showCachedFirst: false);
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Scan QR code for bitmoji URL
+  Future<String?> _scanQRCode(BuildContext context) async {
+    final controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+    );
+    
+    String? scannedUrl;
+    
+    try {
+      final result = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(
+              title: const Text('Scan QR Code'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            body: MobileScanner(
+              controller: controller,
+              onDetect: (capture) {
+                final List<Barcode> barcodes = capture.barcodes;
+                if (barcodes.isNotEmpty) {
+                  final barcode = barcodes.first;
+                  if (barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
+                    scannedUrl = barcode.rawValue;
+                    Navigator.pop(context, scannedUrl);
+                  }
+                }
+              },
+            ),
+          ),
+        ),
+      );
+
+      return result ?? scannedUrl;
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  /// Show menu for relationship editing (admin only)
+  Future<void> _showRelationshipMenu(
+    BuildContext context,
+    UserModel member,
+    UserModel? currentUser,
+    UserModel? familyCreator,
+  ) async {
+    if (currentUser == null || familyCreator == null) return;
+    if (currentUser.uid != familyCreator.uid && !currentUser.isAdmin()) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => RelationshipDialog(
+        user: member,
+        currentUser: currentUser,
+        familyCreator: familyCreator,
+        onUpdated: () {
+          _loadDashboardData(showCachedFirst: false);
+        },
+      ),
     );
   }
 

@@ -60,10 +60,11 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
             .listen((games) {
           if (mounted) {
             setState(() {
-              // Filter: games where current user is invited OR games where they're not the creator
+              // Filter: games where current user is invited, OR games where they're the challenger waiting, OR open invitations
               _waitingGames = games
                   .where((g) => 
                       (g.invitedPlayerId == user.uid) || // User was invited
+                      (g.whitePlayerId == user.uid && g.status == GameStatus.waiting) || // User is challenger waiting for acceptance
                       (g.whitePlayerId != user.uid && g.invitedPlayerId == null) // Open invitation
                   )
                   .toList();
@@ -142,6 +143,49 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
       }
     } catch (e) {
       Logger.error('Error joining family game', error: e, tag: 'ChessFamilyGameScreen');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelChallenge(ChessGame game) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Challenge'),
+        content: const Text('Are you sure you want to cancel this challenge?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      // Delete the game and invite
+      await _chessService.deleteGame(game.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Challenge cancelled'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      Logger.error('Error cancelling challenge', error: e, tag: 'ChessFamilyGameScreen');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${e.toString()}')),
@@ -236,15 +280,25 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
   Widget _buildWaitingGameCard(ChessGame game) {
     final user = _authService.currentUser;
     final isInvited = game.invitedPlayerId == user?.uid;
+    final isChallenger = game.whitePlayerId == user?.uid;
     final challengerName = game.whitePlayerName ?? 'Unknown';
+    final invitedName = game.blackPlayerName ?? 'Someone';
     
     return Container(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
       decoration: BoxDecoration(
-        color: isInvited ? Colors.orange.shade100 : Colors.blue.shade50,
+        color: isInvited 
+            ? Colors.orange.shade100 
+            : isChallenger 
+                ? Colors.green.shade50 
+                : Colors.blue.shade50,
         border: Border.all(
-          color: isInvited ? Colors.orange.shade400 : Colors.blue.shade300,
-          width: isInvited ? 2 : 1,
+          color: isInvited 
+              ? Colors.orange.shade400 
+              : isChallenger 
+                  ? Colors.green.shade400 
+                  : Colors.blue.shade300,
+          width: (isInvited || isChallenger) ? 2 : 1,
         ),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -252,43 +306,76 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isInvited ? Colors.orange.shade200 : Colors.blue.shade200,
+            color: isInvited 
+                ? Colors.orange.shade200 
+                : isChallenger 
+                    ? Colors.green.shade200 
+                    : Colors.blue.shade200,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
-            isInvited ? Icons.notifications_active : Icons.person_add,
-            color: isInvited ? Colors.orange.shade900 : Colors.blue.shade900,
+            isInvited 
+                ? Icons.notifications_active 
+                : isChallenger 
+                    ? Icons.hourglass_empty 
+                    : Icons.person_add,
+            color: isInvited 
+                ? Colors.orange.shade900 
+                : isChallenger 
+                    ? Colors.green.shade900 
+                    : Colors.blue.shade900,
             size: 24,
           ),
         ),
         title: Text(
           isInvited 
               ? '$challengerName challenged you!'
-              : 'Game by $challengerName',
+              : isChallenger
+                  ? 'Waiting for $invitedName to accept...'
+                  : 'Game by $challengerName',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
-            color: isInvited ? Colors.orange.shade900 : Colors.blue.shade900,
+            color: isInvited 
+                ? Colors.orange.shade900 
+                : isChallenger 
+                    ? Colors.green.shade900 
+                    : Colors.blue.shade900,
           ),
         ),
         subtitle: Text(
-          isInvited ? 'Tap to accept challenge' : 'Tap to join as opponent',
+          isInvited 
+              ? 'Tap to accept challenge' 
+              : isChallenger
+                  ? 'Challenge sent - waiting for response'
+                  : 'Tap to join as opponent',
           style: TextStyle(
-            color: isInvited ? Colors.orange.shade700 : Colors.blue.shade700,
+            color: isInvited 
+                ? Colors.orange.shade700 
+                : isChallenger 
+                    ? Colors.green.shade700 
+                    : Colors.blue.shade700,
             fontSize: 12,
           ),
         ),
-        trailing: ElevatedButton.icon(
-          onPressed: () => _joinGame(game),
-          icon: const Icon(Icons.play_arrow, size: 18),
-          label: Text(isInvited ? 'Accept' : 'Join'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isInvited ? Colors.orange.shade700 : Colors.blue.shade700,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          ),
-        ),
-        onTap: () => _joinGame(game),
+        trailing: isChallenger
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Cancel challenge',
+                onPressed: () => _cancelChallenge(game),
+                color: Colors.grey.shade700,
+              )
+            : ElevatedButton.icon(
+                onPressed: () => _joinGame(game),
+                icon: const Icon(Icons.play_arrow, size: 18),
+                label: Text(isInvited ? 'Accept' : 'Join'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isInvited ? Colors.orange.shade700 : Colors.blue.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+              ),
+        onTap: isChallenger ? null : () => _joinGame(game),
       ),
     );
   }
