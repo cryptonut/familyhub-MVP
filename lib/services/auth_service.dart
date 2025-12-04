@@ -38,6 +38,15 @@ class AuthService {
 
   // Track if we're currently in the registration process to prevent auto-creation conflicts
   static final Set<String> _registeringUserIds = <String>{};
+  
+  // CRITICAL FIX: Prevent race conditions from multiple simultaneous Firestore queries
+  // Multiple widgets calling getCurrentUserModel() simultaneously causes gRPC channel reset loops
+  // The gRPC channel resets (initChannel -> shutdownNow) when multiple queries start before channel is ready
+  static final Map<String, Future<UserModel?>> _pendingUserModelQueries = <String, Future<UserModel?>>{};
+  static UserModel? _cachedUserModel;
+  static String? _cachedUserId;
+  static bool _isInitializingChannel = false;
+  static DateTime? _lastChannelInitTime;
 
   // Get current user model
   // Returns null if user doesn't exist or document is missing
@@ -46,9 +55,45 @@ class AuthService {
     final user = _auth.currentUser;
     if (user == null) {
       Logger.debug('No Firebase Auth user - returning null', tag: 'AuthService');
+      _cachedUserModel = null;
+      _cachedUserId = null;
       return null;
     }
     
+    // CRITICAL FIX: Return cached result if available and user hasn't changed
+    if (_cachedUserModel != null && _cachedUserId == user.uid) {
+      Logger.debug('Returning cached user model for ${user.uid}', tag: 'AuthService');
+      return _cachedUserModel;
+    }
+    
+    // CRITICAL FIX: If a query is already in progress for this user, wait for it instead of starting a new one
+    // This prevents multiple simultaneous queries that cause gRPC channel reset loops
+    if (_pendingUserModelQueries.containsKey(user.uid)) {
+      Logger.debug('Query already in progress for ${user.uid}, waiting for existing query...', tag: 'AuthService');
+      return await _pendingUserModelQueries[user.uid]!;
+    }
+    
+    // Start new query and track it
+    final queryFuture = _getCurrentUserModelInternal(user);
+    _pendingUserModelQueries[user.uid] = queryFuture;
+    
+    // Clean up after query completes
+    queryFuture.then((result) {
+      _pendingUserModelQueries.remove(user.uid);
+      if (result != null) {
+        _cachedUserModel = result;
+        _cachedUserId = user.uid;
+      }
+    }).catchError((e) {
+      _pendingUserModelQueries.remove(user.uid);
+    });
+    
+    return await queryFuture;
+  }
+  
+  // Internal method that actually performs the Firestore query
+  // Separated to allow proper synchronization and caching
+  Future<UserModel?> _getCurrentUserModelInternal(User user) async {
     Logger.debug('Firebase Auth user exists: ${user.uid} (${user.email})', tag: 'AuthService');
     Logger.debug('Attempting to load user document from Firestore...', tag: 'AuthService');
 
@@ -84,12 +129,36 @@ class AuthService {
         // CRITICAL FIX: Wait for gRPC channel to initialize before querying
         // The channel reset loop (initChannel -> shutdownNow) happens when queries
         // are made before the gRPC channel is ready. Wait on first attempt.
+        // Use a global flag to ensure only ONE query initializes the channel at a time
         DocumentSnapshot userDoc;
         
         // Wait for gRPC channel to initialize on first attempt (Android only)
         if (attempt == 0 && !kIsWeb) {
-          Logger.debug('Waiting for gRPC channel to initialize...', tag: 'AuthService');
-          await Future.delayed(AppConstants.gRPCChannelInitDelay);
+          // CRITICAL: Ensure only one query initializes the channel at a time
+          // If channel is already being initialized, wait for it to complete
+          if (_isInitializingChannel) {
+            Logger.debug('gRPC channel initialization in progress, waiting...', tag: 'AuthService');
+            // Wait up to 5 seconds for channel initialization
+            int waitCount = 0;
+            while (_isInitializingChannel && waitCount < 50) {
+              await Future.delayed(const Duration(milliseconds: 100));
+              waitCount++;
+            }
+          } else {
+            // Check if channel was recently initialized (within last 2 seconds)
+            // If so, don't wait again to avoid unnecessary delays
+            final now = DateTime.now();
+            if (_lastChannelInitTime == null || 
+                now.difference(_lastChannelInitTime!).inSeconds > 2) {
+              Logger.debug('Waiting for gRPC channel to initialize...', tag: 'AuthService');
+              _isInitializingChannel = true;
+              _lastChannelInitTime = now;
+              await Future.delayed(AppConstants.gRPCChannelInitDelay);
+              _isInitializingChannel = false;
+            } else {
+              Logger.debug('gRPC channel recently initialized, skipping wait', tag: 'AuthService');
+            }
+          }
         }
         
         // Use server source to ensure fresh data and prevent cache-related channel issues
@@ -151,22 +220,18 @@ class AuthService {
         if (errorStr.contains('unavailable') || errorCode == 'unavailable') {
           Logger.warning('Firestore unavailable error detected', tag: 'AuthService');
           Logger.error('=== ROOT CAUSE DIAGNOSIS ===', tag: 'AuthService');
-          Logger.error('This error indicates API key configuration issues in Google Cloud Console', tag: 'AuthService');
+          Logger.error('This error is typically caused by:', tag: 'AuthService');
+          Logger.error('1. gRPC channel reset loop from multiple simultaneous queries (MOST COMMON)', tag: 'AuthService');
+          Logger.error('   - Multiple widgets calling getCurrentUserModel() simultaneously', tag: 'AuthService');
+          Logger.error('   - Fixed by: Query deduplication and caching (already implemented)', tag: 'AuthService');
           Logger.error('', tag: 'AuthService');
-          Logger.error('REQUIRED FIXES (in Google Cloud Console):', tag: 'AuthService');
-          Logger.error('1. Enable Cloud Firestore API:', tag: 'AuthService');
-          Logger.error('   APIs & Services > Library > Search "Cloud Firestore API" > ENABLE', tag: 'AuthService');
+          Logger.error('2. API key configuration issues in Google Cloud Console', tag: 'AuthService');
+          Logger.error('   - Verify Cloud Firestore API is enabled', tag: 'AuthService');
+          Logger.error('   - Check API key restrictions allow Firestore API', tag: 'AuthService');
           Logger.error('', tag: 'AuthService');
-          Logger.error('2. Fix API Key Restrictions:', tag: 'AuthService');
-          Logger.error('   APIs & Services > Credentials > Find API key from google-services.json', tag: 'AuthService');
-          Logger.error('   API Restrictions: Add "Cloud Firestore API" to allowed APIs', tag: 'AuthService');
-          Logger.error('   Application Restrictions: Set to "None" (dev) or add package + SHA-1', tag: 'AuthService');
-          Logger.error('', tag: 'AuthService');
-          Logger.error('3. Verify OAuth Client:', tag: 'AuthService');
-          Logger.error('   Package: com.example.familyhub_mvp.dev', tag: 'AuthService');
-          Logger.error('   SHA-1: BB:7A:6A:5F:57:F1:DD:0D:ED:14:2A:5C:6F:26:14:FD:54:C3:C7:1C', tag: 'AuthService');
-          Logger.error('', tag: 'AuthService');
-          Logger.error('See ROOT_CAUSE_FIX_API_KEY_RESTRICTIONS.md for detailed instructions', tag: 'AuthService');
+          Logger.error('3. Network connectivity issues', tag: 'AuthService');
+          Logger.error('   - Check device internet connection', tag: 'AuthService');
+          Logger.error('   - Verify Firestore backend is reachable', tag: 'AuthService');
           Logger.error('=== END DIAGNOSIS ===', tag: 'AuthService');
           
           if (attempt < maxRetries - 1) {
@@ -821,6 +886,11 @@ class AuthService {
 
   // Sign out - ensure complete cleanup
   Future<void> signOut() async {
+    // Clear cached user model on sign out
+    _cachedUserModel = null;
+    _cachedUserId = null;
+    _pendingUserModelQueries.clear();
+    
     try {
       Logger.info('Signing out user', tag: 'AuthService');
       await _auth.signOut();
