@@ -1,0 +1,243 @@
+﻿Resolving dependencies...
+Downloading packages...
+  _fe_analyzer_shared 67.0.0 (92.0.0 available)
+  _flutterfire_internals 1.3.59 (1.3.64 available)
+  analyzer 6.4.1 (9.0.0 available)
+  audio_session 0.1.25 (0.2.2 available)
+  build 2.4.1 (4.0.3 available)
+  build_config 1.1.2 (1.2.0 available)
+  build_resolvers 2.4.2 (3.0.4 available)
+  build_runner 2.4.13 (2.10.4 available)
+  build_runner_core 7.3.2 (9.3.2 available)
+  built_value 8.12.0 (8.12.1 available)
+  characters 1.4.0 (1.4.1 available)
+  chess 0.7.0 (0.8.1 available)
+  cloud_firestore 5.6.12 (6.1.0 available)
+  cloud_firestore_platform_interface 6.6.12 (7.0.4 available)
+  cloud_firestore_web 4.4.12 (5.1.0 available)
+  confetti 0.7.0 (0.8.0 available)
+  dart_style 2.3.6 (3.1.3 available)
+  file_selector_linux 0.9.3+3 (0.9.4 available)
+  file_selector_macos 0.9.4+6 (0.9.5 available)
+  firebase_app_check 0.3.2+10 (0.4.1+2 available)
+  firebase_app_check_platform_interface 0.1.1+10 (0.2.1+2 available)
+  firebase_app_check_web 0.2.0+14 (0.2.2 available)
+  firebase_auth 5.7.0 (6.1.2 available)
+  firebase_auth_platform_interface 7.7.3 (8.1.4 available)
+  firebase_auth_web 5.15.3 (6.1.0 available)
+  firebase_core 3.15.2 (4.2.1 available)
+  firebase_core_web 2.24.1 (3.3.0 available)
+  firebase_messaging 15.2.10 (16.0.4 available)
+  firebase_messaging_platform_interface 4.6.10 (4.7.4 available)
+  firebase_messaging_web 3.10.10 (4.1.0 available)
+  firebase_storage 12.4.10 (13.0.4 available)
+  firebase_storage_platform_interface 5.2.10 (5.2.15 available)
+  firebase_storage_web 3.10.17 (3.11.0 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_plugin_android_lifecycle 2.0.32 (2.0.33 available)
+  geolocator 11.1.0 (14.0.2 available)
+  geolocator_android 4.6.2 (5.0.2 available)
+  geolocator_web 3.0.0 (4.1.3 available)
+  google_fonts 6.3.2 (6.3.3 available)
+  google_maps_flutter_android 2.18.4 (2.18.6 available)
+  google_maps_flutter_ios 2.15.6 (2.15.7 available)
+  google_maps_flutter_platform_interface 2.14.0 (2.14.1 available)
+  google_sign_in 6.3.0 (7.2.0 available)
+  google_sign_in_android 6.2.1 (7.2.7 available)
+  google_sign_in_ios 5.9.0 (6.2.4 available)
+  google_sign_in_platform_interface 2.5.0 (3.1.0 available)
+  google_sign_in_web 0.12.4+4 (1.1.0 available)
+  image_picker_android 0.8.13+9 (0.8.13+10 available)
+  image_picker_ios 0.8.13+2 (0.8.13+3 available)
+  intl 0.18.1 (0.20.2 available)
+  js 0.6.7 (0.7.2 available)
+  just_audio 0.9.46 (0.10.5 available)
+  lints 3.0.0 (6.0.0 available)
+  matcher 0.12.17 (0.12.18 available)
+  material_color_utilities 0.11.1 (0.13.0 available)
+  meta 1.16.0 (1.17.0 available)
+  path_provider_android 2.2.20 (2.2.22 available)
+  path_provider_foundation 2.4.3 (2.5.1 available)
+  permission_handler 11.4.0 (12.0.1 available)
+  permission_handler_android 12.1.0 (13.0.1 available)
+  record 5.2.1 (6.1.2 available)
+  record_android 1.4.4 (1.4.5 available)
+! record_linux 1.2.1 (overridden)
+  record_web 1.2.1 (1.2.2 available)
+  shared_preferences_android 2.4.15 (2.4.18 available)
+  shared_preferences_foundation 2.5.5 (2.5.6 available)
+  shelf_web_socket 2.0.1 (3.0.0 available)
+  socket_io_client 2.0.3+1 (3.1.3 available)
+  socket_io_common 2.0.3 (3.1.1 available)
+  source_gen 1.5.0 (4.1.1 available)
+  source_helper 1.3.5 (1.3.9 available)
+  table_calendar 3.0.9 (3.2.0 available)
+  test_api 0.7.6 (0.7.8 available)
+  timezone 0.9.4 (0.10.1 available)
+  url_launcher_android 6.3.24 (6.3.28 available)
+  url_launcher_ios 6.3.5 (6.3.6 available)
+  url_launcher_linux 3.2.1 (3.2.2 available)
+  url_launcher_macos 3.2.4 (3.2.5 available)
+  url_launcher_windows 3.1.4 (3.1.5 available)
+Got dependencies!
+78 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Launching lib\main.dart on SM S906E in debug mode...
+Running Gradle task 'assembleDevDebug'...                       
+flutter : lib/main.dart:11:8: Error: Error when reading 
+'../../AppData/Local/Pub/Cache/hosted/pub.dev/recaptcha_enterprise_flutter-18.8.2/lib/recaptcha_enterprise_flutter.dart': The system cannot find the file 
+specified.
+At line:1 char:1
++ flutter run --flavor dev --debug 2>&1 | Tee-Object -FilePath "test_fi ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (lib/main.dart:1...file specified.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+import 'package:recaptcha_enterprise_flutter/recaptcha_enterprise_flutter.dart';
+       ^
+Error: Couldn't resolve the package 'vibration' in 'package:vibration/vibration.dart'.
+Error: Couldn't resolve the package 'get_it' in 'package:get_it/get_it.dart'.
+Error: Couldn't resolve the package 'connectivity_plus' in 'package:connectivity_plus/connectivity_plus.dart'.
+lib/services/notification_service.dart:5:8: Error: Not found: 'package:vibration/vibration.dart'
+import 'package:vibration/vibration.dart';
+       ^
+Error: Couldn't resolve the package 'firebase_crashlytics' in 'package:firebase_crashlytics/firebase_crashlytics.dart'.
+lib/core/di/service_locator.dart:1:8: Error: Not found: 'package:get_it/get_it.dart'
+import 'package:get_it/get_it.dart';
+       ^
+lib/games/chess/services/chess_service.dart:8:8: Error: Not found: 'package:connectivity_plus/connectivity_plus.dart'
+import 'package:connectivity_plus/connectivity_plus.dart';
+       ^
+lib/games/chess/screens/chess_game_screen.dart:7:8: Error: Not found: 'package:firebase_crashlytics/firebase_crashlytics.dart'
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+       ^
+Error: Couldn't resolve the package 'image' in 'package:image/image.dart'.
+lib/services/image_compression_service.dart:3:8: Error: Not found: 'package:image/image.dart'
+import 'package:image/image.dart' as img;
+       ^
+lib/games/chess/services/chess_service.dart:26:9: Error: Type 'Connectivity' not found.
+  final Connectivity _connectivity = Connectivity();
+        ^^^^^^^^^^^^
+lib/core/di/service_locator.dart:5:15: Error: Undefined name 'GetIt'.
+final getIt = GetIt.instance;
+              ^^^^^
+lib/main.dart:105:13: Error: Undefined name 'RecaptchaEnterprise'.
+      await RecaptchaEnterprise.initClient(recaptchaSiteKey);
+            ^^^^^^^^^^^^^^^^^^^
+lib/main.dart:177:35: Error: The getter 'firebaseAuthSettings' isn't defined for the type 'FirebaseAuth'.
+ - 'FirebaseAuth' is from 'package:firebase_auth/firebase_auth.dart' 
+('../../AppData/Local/Pub/Cache/hosted/pub.dev/firebase_auth-5.7.0/lib/firebase_auth.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'firebaseAuthSettings'.
+            final settings = auth.firebaseAuthSettings;
+                                  ^^^^^^^^^^^^^^^^^^^^
+lib/services/auth_service.dart:1938:80: Error: No named parameter with the name 'error'.
+        Logger.debug('FirebaseMessaging not available, skipping subscription', error: e, tag: 'AuthService');
+                                                                               ^^^^^
+lib/core/services/logger_service.dart:24:15: Context: Found this candidate, but the arguments don't match.
+  static void debug(String message, {String? tag}) {
+              ^^^^^
+lib/services/auth_service.dart:1974:82: Error: No named parameter with the name 'error'.
+        Logger.debug('FirebaseMessaging not available, skipping unsubscription', error: e, tag: 'AuthService');
+                                                                                 ^^^^^
+lib/core/services/logger_service.dart:24:15: Context: Found this candidate, but the arguments don't match.
+  static void debug(String message, {String? tag}) {
+              ^^^^^
+lib/services/notification_service.dart:445:19: Error: The getter 'Vibration' isn't defined for the type 'NotificationService'.
+ - 'NotificationService' is from 'package:familyhub_mvp/services/notification_service.dart' ('lib/services/notification_service.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'Vibration'.
+        if (await Vibration.hasVibrator() ?? false) {
+                  ^^^^^^^^^
+lib/services/notification_service.dart:446:17: Error: The getter 'Vibration' isn't defined for the type 'NotificationService'.
+ - 'NotificationService' is from 'package:familyhub_mvp/services/notification_service.dart' ('lib/services/notification_service.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'Vibration'.
+          await Vibration.vibrate(duration: 100);
+                ^^^^^^^^^
+lib/games/chess/services/chess_service.dart:26:9: Error: 'Connectivity' isn't a type.
+  final Connectivity _connectivity = Connectivity();
+        ^^^^^^^^^^^^
+lib/games/chess/services/chess_service.dart:26:38: Error: Method not found: 'Connectivity'.
+  final Connectivity _connectivity = Connectivity();
+                                     ^^^^^^^^^^^^
+lib/games/chess/services/chess_service.dart:56:21: Error: The getter 'ConnectivityResult' isn't defined for the type 'ChessService'.
+ - 'ChessService' is from 'package:familyhub_mvp/games/chess/services/chess_service.dart' ('lib/games/chess/services/chess_service.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'ConnectivityResult'.
+      if (result != ConnectivityResult.none) {
+                    ^^^^^^^^^^^^^^^^^^
+lib/games/chess/screens/chess_game_screen.dart:101:7: Error: The getter 'FirebaseCrashlytics' isn't defined for the type '_ChessGameScreenState'.
+ - '_ChessGameScreenState' is from 'package:familyhub_mvp/games/chess/screens/chess_game_screen.dart' ('lib/games/chess/screens/chess_game_screen.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'FirebaseCrashlytics'.
+      FirebaseCrashlytics.instance.recordError(e, st, reason: 'Agora mute failed');
+      ^^^^^^^^^^^^^^^^^^^
+lib/games/chess/screens/chess_game_screen.dart:156:9: Error: The getter 'FirebaseCrashlytics' isn't defined for the type '_ChessGameScreenState'.
+ - '_ChessGameScreenState' is from 'package:familyhub_mvp/games/chess/screens/chess_game_screen.dart' ('lib/games/chess/screens/chess_game_screen.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'FirebaseCrashlytics'.
+        FirebaseCrashlytics.instance.recordError(error, StackTrace.current, reason: 'WebSocket error');
+        ^^^^^^^^^^^^^^^^^^^
+lib/games/chess/screens/chess_game_screen.dart:170:7: Error: The getter 'FirebaseCrashlytics' isn't defined for the type '_ChessGameScreenState'.
+ - '_ChessGameScreenState' is from 'package:familyhub_mvp/games/chess/screens/chess_game_screen.dart' ('lib/games/chess/screens/chess_game_screen.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'FirebaseCrashlytics'.
+      FirebaseCrashlytics.instance.recordError(e, st, reason: 'WebSocket connection failed');
+      ^^^^^^^^^^^^^^^^^^^
+lib/services/image_compression_service.dart:41:25: Error: Method not found: 'decodeImage'.
+      final image = img.decodeImage(bytes);
+                        ^^^^^^^^^^^
+lib/services/image_compression_service.dart:47:11: Error: 'Image' isn't a type.
+      img.Image resized = image;
+          ^^^^^
+lib/services/image_compression_service.dart:49:23: Error: Method not found: 'copyResize'.
+        resized = img.copyResize(
+                      ^^^^^^^^^^
+lib/services/image_compression_service.dart:58:30: Error: Method not found: 'encodeJpg'.
+      final compressed = img.encodeJpg(resized, quality: quality);
+                             ^^^^^^^^^
+lib/services/image_compression_service.dart:72:25: Error: Method not found: 'decodeImage'.
+      final image = img.decodeImage(bytes);
+                        ^^^^^^^^^^^
+lib/services/image_compression_service.dart:77:29: Error: Method not found: 'copyResize'.
+      final thumbnail = img.copyResize(
+                            ^^^^^^^^^^
+lib/services/image_compression_service.dart:84:34: Error: Method not found: 'encodeJpg'.
+      final thumbnailBytes = img.encodeJpg(thumbnail, quality: 70);
+                                 ^^^^^^^^^
+lib/services/image_compression_service.dart:98:25: Error: Method not found: 'decodeImage'.
+      final image = img.decodeImage(bytes);
+                        ^^^^^^^^^^^
+lib/services/image_compression_service.dart:103:26: Error: Method not found: 'copyResize'.
+      final medium = img.copyResize(
+                         ^^^^^^^^^^
+lib/services/image_compression_service.dart:110:31: Error: Method not found: 'encodeJpg'.
+      final mediumBytes = img.encodeJpg(medium, quality: 85);
+                              ^^^^^^^^^
+Unhandled exception:
+FileSystemException(uri=org-dartlang-untranslatable-uri:package%3Avibration%2Fvibration.dart; message=StandardFileSystem only supports file:* and data:* 
+URIs)
+#0      StandardFileSystem.entityForUri (package:front_end/src/api_prototype/standard_file_system.dart:45)
+#1      asFileUri (package:vm/kernel_front_end.dart:1002)
+#2      writeDepfile (package:vm/kernel_front_end.dart:1165)
+<asynchronous suspension>
+#3      FrontendCompiler.compile (package:frontend_server/frontend_server.dart:729)
+<asynchronous suspension>
+#4      starter (package:frontend_server/starter.dart:102)
+<asynchronous suspension>
+#5      main (file:///C:/b/s/w/ir/x/w/sdk/pkg/frontend_server/bin/frontend_server_starter.dart:13)
+<asynchronous suspension>
+
+Target kernel_snapshot_program failed: Exception
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileFlutterBuildDevDebug'.
+> Process 'command 'C:\src\flutter\bin\flutter.bat'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2m 13s
+Running Gradle task 'assembleDevDebug'...                         136.1s
+Error: Gradle task assembleDevDebug failed with exit code 1
