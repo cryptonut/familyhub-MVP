@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:recaptcha_enterprise_flutter/recaptcha_enterprise_flutter.dart';
 import 'firebase_options.dart';
 import 'core/services/logger_service.dart';
 import 'core/constants/app_constants.dart';
@@ -90,6 +92,24 @@ void main() async {
   } catch (e, st) {
     Logger.warning('Timezone initialization error', error: e, stackTrace: st, tag: 'main');
     // Continue - timezone errors shouldn't block app startup
+  }
+  
+  // Initialize reCAPTCHA Enterprise client for manual token generation if needed
+  // NOTE: Firebase Auth on Android uses native reCAPTCHA SDK automatically
+  // This initialization is for cases where we need to manually generate tokens
+  if (!kIsWeb) {
+    try {
+      Logger.info('Initializing reCAPTCHA Enterprise client...', tag: 'main');
+      const recaptchaSiteKey = '6LeprxosAAAAACXWuPlrlx0zOyM3GpJOVhBHvJ5e';
+      
+      await RecaptchaEnterprise.initClient(recaptchaSiteKey);
+      Logger.info('✓ reCAPTCHA Enterprise client initialized', tag: 'main');
+      Logger.info('  - Site key: ${recaptchaSiteKey.substring(0, 10)}...', tag: 'main');
+      Logger.info('  - Firebase Auth will use native reCAPTCHA SDK automatically', tag: 'main');
+    } catch (e, st) {
+      Logger.warning('⚠ reCAPTCHA Enterprise client init failed (non-blocking)', error: e, stackTrace: st, tag: 'main');
+      Logger.warning('  - Firebase Auth uses native SDK, not Flutter package', tag: 'main');
+    }
   }
   
   // Initialize Firebase with comprehensive error handling
@@ -223,36 +243,25 @@ void main() async {
       }
     }
     
-    // App Check is disabled to prevent potential Android auth timeouts
-    // App Check enforcement can block requests if not properly configured
-    // This is a platform-agnostic decision, not a Chrome workaround
-    // TODO: Re-enable App Check once properly registered in Firebase Console
-    Logger.warning('⚠ App Check disabled to prevent authentication timeouts', tag: 'main');
-    /*
-    try {
-      if (kIsWeb) {
-        debugPrint('⚠ App Check skipped for web');
-      } else {
-        debugPrint('Initializing Firebase App Check (debug mode)...');
-        // Android/iOS App Check with debug provider for development
-        // Using timeout to prevent blocking
+    // Initialize App Check with reCAPTCHA Enterprise provider
+    // This provides tokens that Firebase Auth can use for verification
+    if (!kIsWeb) {
+      try {
+        Logger.info('Initializing App Check with reCAPTCHA Enterprise...', tag: 'main');
+        const recaptchaSiteKey = '6LeprxosAAAAACXWuPlrlx0zOyM3GpJOVhBHvJ5e';
+        
         await FirebaseAppCheck.instance.activate(
-          androidProvider: AndroidProvider.debug,
-          appleProvider: AppleProvider.debug,
-        ).timeout(
-          const Duration(seconds: 3),
-          onTimeout: () {
-            debugPrint('⚠ App Check init timeout - skipping');
-            return; // Return early on timeout
-          },
+          androidProvider: AndroidProvider.playIntegrity, // Use Play Integrity for production
+          appleProvider: AppleProvider.appAttest,
         );
-        debugPrint('✓ Firebase App Check initialized');
+        Logger.info('✓ App Check initialized', tag: 'main');
+        Logger.info('  - Provider: Play Integrity (Android)', tag: 'main');
+        Logger.info('  - Firebase Auth will use native reCAPTCHA SDK automatically', tag: 'main');
+      } catch (e, st) {
+        Logger.warning('⚠ App Check initialization failed (non-blocking)', error: e, stackTrace: st, tag: 'main');
+        Logger.warning('  - Authentication may still work without App Check', tag: 'main');
       }
-    } catch (e) {
-      debugPrint('⚠ App Check error (non-critical): $e');
-      // Continue - App Check warnings won't block auth
     }
-    */
   } else {
     // FAIL FAST: Don't proceed if Firebase initialization failed
     // This prevents "FirebaseException: [core/no-app]" errors during login
