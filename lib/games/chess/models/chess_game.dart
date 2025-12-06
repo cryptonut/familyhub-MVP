@@ -200,10 +200,16 @@ class ChessGame {
     );
   }
 
+  /// Copy with support for clearing nullable fields.
+  /// To explicitly clear a nullable field (set to null), pass the special _ClearField sentinel.
+  /// For normal updates, just pass the new value.
+  /// 
+  /// Example: copyWith(invitedPlayerId: null, clearInvitedPlayerId: true) clears the field
   ChessGame copyWith({
     String? id,
     String? whitePlayerId,
     String? blackPlayerId,
+    bool clearBlackPlayerId = false,
     String? whitePlayerName,
     String? blackPlayerName,
     GameMode? mode,
@@ -231,11 +237,12 @@ class ChessGame {
     List<String>? spectators,
     Map<String, dynamic>? metadata,
     String? invitedPlayerId,
+    bool clearInvitedPlayerId = false,
   }) {
     return ChessGame(
       id: id ?? this.id,
       whitePlayerId: whitePlayerId ?? this.whitePlayerId,
-      blackPlayerId: blackPlayerId ?? this.blackPlayerId,
+      blackPlayerId: clearBlackPlayerId ? null : (blackPlayerId ?? this.blackPlayerId),
       whitePlayerName: whitePlayerName ?? this.whitePlayerName,
       blackPlayerName: blackPlayerName ?? this.blackPlayerName,
       mode: mode ?? this.mode,
@@ -262,7 +269,7 @@ class ChessGame {
       resultReason: resultReason ?? this.resultReason,
       spectators: spectators ?? this.spectators,
       metadata: metadata ?? this.metadata,
-      invitedPlayerId: invitedPlayerId ?? this.invitedPlayerId,
+      invitedPlayerId: clearInvitedPlayerId ? null : (invitedPlayerId ?? this.invitedPlayerId),
     );
   }
 

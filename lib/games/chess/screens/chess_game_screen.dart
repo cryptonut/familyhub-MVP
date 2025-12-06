@@ -575,26 +575,68 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
               ),
               if (!isCreator) ...[
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      final userModel = await _authService.getCurrentUserModel();
-                      await _chessService.joinFamilyGame(
-                        gameId: _game!.id,
-                        blackPlayerId: user.uid,
-                        blackPlayerName: userModel?.displayName ?? 'Player',
-                      );
-                      // Game will update via stream, no need to reload
-                    } catch (e) {
-                      Logger.error('Error joining game', error: e, tag: 'ChessGameScreen');
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error joining: ${e.toString()}')),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('Join Game'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Decline button
+                    if (_game!.invitedPlayerId == user.uid)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            try {
+                              await _chessService.declineInvite(_game!.id);
+                              if (mounted) {
+                                Navigator.pop(context);
+                              }
+                            } catch (e) {
+                              Logger.error('Error declining invite', error: e, tag: 'ChessGameScreen');
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: ${e.toString()}')),
+                                );
+                              }
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
+                          child: const Text('Decline'),
+                        ),
+                      ),
+                    // Accept/Join button
+                    ElevatedButton(
+                      onPressed: () async {
+                        try {
+                          final userModel = await _authService.getCurrentUserModel();
+                          
+                          // If specifically invited, accept the invite first
+                          if (_game!.invitedPlayerId == user.uid) {
+                            try {
+                              await _chessService.acceptInvite(_game!.id);
+                            } catch (e) {
+                              Logger.warning('Could not accept invite', error: e, tag: 'ChessGameScreen');
+                            }
+                          }
+                          
+                          await _chessService.joinFamilyGame(
+                            gameId: _game!.id,
+                            blackPlayerId: user.uid,
+                            blackPlayerName: userModel?.displayName ?? 'Player',
+                          );
+                          // Game will update via stream, no need to reload
+                        } catch (e) {
+                          Logger.error('Error joining game', error: e, tag: 'ChessGameScreen');
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error joining: ${e.toString()}')),
+                            );
+                          }
+                        }
+                      },
+                      child: Text(_game!.invitedPlayerId == user.uid ? 'Accept' : 'Join Game'),
+                    ),
+                  ],
                 ),
               ],
             ],

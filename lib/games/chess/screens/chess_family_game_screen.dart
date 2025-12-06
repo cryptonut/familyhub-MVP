@@ -125,6 +125,19 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
       if (user == null) return;
 
       final userModel = await _authService.getCurrentUserModel();
+      
+      // If this user was specifically invited, accept the invite first
+      // This updates invite status and cancels the timeout timer
+      if (game.invitedPlayerId == user.uid) {
+        try {
+          await _chessService.acceptInvite(game.id);
+        } catch (e) {
+          // If invite acceptance fails (e.g., invite expired), log but continue
+          // The joinFamilyGame call will handle validation
+          Logger.warning('Could not accept invite, trying to join directly', error: e, tag: 'ChessFamilyGameScreen');
+        }
+      }
+      
       await _chessService.joinFamilyGame(
         gameId: game.id,
         blackPlayerId: user.uid,
@@ -278,19 +291,56 @@ class _ChessFamilyGameScreenState extends State<ChessFamilyGameScreen> {
             fontSize: 12,
           ),
         ),
-        trailing: ElevatedButton.icon(
-          onPressed: () => _joinGame(game),
-          icon: const Icon(Icons.play_arrow, size: 18),
-          label: Text(isInvited ? 'Accept' : 'Join'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isInvited ? Colors.orange.shade700 : Colors.blue.shade700,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Decline button (only for invited users)
+            if (isInvited)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  onPressed: () => _declineGame(game),
+                  icon: const Icon(Icons.close, color: Colors.red),
+                  tooltip: 'Decline',
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.red.shade50,
+                  ),
+                ),
+              ),
+            // Accept/Join button
+            ElevatedButton.icon(
+              onPressed: () => _joinGame(game),
+              icon: const Icon(Icons.play_arrow, size: 18),
+              label: Text(isInvited ? 'Accept' : 'Join'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isInvited ? Colors.orange.shade700 : Colors.blue.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
+          ],
         ),
         onTap: () => _joinGame(game),
       ),
     );
+  }
+  
+  Future<void> _declineGame(ChessGame game) async {
+    try {
+      await _chessService.declineInvite(game.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Challenge declined')),
+        );
+      }
+    } catch (e) {
+      Logger.error('Error declining game', error: e, tag: 'ChessFamilyGameScreen');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   Widget _buildMemberCard(UserModel member) {

@@ -52,8 +52,13 @@ class ChessService {
   
   /// Set up connectivity listener to retry cached invites on reconnect
   void _setupConnectivityListener() {
-    _connectivity.onConnectivityChanged.listen((result) {
-      if (result != ConnectivityResult.none) {
+    _connectivity.onConnectivityChanged.listen((results) {
+      // connectivity_plus returns List<ConnectivityResult> in newer versions
+      // Check if any result indicates we have connectivity
+      final hasConnectivity = results is List 
+          ? (results as List).any((r) => r != ConnectivityResult.none)
+          : results != ConnectivityResult.none;
+      if (hasConnectivity) {
         _retryCachedInvites();
       }
     });
@@ -411,12 +416,16 @@ class ChessService {
         throw ValidationException('You cannot join your own game');
       }
 
+      // Cancel the invite timeout timer if it exists
+      _inviteTimers[gameId]?.cancel();
+      _inviteTimers.remove(gameId);
+
       final updatedGame = game.copyWith(
         blackPlayerId: blackPlayerId,
         blackPlayerName: blackPlayerName,
         status: GameStatus.active,
         startedAt: DateTime.now(),
-        invitedPlayerId: null, // Clear invitation once player joins
+        clearInvitedPlayerId: true, // Clear invitation once player joins
       );
 
       await _firestore.collection('chess_games').doc(gameId).update(updatedGame.toJson());
@@ -614,22 +623,28 @@ class ChessService {
 
       // Validate and make move
       final move = ChessMove.fromUCI(moveUCI);
+      
+      // Convert square names to 0x88 indices for comparison with generate_moves output
       final fromIndex = _squareToIndex(move.from);
       final toIndex = _squareToIndex(move.to);
 
-      // Get valid moves
+      // Get valid moves - generate_moves returns moves with from/to as 0x88 indices
       final validMoves = chess.generate_moves({'verbose': true});
       final validMove = validMoves.firstWhere(
         (m) => m.from == fromIndex && m.to == toIndex && (move.promotion == null || _getPromotionPiece(move.promotion!) == m.promotion),
         orElse: () => throw ValidationException('Invalid move'),
       );
 
-      // Make the move
-      chess.move({
-        'from': fromIndex,
-        'to': toIndex,
-        'promotion': move.promotion != null ? _getPromotionPiece(move.promotion!) : null,
+      // Make the move using string format (chess.move expects 'from' and 'to' as strings)
+      final moveResult = chess.move({
+        'from': move.from,  // Use string square name like "e2"
+        'to': move.to,      // Use string square name like "e4"
+        'promotion': move.promotion,  // Promotion piece as string like "q"
       });
+      
+      if (moveResult == null) {
+        throw ValidationException('Move was rejected by chess engine');
+      }
 
       // Update game state
       final newMove = ChessMove(

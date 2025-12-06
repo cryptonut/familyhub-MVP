@@ -371,8 +371,12 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      'Your turn' + (game.isMyTurn(_currentUserId!) ? '' : ' - Waiting'),
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      game.isMyTurn(_currentUserId!) ? 'Your turn' : 'Waiting for opponent',
+                      style: TextStyle(
+                        color: game.isMyTurn(_currentUserId!) ? Colors.green[600] : Colors.grey[600], 
+                        fontSize: 12,
+                        fontWeight: game.isMyTurn(_currentUserId!) ? FontWeight.bold : FontWeight.normal,
+                      ),
                     ),
                   ],
                 ),
