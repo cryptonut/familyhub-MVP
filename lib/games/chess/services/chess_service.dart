@@ -713,6 +713,83 @@ class ChessService {
     }
   }
 
+  /// Offer a draw
+  Future<void> offerDraw(String gameId, String userId) async {
+    try {
+      final game = await getGame(gameId);
+      if (game == null) throw FirestoreException('Game not found', code: 'not-found');
+      if (game.status != GameStatus.active) throw ValidationException('Game is not active');
+      if (!game.isPlayer(userId)) throw ValidationException('You are not a player in this game');
+
+      // Store draw offer in game metadata
+      final metadata = Map<String, dynamic>.from(game.metadata ?? {});
+      metadata['drawOfferedBy'] = userId;
+      metadata['drawOfferedAt'] = DateTime.now().toIso8601String();
+
+      await _firestore.collection('chess_games').doc(gameId).update({
+        'metadata': metadata,
+      });
+      Logger.info('Draw offered in game $gameId by $userId', tag: 'ChessService');
+    } catch (e, st) {
+      Logger.error('Error offering draw', error: e, stackTrace: st, tag: 'ChessService');
+      rethrow;
+    }
+  }
+
+  /// Accept a draw offer
+  Future<void> acceptDraw(String gameId, String userId) async {
+    try {
+      final game = await getGame(gameId);
+      if (game == null) throw FirestoreException('Game not found', code: 'not-found');
+      if (game.status != GameStatus.active) throw ValidationException('Game is not active');
+      if (!game.isPlayer(userId)) throw ValidationException('You are not a player in this game');
+
+      final drawOfferedBy = game.metadata?['drawOfferedBy'] as String?;
+      if (drawOfferedBy == null) throw ValidationException('No draw offer pending');
+      if (drawOfferedBy == userId) throw ValidationException('You cannot accept your own draw offer');
+
+      final updatedGame = game.copyWith(
+        status: GameStatus.finished,
+        finishedAt: DateTime.now(),
+        result: GameResult.draw,
+        resultReason: 'agreement',
+      );
+
+      await _firestore.collection('chess_games').doc(gameId).update(updatedGame.toJson());
+      await _updateGameStats(updatedGame);
+      Logger.info('Draw accepted in game $gameId', tag: 'ChessService');
+    } catch (e, st) {
+      Logger.error('Error accepting draw', error: e, stackTrace: st, tag: 'ChessService');
+      rethrow;
+    }
+  }
+
+  /// Decline a draw offer
+  Future<void> declineDraw(String gameId, String userId) async {
+    try {
+      final game = await getGame(gameId);
+      if (game == null) throw FirestoreException('Game not found', code: 'not-found');
+      if (!game.isPlayer(userId)) throw ValidationException('You are not a player in this game');
+
+      final drawOfferedBy = game.metadata?['drawOfferedBy'] as String?;
+      if (drawOfferedBy == null) throw ValidationException('No draw offer pending');
+      if (drawOfferedBy == userId) throw ValidationException('You cannot decline your own draw offer');
+
+      // Clear draw offer from metadata
+      final metadata = Map<String, dynamic>.from(game.metadata ?? {});
+      metadata.remove('drawOfferedBy');
+      metadata.remove('drawOfferedAt');
+
+      await _firestore.collection('chess_games').doc(gameId).update({
+        'metadata': metadata,
+      });
+      Logger.info('Draw declined in game $gameId', tag: 'ChessService');
+    } catch (e, st) {
+      Logger.error('Error declining draw', error: e, stackTrace: st, tag: 'ChessService');
+      rethrow;
+    }
+  }
+
   /// Resign from a game
   Future<void> resignGame(String gameId, String userId) async {
     try {

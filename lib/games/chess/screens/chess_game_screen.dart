@@ -404,14 +404,13 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
     _timer?.cancel();
     
     String message = 'Game Over';
+    final currentUserId = _authService.currentUser?.uid;
+    final didWin = game.winnerId == currentUserId;
+    
     if (game.result == GameResult.whiteWin) {
-      message = game.winnerId == _authService.currentUser?.uid
-          ? 'You won!'
-          : 'White won!';
+      message = didWin ? 'You won!' : 'White won!';
     } else if (game.result == GameResult.blackWin) {
-      message = game.winnerId == _authService.currentUser?.uid
-          ? 'You won!'
-          : 'Black won!';
+      message = didWin ? 'You won!' : 'Black won!';
     } else {
       message = 'Draw!';
     }
@@ -419,6 +418,14 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
     if (game.resultReason != null) {
       message += ' (${game.resultReason})';
     }
+
+    // Determine opponent for rematch
+    final opponentId = game.whitePlayerId == currentUserId 
+        ? game.blackPlayerId 
+        : game.whitePlayerId;
+    final opponentName = game.whitePlayerId == currentUserId 
+        ? game.blackPlayerName 
+        : game.whitePlayerName;
 
     showDialog(
       context: context,
@@ -434,6 +441,40 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
             },
             child: const Text('Back to Lobby'),
           ),
+          // Rematch button (only for family games with a valid opponent)
+          if (game.mode == GameMode.family && opponentId != null)
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context); // Close dialog
+                try {
+                  final userModel = await _authService.getCurrentUserModel();
+                  if (userModel?.familyId != null && currentUserId != null) {
+                    // Create new game with swapped colors (loser gets white)
+                    await _chessService.createFamilyGame(
+                      whitePlayerId: didWin ? opponentId : currentUserId,
+                      whitePlayerName: didWin ? (opponentName ?? 'Opponent') : (userModel?.displayName ?? 'Player'),
+                      familyId: userModel!.familyId!,
+                      invitedPlayerId: didWin ? currentUserId : opponentId,
+                      invitedPlayerName: didWin ? userModel.displayName : opponentName,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Rematch sent to ${opponentName ?? "opponent"}!')),
+                      );
+                      Navigator.pop(context); // Close game screen
+                    }
+                  }
+                } catch (e) {
+                  Logger.error('Error creating rematch', error: e, tag: 'ChessGameScreen');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: ${e.toString()}')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Rematch'),
+            ),
         ],
       ),
     );
@@ -463,6 +504,115 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
               }
             },
             child: const Text('Resign'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _offerDraw() {
+    final user = _authService.currentUser;
+    if (user == null || _game == null) return;
+    
+    // Check if there's already a pending draw offer from us
+    final drawOfferedBy = _game!.metadata?['drawOfferedBy'] as String?;
+    if (drawOfferedBy == user.uid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You already have a pending draw offer')),
+      );
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Offer Draw?'),
+        content: const Text('Would you like to offer a draw to your opponent?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _chessService.offerDraw(_game!.id, user.uid);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Draw offer sent!')),
+                  );
+                }
+              } catch (e) {
+                Logger.error('Error offering draw', error: e, tag: 'ChessGameScreen');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: ${e.toString()}')),
+                  );
+                }
+              }
+            },
+            child: const Text('Offer Draw'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawOfferBanner() {
+    final user = _authService.currentUser;
+    if (user == null || _game == null) return const SizedBox.shrink();
+    
+    final drawOfferedBy = _game!.metadata?['drawOfferedBy'] as String?;
+    if (drawOfferedBy == null || drawOfferedBy == user.uid) {
+      return const SizedBox.shrink();
+    }
+    
+    // Opponent has offered a draw
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+      padding: const EdgeInsets.all(AppTheme.spacingSM),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        border: Border.all(color: Colors.blue.shade300, width: 2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.handshake, color: Colors.blue.shade700),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Your opponent offers a draw',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue.shade900,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                await _chessService.declineDraw(_game!.id, user.uid);
+              } catch (e) {
+                Logger.error('Error declining draw', error: e, tag: 'ChessGameScreen');
+              }
+            },
+            child: const Text('Decline'),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await _chessService.acceptDraw(_game!.id, user.uid);
+              } catch (e) {
+                Logger.error('Error accepting draw', error: e, tag: 'ChessGameScreen');
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+            ),
+            child: const Text('Accept'),
           ),
         ],
       ),
@@ -655,6 +805,12 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       appBar: AppBar(
         title: const Text('Chess'),
         actions: [
+          // Draw offer button
+          IconButton(
+            icon: const Icon(Icons.handshake),
+            onPressed: _offerDraw,
+            tooltip: 'Offer Draw',
+          ),
           IconButton(
             icon: const Icon(Icons.flag),
             onPressed: _resign,
@@ -717,6 +873,9 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
             ),
             
             const SizedBox(height: AppTheme.spacingMD),
+            
+            // Draw offer banner
+            _buildDrawOfferBanner(),
             
             // Turn indicator
             if (!isMyTurn && !_isMakingMove)

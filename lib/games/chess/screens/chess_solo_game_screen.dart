@@ -35,6 +35,7 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
   chess_lib.Chess? _chessEngine;
   bool _isLoading = true;
   bool _isMakingMove = false;
+  bool _isAIThinking = false;
   AIDifficulty _difficulty = AIDifficulty.medium;
   Timer? _timer;
   int _whiteTimeRemaining = 600000;
@@ -253,6 +254,8 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
   Future<void> _makeAIMove() async {
     if (_chessEngine == null || _game == null) return;
 
+    setState(() => _isAIThinking = true);
+    
     try {
       final aiMove = await _aiService.getBestMove(
         game: _chessEngine!,
@@ -294,6 +297,10 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
       }
     } catch (e) {
       Logger.error('Error making AI move', error: e, tag: 'ChessSoloGameScreen');
+    } finally {
+      if (mounted) {
+        setState(() => _isAIThinking = false);
+      }
     }
   }
 
@@ -458,6 +465,39 @@ class _ChessSoloGameScreenState extends State<ChessSoloGameScreen> {
             ),
             
             const SizedBox(height: AppTheme.spacingMD),
+            
+            // AI thinking indicator
+            if (_isAIThinking)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade400),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.amber.shade700),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'AI is thinking...',
+                      style: TextStyle(
+                        color: Colors.amber.shade900,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             
             // Chess board - use chess engine turn for interactivity
             ChessBoardWidget(

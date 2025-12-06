@@ -27,7 +27,6 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
   List<ChessGame> _waitingGames = [];
   List<ChessGame> _activeGames = [];
   StreamSubscription<List<ChessGame>>? _waitingGamesSubscription;
-  StreamSubscription<List<ChessGame>>? _activeGamesSubscription;
   String? _currentFamilyId;
   String? _currentUserId;
 
@@ -41,7 +40,6 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
   @override
   void dispose() {
     _waitingGamesSubscription?.cancel();
-    _activeGamesSubscription?.cancel();
     super.dispose();
   }
 
