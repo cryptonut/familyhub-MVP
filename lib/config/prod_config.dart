@@ -31,5 +31,14 @@ class ProdConfig implements AppConfig {
 
   @override
   String? get apiBaseUrl => null; // Add if you have prod API
+
+  @override
+  String? get agoraAppId => null; // TODO: Add Agora App ID for production environment
+  
+  @override
+  String? get agoraAppCertificate => null; // TODO: Add Agora App Certificate for production environment
+  
+  @override
+  String? get chessWebSocketUrl => null; // TODO: Add WebSocket URL for real-time chess if needed
 }
 

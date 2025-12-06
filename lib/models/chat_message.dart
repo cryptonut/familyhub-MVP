@@ -7,7 +7,8 @@ class ChatMessage {
   final String content;
   final DateTime timestamp;
   final MessageType type;
-  final String? recipientId; // For private chats - null means family chat
+  final String? recipientId; // For private chats - null means family/hub chat
+  final String? hubId; // For hub chats - null means family chat
   final String? audioUrl; // For voice messages
   final List<MessageReaction> reactions; // Emoji reactions
   final String? threadId; // If this is part of a thread
@@ -22,6 +23,7 @@ class ChatMessage {
     required this.timestamp,
     this.type = MessageType.text,
     this.recipientId,
+    this.hubId,
     this.audioUrl,
     this.reactions = const [],
     this.threadId,
@@ -37,6 +39,7 @@ class ChatMessage {
         'timestamp': timestamp.toIso8601String(),
         'type': type.toString().split('.').last,
         if (recipientId != null) 'recipientId': recipientId,
+        if (hubId != null) 'hubId': hubId,
         if (audioUrl != null) 'audioUrl': audioUrl,
         'reactions': reactions.map((r) => r.toJson()).toList(),
         if (threadId != null) 'threadId': threadId,
@@ -61,6 +64,7 @@ class ChatMessage {
         orElse: () => MessageType.text,
       ),
       recipientId: json['recipientId'] as String?,
+      hubId: json['hubId'] as String?,
       audioUrl: json['audioUrl'] as String?,
       reactions: reactions,
       threadId: json['threadId'] as String?,

@@ -138,6 +138,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('${stats.totalWins} total wins'),
+                if (stats.tetrisHighScore > 0)
+                  Row(
+                    children: [
+                      const Icon(Icons.gamepad, color: Colors.red, size: 16),
+                      const SizedBox(width: 4),
+                      Text('Tetris: ${stats.tetrisHighScore}'),
+                    ],
+                  ),
                 if (stats.streakDays > 0)
                   Row(
                     children: [

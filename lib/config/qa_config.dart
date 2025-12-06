@@ -31,4 +31,13 @@ class QaConfig implements AppConfig {
 
   @override
   String? get apiBaseUrl => null; // Add if you have test API
+
+  @override
+  String? get agoraAppId => null; // TODO: Add Agora App ID for QA environment
+  
+  @override
+  String? get agoraAppCertificate => null; // TODO: Add Agora App Certificate for QA environment
+  
+  @override
+  String? get chessWebSocketUrl => null; // TODO: Add WebSocket URL for real-time chess if needed
 }

@@ -28,6 +28,8 @@ import 'settings/calendar_sync_settings_screen.dart';
 import 'settings/privacy_center_screen.dart';
 import 'games/games_home_screen.dart';
 import 'photos/photos_home_screen.dart';
+import 'hubs/my_hubs_screen.dart';
+import 'hubs/my_friends_hub_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -204,17 +206,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHubDropdown() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     if (_availableHubs.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.grey[300],
+          color: isDark ? Colors.grey[800] : Colors.grey[300],
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Text(
+        child: Text(
           'Family Hub',
           style: TextStyle(
-            color: Colors.black87,
+            color: theme.colorScheme.onSurface,
             fontSize: 16,
             fontWeight: FontWeight.w500,
           ),
@@ -227,45 +232,129 @@ class _HomeScreenState extends State<HomeScreen> {
       orElse: () => _availableHubs.first,
     );
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: DropdownButton<Hub>(
-        value: selectedHub,
-        isDense: true,
+    return Align(
+      alignment: Alignment.center,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 200, minWidth: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[800] : Colors.grey[300],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark ? Colors.grey[700]! : Colors.grey[400]!,
+            width: 1,
+          ),
+        ),
+        child: DropdownButton<Hub>(
+          value: selectedHub,
+          isDense: true,
+          isExpanded: false,
         underline: const SizedBox.shrink(),
-        icon: const Icon(Icons.arrow_drop_down, color: Colors.black87, size: 20),
-        style: const TextStyle(
-          color: Colors.black87,
+        icon: Icon(
+          Icons.arrow_drop_down,
+          color: theme.colorScheme.onSurface,
+          size: 20,
+        ),
+        dropdownColor: isDark ? Colors.grey[900] : Colors.white,
+        menuMaxHeight: 300,
+        style: TextStyle(
+          color: theme.colorScheme.onSurface,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
-        items: _availableHubs.map((hub) {
-          return DropdownMenuItem<Hub>(
-            value: hub,
-            child: Text(
-              hub.name,
-              style: const TextStyle(color: Colors.black87),
+        items: [
+          // Add "Add New Hub" option at the top
+          DropdownMenuItem<Hub>(
+            value: null, // Special value to indicate "Add New Hub"
+            child: Row(
+              children: [
+                Icon(
+                  Icons.add,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Add New Hub',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-          );
-        }).toList(),
+          ),
+          // Divider - use a disabled item that won't interfere with selection
+          DropdownMenuItem<Hub>(
+            value: null,
+            enabled: false,
+            child: Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              color: isDark ? Colors.grey[700] : Colors.grey[400],
+            ),
+          ),
+          // Existing hubs
+          ..._availableHubs.map((hub) {
+            return DropdownMenuItem<Hub>(
+              value: hub,
+              child: Text(
+                hub.name,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            );
+          }).toList(),
+        ],
         onChanged: (Hub? newHub) {
-          if (newHub != null && newHub.id != _selectedHubId) {
-            setState(() {
-              _selectedHubId = newHub.id;
+          if (newHub == null) {
+            // "Add New Hub" was selected - navigate to hubs screen
+            // Use a small delay to allow dropdown to close first
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MyHubsScreen(),
+                  ),
+                ).then((_) {
+                  // Reload hubs when returning from hubs screen
+                  _loadHubsAndFamily();
+                });
+              }
             });
-            
-            // If switching to a different hub, update the family context
-            // For now, we'll just log it - actual switching logic can be added later
-            Logger.info('Switched to hub: ${newHub.name} (${newHub.id})', tag: 'HomeScreen');
-            
-            // TODO: Implement hub switching logic if needed
-            // This might involve updating the user's active hub/family context
+            return;
           }
+          
+          // Hub was selected - navigate to hub screen
+          Logger.info('Navigating to hub: ${newHub.name} (${newHub.id})', tag: 'HomeScreen');
+          
+          // Update selected hub state
+          setState(() {
+            _selectedHubId = newHub.id;
+            _currentFamilyName = newHub.name;
+          });
+          
+          // Navigate to the hub screen
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MyFriendsHubScreen(hub: newHub),
+                ),
+              ).then((_) {
+                // Reload data when returning from hub screen
+                if (mounted) {
+                  _loadWaitingGames();
+                  _loadBadgeCounts();
+                }
+              });
+            }
+          });
         },
+        ),
       ),
     );
   }
@@ -713,13 +802,19 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, appState, _) {
         return Scaffold(
           appBar: AppBar(
-            title: _hubsLoaded
-                ? _buildHubDropdown()
-                : const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
+            title: const SizedBox.shrink(), // Empty title to make room for flexibleSpace
+            centerTitle: true,
+            flexibleSpace: SafeArea(
+              child: Center(
+                child: _hubsLoaded
+                    ? _buildHubDropdown()
+                    : const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+              ),
+            ),
             actions: [
               PopupMenuButton(
                 icon: const Icon(Icons.more_vert),
@@ -952,7 +1047,6 @@ class _HomeScreenState extends State<HomeScreen> {
               DashboardScreen(),
               CalendarScreen(),
               TasksScreen(),
-              const ChatTabsScreen(),
               GamesHomeScreen(),
               PhotosHomeScreen(),
               LocationScreen(),
@@ -978,11 +1072,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: _buildJobsIcon(Icons.task_outlined),
                 selectedIcon: _buildJobsIcon(Icons.task),
                 label: 'Jobs',
-              ),
-              NavigationDestination(
-                icon: _buildChatIcon(Icons.chat_bubble_outline),
-                selectedIcon: _buildChatIcon(Icons.chat_bubble),
-                label: 'Chat',
               ),
               NavigationDestination(
                 icon: _buildGamesIcon(Icons.sports_esports_outlined),

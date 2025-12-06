@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:chess/chess.dart' as chess_lib;
 import '../../../core/services/logger_service.dart';
-import '../utils/chess_move_validator.dart';
 
 /// Improved chess board widget with proper rendering and interaction
 class ChessBoardWidget extends StatefulWidget {
@@ -13,6 +12,7 @@ class ChessBoardWidget extends StatefulWidget {
   final bool isInteractive; // Whether board is interactive
   final String? lastMoveFrom; // Highlight last move
   final String? lastMoveTo;
+  final bool showValidMoves; // OPTION 2: Enable/disable move highlighting
 
   const ChessBoardWidget({
     super.key,
@@ -24,6 +24,7 @@ class ChessBoardWidget extends StatefulWidget {
     this.isInteractive = true,
     this.lastMoveFrom,
     this.lastMoveTo,
+    this.showValidMoves = true, // Default: show highlighting
   });
 
   @override
@@ -241,8 +242,159 @@ class _ChessBoardWidgetState extends State<ChessBoardWidget> {
   }
 
   List<String> _getValidMovesForSquare(String square) {
-    // Use the custom validator that actually works
-    return ChessMoveValidator.getValidMoves(widget.game, square);
+    // OPTION 2: If highlighting is disabled, return empty list
+    if (!widget.showValidMoves) return [];
+    
+    try {
+      final piece = widget.game.get(square);
+      if (piece == null) return [];
+      
+      // Check if it's the piece's turn
+      if (piece.color != widget.game.turn) return [];
+      
+      // OPTION 1: Use generate_moves() - most efficient
+      // Move objects have .from and .to as 0x88 indices
+      try {
+        final allMoves = widget.game.generate_moves();
+        final validMoves = <String>[];
+        final fromIndex = _squareToIndex(square);
+        
+        for (final move in allMoves) {
+          if (move.from == fromIndex) {
+            final toSquare = _indexToSquare(move.to);
+            validMoves.add(toSquare);
+          }
+        }
+        
+        if (validMoves.isNotEmpty) {
+          return validMoves;
+        }
+      } catch (e) {
+        Logger.debug('generate_moves() failed, falling back to smart filtering: $e', tag: 'ChessBoardWidget');
+      }
+      
+      // OPTION 3: Smart piece-based filtering (fallback)
+      return _getValidMovesSmartFiltering(square, piece);
+    } catch (e) {
+      Logger.error('Error getting valid moves for $square', error: e, tag: 'ChessBoardWidget');
+      return [];
+    }
+  }
+  
+  /// OPTION 3: Smart piece-based move filtering
+  /// Only tests squares that could be valid based on piece type
+  /// Much faster than testing all 64 squares
+  List<String> _getValidMovesSmartFiltering(String square, chess_lib.Piece piece) {
+    final validMoves = <String>[];
+    final testGame = chess_lib.Chess();
+    testGame.load(widget.game.fen);
+    
+    final file = square[0].codeUnitAt(0) - 'a'.codeUnitAt(0);
+    final rank = int.parse(square[1]) - 1;
+    
+    // Get candidate squares based on piece type
+    final candidateSquares = <String>[];
+    
+    switch (piece.type) {
+      case chess_lib.PieceType.PAWN:
+        // Pawns move forward (1 or 2 squares from starting position)
+        // Can capture diagonally
+        final direction = piece.color == chess_lib.Color.WHITE ? 1 : -1;
+        final newRank = rank + direction;
+        if (newRank >= 0 && newRank < 8) {
+          // Forward move
+          candidateSquares.add('${String.fromCharCode('a'.codeUnitAt(0) + file)}${newRank + 1}');
+          // Double move from starting position
+          if ((piece.color == chess_lib.Color.WHITE && rank == 1) ||
+              (piece.color == chess_lib.Color.BLACK && rank == 6)) {
+            candidateSquares.add('${String.fromCharCode('a'.codeUnitAt(0) + file)}${newRank + 1 + direction}');
+          }
+        }
+        // Diagonal captures
+        for (final fileOffset in [-1, 1]) {
+          final captureFile = file + fileOffset;
+          if (captureFile >= 0 && captureFile < 8 && newRank >= 0 && newRank < 8) {
+            candidateSquares.add('${String.fromCharCode('a'.codeUnitAt(0) + captureFile)}${newRank + 1}');
+          }
+        }
+        break;
+        
+      case chess_lib.PieceType.KNIGHT:
+        // Knights move in L-shapes
+        for (final rankOffset in [-2, -1, 1, 2]) {
+          for (final fileOffset in [-2, -1, 1, 2]) {
+            if (rankOffset.abs() == fileOffset.abs()) continue; // Must be L-shape
+            final newFile = file + fileOffset;
+            final newRank = rank + rankOffset;
+            if (newFile >= 0 && newFile < 8 && newRank >= 0 && newRank < 8) {
+              candidateSquares.add('${String.fromCharCode('a'.codeUnitAt(0) + newFile)}${newRank + 1}');
+            }
+          }
+        }
+        break;
+        
+      case chess_lib.PieceType.KING:
+        // King moves one square in any direction
+        for (final rankOffset in [-1, 0, 1]) {
+          for (final fileOffset in [-1, 0, 1]) {
+            if (rankOffset == 0 && fileOffset == 0) continue;
+            final newFile = file + fileOffset;
+            final newRank = rank + rankOffset;
+            if (newFile >= 0 && newFile < 8 && newRank >= 0 && newRank < 8) {
+              candidateSquares.add('${String.fromCharCode('a'.codeUnitAt(0) + newFile)}${newRank + 1}');
+            }
+          }
+        }
+        break;
+        
+      case chess_lib.PieceType.ROOK:
+      case chess_lib.PieceType.BISHOP:
+      case chess_lib.PieceType.QUEEN:
+        // Rooks, Bishops, and Queens move in lines
+        final directions = piece.type == chess_lib.PieceType.ROOK
+            ? [
+                [0, 1], [0, -1], [1, 0], [-1, 0] // Horizontal and vertical
+              ]
+            : piece.type == chess_lib.PieceType.BISHOP
+                ? [
+                    [1, 1], [1, -1], [-1, 1], [-1, -1] // Diagonals
+                  ]
+                : [
+                    [0, 1], [0, -1], [1, 0], [-1, 0], // Rook moves
+                    [1, 1], [1, -1], [-1, 1], [-1, -1] // Bishop moves
+                  ];
+        
+        for (final dir in directions) {
+          for (int i = 1; i < 8; i++) {
+            final newFile = file + dir[0] * i;
+            final newRank = rank + dir[1] * i;
+            if (newFile >= 0 && newFile < 8 && newRank >= 0 && newRank < 8) {
+              candidateSquares.add('${String.fromCharCode('a'.codeUnitAt(0) + newFile)}${newRank + 1}');
+            } else {
+              break; // Out of bounds
+            }
+          }
+        }
+        break;
+    }
+    
+    // Test each candidate square
+    for (final toSquare in candidateSquares) {
+      if (toSquare == square) continue;
+      
+      final originalFen = testGame.fen;
+      final moveResult = testGame.move({'from': square, 'to': toSquare});
+      
+      if (moveResult != null) {
+        final newFen = testGame.fen;
+        if (newFen != originalFen) {
+          validMoves.add(toSquare);
+        }
+        testGame.load(widget.game.fen); // Reset
+      }
+    }
+    
+    return validMoves;
   }
   
   /// Convert square name (e.g., "e2") to 0x88 index
@@ -296,8 +448,8 @@ class _ChessBoardWidgetState extends State<ChessBoardWidget> {
       return Colors.blue.shade300;
     }
 
-    // Highlight valid moves
-    if (_validMoves.contains(square)) {
+    // Highlight valid moves (OPTION 2: only if enabled)
+    if (widget.showValidMoves && _validMoves.contains(square)) {
       return Colors.green.shade200;
     }
 

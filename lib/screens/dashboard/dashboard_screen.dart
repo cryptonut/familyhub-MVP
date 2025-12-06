@@ -18,6 +18,7 @@ import '../../utils/date_utils.dart' as app_date_utils;
 import '../../utils/relationship_utils.dart';
 import '../wallet/wallet_screen.dart';
 import '../chat/private_chat_screen.dart';
+import '../chat/chat_tabs_screen.dart';
 import '../hubs/my_hubs_screen.dart';
 import '../tasks/add_edit_task_screen.dart';
 import '../tasks/refund_notification_dialog.dart';
@@ -33,6 +34,9 @@ import '../../models/payout_request.dart';
 import '../../services/birthday_service.dart';
 import '../../services/profile_photo_service.dart';
 import '../../screens/profile/edit_profile_screen.dart';
+import '../../widgets/chat_widget.dart';
+import '../../models/chat_message.dart';
+import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart' hide CalendarEvent;
@@ -54,6 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final PayoutService _payoutService = PayoutService();
   final BirthdayService _birthdayService = BirthdayService();
   final ProfilePhotoService _profilePhotoService = ProfilePhotoService();
+  final ChatService _chatService = ChatService();
   final ImagePicker _imagePicker = ImagePicker();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -418,7 +423,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               familyMembers: familyMembers,
               familyCreator: familyCreator,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            
+            // Family Chat Widget
+            _buildFamilyChatWidget(),
+            const SizedBox(height: 24),
             
             // Pending Approvals (prominent if there are any)
             if (_pendingApprovalsCount > 0) ...[
@@ -631,11 +640,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       (familyCreator.uid == currentUserModel.uid || currentUserModel.isAdmin());
                   
                   return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: isCurrentUser
-                        ? () => _showProfilePhotoMenu(context, member, currentUserModel)
-                        : null,
+                        ? () {
+                            // Navigate to hubs screen on tap
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MyHubsScreen(),
+                              ),
+                            );
+                          }
+                        : () {
+                            // Navigate to private chat with this member
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PrivateChatScreen(
+                                  recipientId: member.uid,
+                                  recipientName: member.displayName.isNotEmpty
+                                      ? member.displayName
+                                      : member.email.split('@')[0],
+                                ),
+                              ),
+                            );
+                          },
                     onLongPress: isCurrentUser
-                        ? null
+                        ? () => _showProfilePhotoMenu(context, member, currentUserModel)
                         : canEditRelationship
                             ? () => _showRelationshipMenu(context, member, currentUserModel, familyCreator)
                             : null,
@@ -2295,6 +2326,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFamilyChatWidget() {
+    return ChatWidget(
+      messagesStream: _chatService.getMessagesStream(),
+      onSendMessage: (messageText) async {
+        final currentUserId = _chatService.currentUserId;
+        final currentUserName = _chatService.currentUserName ?? 'You';
+        
+        if (currentUserId == null) {
+          throw Exception('User not authenticated');
+        }
+
+        final message = ChatMessage(
+          id: const Uuid().v4(),
+          senderId: currentUserId,
+          senderName: currentUserName,
+          content: messageText,
+          timestamp: DateTime.now(),
+        );
+
+        await _chatService.sendMessage(message);
+      },
+      currentUserId: _chatService.currentUserId,
+      currentUserName: _chatService.currentUserName,
+      maxHeight: 400, // Max height for embedded chat
+      onViewFullChat: () {
+        // Navigate to full chat screen (ChatTabsScreen)
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ChatTabsScreen(),
+          ),
+        );
+      },
+      emptyStateMessage: 'No messages yet. Start the conversation!',
     );
   }
 }

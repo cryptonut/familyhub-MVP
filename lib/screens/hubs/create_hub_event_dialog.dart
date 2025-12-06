@@ -109,6 +109,7 @@ class _CreateHubEventDialogState extends State<CreateHubEventDialog> {
             : _locationController.text.trim(),
         participants: participants,
         color: '#2196F3',
+        hubId: widget.hub.id, // Mark this event as belonging to this hub
       );
 
       await _calendarService.addEvent(event);

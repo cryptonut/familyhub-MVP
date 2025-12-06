@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 /// Centralized logging service with log levels
 /// 
@@ -59,8 +60,17 @@ class Logger {
     
     // In production, report to crash analytics
     if (!kDebugMode && error != null) {
-      // TODO: Integrate Firebase Crashlytics or similar
-      // FirebaseCrashlytics.instance.recordError(error, stackTrace);
+      try {
+        FirebaseCrashlytics.instance.recordError(
+          error,
+          stackTrace,
+          reason: message,
+          fatal: false,
+        );
+      } catch (e) {
+        // Silently fail if Crashlytics is not initialized
+        // This prevents logging errors from breaking the app
+      }
     }
   }
 
