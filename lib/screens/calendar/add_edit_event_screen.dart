@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'dart:typed_data';
 import '../../core/services/logger_service.dart';
 import '../../models/calendar_event.dart';
 import '../../models/user_model.dart';
 import '../../services/calendar_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/event_template_service.dart';
+import '../../models/event_template.dart';
+import '../../widgets/toast_notification.dart';
 import '../../services/calendar_sync_service.dart';
+import '../../services/event_template_service.dart';
+import '../../models/event_template.dart';
+import '../../widgets/toast_notification.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 
 class AddEditEventScreen extends StatefulWidget {
@@ -31,6 +41,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
   final _calendarService = CalendarService();
   final _authService = AuthService();
   final _syncService = CalendarSyncService();
+  final _templateService = EventTemplateService();
   final _auth = FirebaseAuth.instance;
   
   DateTime _startTime = DateTime.now();
@@ -42,6 +53,11 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
   List<UserModel> _familyMembers = [];
   bool _addToPersonalCalendar = true;
   bool _calendarSyncEnabled = false;
+  List<String> _photoUrls = [];
+  List<File> _pendingPhotos = []; // For mobile
+  List<Uint8List> _pendingPhotosWeb = []; // For web
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _isUploadingPhoto = false;
   
   final List<String> _colors = [
     '#2196F3', // Blue
@@ -74,6 +90,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
       _isRecurring = widget.event!.isRecurring;
       _selectedRecurrenceRule = widget.event!.recurrenceRule;
       _selectedInvitees = List<String>.from(widget.event!.invitedMemberIds);
+      _photoUrls = List<String>.from(widget.event!.photoUrls ?? []);
     } else if (widget.selectedDate != null) {
       _startTime = DateTime(
         widget.selectedDate!.year,
@@ -171,12 +188,76 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
         recurrenceRule: _isRecurring ? _selectedRecurrenceRule : null,
         invitedMemberIds: _selectedInvitees,
         rsvpStatus: widget.event?.rsvpStatus ?? {},
+        createdBy: widget.event?.createdBy ?? _auth.currentUser?.uid, // Preserve creator when editing, set for new events
+        photoUrls: _photoUrls, // Use current photo URLs
+        sourceCalendar: widget.event?.sourceCalendar, // Preserve source calendar when editing
       );
 
+      String eventId = event.id;
       if (widget.event != null) {
         await _calendarService.updateEvent(event);
       } else {
         await _calendarService.addEvent(event);
+      }
+
+      // Upload pending photos after event is created/updated
+      if (_pendingPhotos.isNotEmpty || _pendingPhotosWeb.isNotEmpty) {
+        try {
+          final uploadedUrls = <String>[];
+          for (var photoFile in _pendingPhotos) {
+            try {
+              final url = await _calendarService.uploadEventPhoto(
+                imageFile: photoFile,
+                eventId: eventId,
+              );
+              uploadedUrls.add(url);
+            } catch (e) {
+              Logger.error('Error uploading pending photo', error: e, tag: 'AddEditEventScreen');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error uploading photo: $e'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            }
+          }
+          for (var photoBytes in _pendingPhotosWeb) {
+            try {
+              final url = await _calendarService.uploadEventPhotoWeb(
+                imageBytes: photoBytes,
+                eventId: eventId,
+              );
+              uploadedUrls.add(url);
+            } catch (e) {
+              Logger.error('Error uploading pending photo', error: e, tag: 'AddEditEventScreen');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error uploading photo: $e'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            }
+          }
+          // Add uploaded URLs to the event
+          if (uploadedUrls.isNotEmpty) {
+            final updatedEvent = event.copyWith(
+              photoUrls: [...event.photoUrls, ...uploadedUrls],
+            );
+            await _calendarService.updateEvent(updatedEvent);
+            // Don't show SnackBar here - we're about to pop, parent will show success
+          }
+          // Clear pending photos
+          _pendingPhotos.clear();
+          _pendingPhotosWeb.clear();
+        } catch (e) {
+          Logger.error('Error uploading pending photos', error: e, tag: 'AddEditEventScreen');
+          // Don't show SnackBar here - widget might be disposed
+          // Error is already logged
+        }
       }
 
       // Sync to device calendar if enabled and checkbox is checked
@@ -189,6 +270,25 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
         }
       }
 
+      // Show success message before popping to avoid widget lifecycle errors
+      if (mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(widget.event != null ? 'Event updated successfully' : 'Event created successfully'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          // Small delay to ensure SnackBar is displayed before navigation
+          await Future.delayed(const Duration(milliseconds: 100));
+        } catch (e) {
+          // Ignore errors showing SnackBar - widget might be deactivating
+          Logger.debug('Could not show success SnackBar: $e', tag: 'AddEditEventScreen');
+        }
+      }
+
+      // Pop after showing success message
       if (mounted) {
         Navigator.pop(context, true);
       }
@@ -221,25 +321,27 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
               'Check Firebase Console to verify Firestore exists.';
         }
         
-        // Show both detailed message and original error for debugging
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(detailedError),
-                const SizedBox(height: 8),
-                Text(
-                  'Original error: ${e.toString()}',
-                  style: const TextStyle(fontSize: 10),
-                ),
-              ],
+        // Show error message only if widget is still mounted
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(detailedError),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Original error: ${e.toString()}',
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 8),
             ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 8),
-          ),
-        );
+          );
+        }
       }
     }
   }
@@ -250,6 +352,12 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
       appBar: AppBar(
         title: Text(widget.event != null ? 'Edit Event' : 'New Event'),
         actions: [
+          if (widget.event == null)
+            IconButton(
+              icon: const Icon(Icons.bookmark),
+              tooltip: 'Use Template',
+              onPressed: () => _showTemplatePicker(),
+            ),
           TextButton(
             onPressed: _saveEvent,
             child: const Text('Save'),
@@ -438,6 +546,168 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
               const SizedBox(height: 16),
             ],
             
+            // Photo Attachments
+            const Text(
+              'Photos',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            if (_photoUrls.isNotEmpty || _pendingPhotos.isNotEmpty || _pendingPhotosWeb.isNotEmpty)
+              SizedBox(
+                height: 100,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _photoUrls.length + _pendingPhotos.length + _pendingPhotosWeb.length,
+                  itemBuilder: (context, index) {
+                    if (index < _photoUrls.length) {
+                      // Display uploaded photo
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                _photoUrls[index],
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: Colors.grey[300],
+                                    child: const Icon(Icons.broken_image),
+                                  );
+                                },
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Colors.red,
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      _photoUrls.removeAt(index);
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else if (index < _photoUrls.length + _pendingPhotos.length) {
+                      // Display pending photo (mobile)
+                      final photoIndex = index - _photoUrls.length;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                _pendingPhotos[photoIndex],
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Colors.red,
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      _pendingPhotos.removeAt(photoIndex);
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                            const Positioned(
+                              bottom: 4,
+                              left: 4,
+                              child: Chip(
+                                label: Text('Pending', style: TextStyle(fontSize: 10)),
+                                backgroundColor: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      // Display pending photo (web)
+                      final photoIndex = index - _photoUrls.length - _pendingPhotos.length;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.memory(
+                                _pendingPhotosWeb[photoIndex],
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Colors.red,
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      _pendingPhotosWeb.removeAt(photoIndex);
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                            const Positioned(
+                              bottom: 4,
+                              left: 4,
+                              child: Chip(
+                                label: Text('Pending', style: TextStyle(fontSize: 10)),
+                                backgroundColor: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: _isUploadingPhoto ? null : _pickAndUploadPhoto,
+              icon: _isUploadingPhoto
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add_photo_alternate),
+              label: Text(_isUploadingPhoto ? 'Uploading...' : 'Add Photo'),
+            ),
+            const SizedBox(height: 24),
+            
             const Text(
               'Color',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -473,11 +743,245 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
     );
   }
 
+  Future<void> _pickAndUploadPhoto() async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) return;
+
+      setState(() {
+        _isUploadingPhoto = true;
+      });
+
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        if (widget.event != null) {
+          // Event exists, upload immediately
+          try {
+            final photoUrl = await _calendarService.uploadEventPhotoWeb(
+              imageBytes: bytes,
+              eventId: widget.event!.id,
+            );
+            // Update local state immediately
+            setState(() {
+              _photoUrls.add(photoUrl);
+              _isUploadingPhoto = false;
+            });
+            // Update event in Firestore so it shows up immediately
+            try {
+              final updatedEvent = widget.event!.copyWith(
+                photoUrls: [..._photoUrls, photoUrl],
+              );
+              await _calendarService.updateEvent(updatedEvent);
+            } catch (e) {
+              Logger.warning('Error updating event with photo URL', error: e, tag: 'AddEditEventScreen');
+              // Don't fail the upload if update fails
+            }
+            if (mounted) {
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Photo uploaded successfully!'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              } catch (_) {
+                // Widget was disposed - ignore silently
+              }
+            }
+          } catch (e) {
+            setState(() {
+              _isUploadingPhoto = false;
+            });
+            if (mounted) {
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error uploading photo: $e'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              } catch (_) {
+                // Widget was disposed - ignore silently
+              }
+            }
+          }
+        } else {
+          // Event doesn't exist yet, store for later upload
+          setState(() {
+            _pendingPhotosWeb.add(bytes);
+            _isUploadingPhoto = false;
+          });
+        }
+      } else {
+        final file = File(pickedFile.path);
+        if (widget.event != null) {
+          // Event exists, upload immediately
+          try {
+            final photoUrl = await _calendarService.uploadEventPhoto(
+              imageFile: file,
+              eventId: widget.event!.id,
+            );
+            // Update local state immediately
+            setState(() {
+              _photoUrls.add(photoUrl);
+              _isUploadingPhoto = false;
+            });
+            // Update event in Firestore so it shows up immediately
+            try {
+              final updatedEvent = widget.event!.copyWith(
+                photoUrls: [..._photoUrls, photoUrl],
+              );
+              await _calendarService.updateEvent(updatedEvent);
+            } catch (e) {
+              Logger.warning('Error updating event with photo URL', error: e, tag: 'AddEditEventScreen');
+              // Don't fail the upload if update fails
+            }
+            if (mounted) {
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Photo uploaded successfully!'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              } catch (_) {
+                // Widget was disposed - ignore silently
+              }
+            }
+          } catch (e) {
+            setState(() {
+              _isUploadingPhoto = false;
+            });
+            if (mounted) {
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error uploading photo: $e'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              } catch (_) {
+                // Widget was disposed - ignore silently
+              }
+            }
+          }
+        } else {
+          // Event doesn't exist yet, store for later upload
+          setState(() {
+            _pendingPhotos.add(file);
+            _isUploadingPhoto = false;
+          });
+          if (mounted) {
+            try {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Photo will be uploaded when event is saved'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            } catch (_) {
+              // Widget was disposed - ignore silently
+            }
+          }
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _isUploadingPhoto = false;
+      });
+      // Safely show error message - check mounted and wrap in try-catch
+      if (mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error uploading photo: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } catch (_) {
+          // Widget was disposed during SnackBar call - ignore silently
+          Logger.warning('Could not show SnackBar - widget disposed', tag: 'AddEditEventScreen');
+        }
+      }
+    }
+  }
+
   Color _parseColor(String colorString) {
     try {
       return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
     } catch (e) {
       return Colors.blue;
+    }
+  }
+
+  Future<void> _showTemplatePicker() async {
+    try {
+      final userModel = await _authService.getCurrentUserModel();
+      if (userModel?.familyId == null) {
+        ToastNotification.error(context, 'No family found');
+        return;
+      }
+
+      final templates = await _templateService.getTemplates();
+      
+      if (templates.isEmpty) {
+        ToastNotification.info(context, 'No templates available');
+        return;
+      }
+
+      final selected = await showDialog<EventTemplate>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Select Template'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: templates.length,
+              itemBuilder: (context, index) {
+                final template = templates[index];
+                return ListTile(
+                  title: Text(template.name),
+                  subtitle: Text(template.title),
+                  onTap: () => Navigator.pop(context, template),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      if (selected != null) {
+        final event = await _templateService.createEventFromTemplate(
+          selected.id,
+          _startTime,
+        );
+        
+        // Populate form with template data
+        _titleController.text = event.title;
+        _descriptionController.text = event.description;
+        _locationController.text = event.location ?? '';
+        _selectedColor = event.color;
+        _isRecurring = event.isRecurring;
+        _selectedRecurrenceRule = event.recurrenceRule;
+        _selectedInvitees = event.invitedMemberIds;
+        
+        setState(() {});
+        ToastNotification.success(context, 'Template applied');
+      }
+    } catch (e) {
+      ToastNotification.error(context, 'Error loading template: $e');
     }
   }
 }

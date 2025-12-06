@@ -11,6 +11,7 @@ class ChatService {
   final AuthService _authService = AuthService();
   
   String? _cachedFamilyId;
+  Stream<List<ChatMessage>>? _cachedMessagesStream;
   
   Future<String?> get _familyId async {
     if (_cachedFamilyId != null) return _cachedFamilyId;
@@ -27,11 +28,18 @@ class ChatService {
   }
 
   Stream<List<ChatMessage>> getMessagesStream() {
-    return Stream.fromFuture(_familyId).asyncExpand((familyId) {
+    // Return cached stream if available to ensure all listeners share the same stream
+    if (_cachedMessagesStream != null) {
+      return _cachedMessagesStream!;
+    }
+    
+    // Create stream that waits for familyId, then streams from Firestore
+    _cachedMessagesStream = Stream.fromFuture(_familyId).asyncExpand((familyId) {
       if (familyId == null) {
         return Stream.value(<ChatMessage>[]);
       }
       
+      // Stream from Firestore - this emits immediately when connected
       return _firestore
           .collection('families/$familyId/messages')
           .orderBy('timestamp', descending: false)
@@ -74,7 +82,9 @@ class ChatService {
             }
             return messages;
           });
-    });
+    }).asBroadcastStream();
+    
+    return _cachedMessagesStream!;
   }
 
   Future<List<ChatMessage>> getMessages() async {
@@ -132,7 +142,6 @@ class ChatService {
       await _firestore.collection('families/$familyId/messages').add(message.toJson());
     } catch (e) {
       Logger.error('sendMessage error', error: e, tag: 'ChatService');
-      Logger.debug('Family ID: $familyId', tag: 'ChatService');
       rethrow;
     }
   }
@@ -203,7 +212,7 @@ class ChatService {
             }
             return messages;
           });
-    });
+    }).asBroadcastStream();
   }
   
   /// Send a private message to another user
@@ -238,7 +247,6 @@ class ChatService {
           .add(privateMessage.toJson());
     } catch (e) {
       Logger.error('sendPrivateMessage error', error: e, tag: 'ChatService');
-      Logger.debug('Family ID: $familyId, Chat ID: $chatId', tag: 'ChatService');
       rethrow;
     }
   }
@@ -276,6 +284,61 @@ class ChatService {
     }
   }
   
+  /// Get hub messages stream
+  Stream<List<ChatMessage>> getHubMessagesStream(String hubId) {
+    return _firestore
+        .collection('hubs/$hubId/messages')
+        .orderBy('timestamp', descending: false)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          final messages = <ChatMessage>[];
+          for (var doc in snapshot.docs) {
+            final data = doc.data();
+            var messageData = {
+              'id': doc.id,
+              ...data,
+            };
+            
+            // If senderName is missing, try to get it from user document
+            if (messageData['senderName'] == null || 
+                (messageData['senderName'] as String).isEmpty) {
+              final senderId = messageData['senderId'] as String?;
+              if (senderId != null) {
+                try {
+                  final userDoc = await _firestore.collection('users').doc(senderId).get();
+                  if (userDoc.exists) {
+                    final userData = userDoc.data();
+                    messageData['senderName'] = userData?['displayName'] as String? ?? 
+                                                 userData?['email'] as String? ?? 
+                                                 'Unknown User';
+                  } else {
+                    messageData['senderName'] = 'Unknown User';
+                  }
+                } catch (e) {
+                  Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
+                  messageData['senderName'] = 'Unknown User';
+                }
+              } else {
+                messageData['senderName'] = 'Unknown User';
+              }
+            }
+            
+            messages.add(ChatMessage.fromJson(messageData));
+          }
+          return messages;
+        }).asBroadcastStream();
+  }
+
+  /// Send a message to a hub
+  Future<void> sendHubMessage(String hubId, ChatMessage message) async {
+    try {
+      await _firestore.collection('hubs/$hubId/messages').add(message.toJson());
+    } catch (e) {
+      Logger.error('sendHubMessage error', error: e, tag: 'ChatService');
+      rethrow;
+    }
+  }
+
   /// Check if there are unread messages from another user
   /// This is a simple check - we consider messages unread if they exist
   /// and were sent by the other user (not by current user)

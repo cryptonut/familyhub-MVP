@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:device_calendar/device_calendar.dart';
+import 'package:timezone/timezone.dart' as tz;
 import '../../services/calendar_sync_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/background_sync_service.dart';
+import '../../services/calendar_service.dart';
 import '../../models/user_model.dart';
+import '../../core/services/logger_service.dart';
 import 'package:intl/intl.dart';
 
 class CalendarSyncSettingsScreen extends StatefulWidget {
@@ -17,6 +20,7 @@ class CalendarSyncSettingsScreen extends StatefulWidget {
 class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen> {
   final _syncService = CalendarSyncService();
   final _authService = AuthService();
+  final _calendarService = CalendarService();
 
   UserModel? _currentUser;
   bool _isLoading = true;
@@ -82,12 +86,16 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
       if (hasPermission) {
         await _loadSettings();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Calendar permissions already granted'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          try {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Calendar permissions already granted'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } catch (e) {
+            // Ignore - widget may be deactivating
+          }
         }
         return;
       }
@@ -98,23 +106,31 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
           _errorMessage = 'Calendar permissions are required for sync. Please grant permissions in your device settings.';
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Permission denied. Please enable calendar access in device settings.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 5),
-            ),
-          );
+          try {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Permission denied. Please enable calendar access in device settings.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 5),
+              ),
+            );
+          } catch (e) {
+            // Ignore - widget may be deactivating
+          }
         }
       } else {
         await _loadSettings();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Calendar permissions granted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          try {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Calendar permissions granted successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } catch (e) {
+            // Ignore - widget may be deactivating
+          }
         }
       }
     } catch (e) {
@@ -123,19 +139,27 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
       if (errorMsg.contains('Exception:')) {
         errorMsg = errorMsg.split('Exception:').last.trim();
       }
+      // Remove widget lifecycle error messages from display
+      if (errorMsg.contains('deactivated widget') || errorMsg.contains('Looking up')) {
+        errorMsg = 'An error occurred. Please try again.';
+      }
       
       setState(() {
         _errorMessage = errorMsg;
       });
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $errorMsg'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $errorMsg'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
       }
     } finally {
       if (mounted) {
@@ -162,8 +186,12 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
         });
       }
     } catch (e) {
+      String errorMsg = e.toString();
+      if (errorMsg.contains('deactivated widget') || errorMsg.contains('Looking up')) {
+        errorMsg = 'Error creating calendar. Please try again.';
+      }
       setState(() {
-        _errorMessage = 'Error creating calendar: $e';
+        _errorMessage = 'Error creating calendar: $errorMsg';
       });
     } finally {
       if (mounted) {
@@ -195,16 +223,24 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
       await _loadSettings();
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Calendar sync enabled successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Calendar sync enabled successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
       }
     } catch (e) {
+      String errorMsg = e.toString();
+      if (errorMsg.contains('deactivated widget') || errorMsg.contains('Looking up')) {
+        errorMsg = 'Error enabling sync. Please try again.';
+      }
       setState(() {
-        _errorMessage = 'Error enabling sync: $e';
+        _errorMessage = 'Error enabling sync: $errorMsg';
       });
     } finally {
       if (mounted) {
@@ -253,12 +289,16 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
       await _loadSettings();
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Calendar sync disabled'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Calendar sync disabled'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
       }
     } catch (e) {
       setState(() {
@@ -284,30 +324,177 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
       await _loadSettings();
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sync completed successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sync completed successfully. Calendar will refresh automatically.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
       }
     } catch (e) {
+      String errorMsg = e.toString();
+      if (errorMsg.contains('deactivated widget') || errorMsg.contains('Looking up')) {
+        errorMsg = 'Sync failed. Please try again.';
+      }
       setState(() {
-        _errorMessage = 'Sync failed: $e';
+        _errorMessage = 'Sync failed: $errorMsg';
       });
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sync failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sync failed: $errorMsg'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
       }
     } finally {
       if (mounted) {
         setState(() {
           _isSyncing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _cleanupDuplicates() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final mergedCount = await _calendarService.mergeDuplicateEvents();
+      
+      if (mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                mergedCount > 0
+                    ? 'Successfully merged $mergedCount duplicate events'
+                    : 'No duplicate events found',
+              ),
+              backgroundColor: mergedCount > 0 ? Colors.green : Colors.blue,
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
+      }
+    } catch (e) {
+      String errorMsg = e.toString();
+      if (errorMsg.contains('deactivated widget') || errorMsg.contains('Looking up')) {
+        errorMsg = 'Failed to cleanup duplicates. Please try again.';
+      }
+      setState(() {
+        _errorMessage = 'Error: $errorMsg';
+      });
+      
+      if (mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $errorMsg'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _cleanSyncedEvents() async {
+    // Confirm before deleting
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove All Synced Events'),
+        content: const Text(
+          'This will permanently delete all events that were imported from your device calendar.\n\n'
+          'Events you created manually in FamilyHub will NOT be affected.\n\n'
+          'This action cannot be undone. Do you want to continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Delete All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final deletedCount = await _syncService.removeAllSyncedEvents(resetLastSyncedAt: true);
+      
+      await _loadSettings();
+      
+      if (mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Successfully removed $deletedCount synced events'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
+      }
+    } catch (e) {
+      String errorMsg = e.toString();
+      if (errorMsg.contains('deactivated widget') || errorMsg.contains('Looking up')) {
+        errorMsg = 'Failed to remove synced events. Please try again.';
+      }
+      setState(() {
+        _errorMessage = 'Error: $errorMsg';
+      });
+      
+      if (mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $errorMsg'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
         });
       }
     }
@@ -399,9 +586,63 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                         const Icon(Icons.calendar_today, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            'Calendar: ${_selectedCalendar!.name}',
-                            style: const TextStyle(fontSize: 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Syncing with:',
+                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _selectedCalendar!.name ?? 'Unknown Calendar',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                              ),
+                              if (_selectedCalendar!.accountName != null && _selectedCalendar!.accountName!.isNotEmpty)
+                                Text(
+                                  _selectedCalendar!.accountName!,
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              if (lastSynced != null) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.schedule,
+                                      size: 14,
+                                      color: Colors.grey[600],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Last synced: ${_formatLastSynced(lastSynced)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else if (isEnabled) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.schedule,
+                                      size: 14,
+                                      color: Colors.orange[600],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Not synced yet',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.orange[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ],
@@ -416,23 +657,29 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
           if (_errorMessage != null) ...[
             Card(
               color: Colors.red.shade50,
+              margin: const EdgeInsets.only(bottom: 16),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.error, color: Colors.red.shade700),
+                    Icon(Icons.error, color: Colors.red.shade700, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMessage!,
-                        style: TextStyle(color: Colors.red.shade700),
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 13,
+                        ),
+                        maxLines: 5,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
           ],
 
           // Setup Section
@@ -549,6 +796,18 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
             ),
             const SizedBox(height: 16),
 
+            // Cleanup Duplicates Button
+            OutlinedButton.icon(
+              onPressed: _isLoading ? null : _cleanupDuplicates,
+              icon: const Icon(Icons.merge_type),
+              label: const Text('Cleanup Duplicate Events'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                foregroundColor: Colors.blue,
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Disable Sync
             OutlinedButton.icon(
               onPressed: _disableSync,
@@ -557,6 +816,18 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 foregroundColor: Colors.red,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Clean Synced Events (for testing)
+            OutlinedButton.icon(
+              onPressed: _cleanSyncedEvents,
+              icon: const Icon(Icons.delete_sweep),
+              label: const Text('Remove All Synced Events'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                foregroundColor: Colors.orange,
               ),
             ),
           ],
@@ -614,41 +885,53 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              backgroundColor: Theme.of(context).primaryColor,
-              child: Text(
-                '$step',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  radius: 20,
+                  child: Text(
+                    '$step',
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
                     title,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 52),
+              child: Text(
+                description,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[600],
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            ElevatedButton(
-              onPressed: onAction,
-              child: Text(action),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onAction,
+                child: Text(action),
+              ),
             ),
           ],
         ),
@@ -658,16 +941,108 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
 
   Future<void> _showCalendarSelectionDialog() async {
     if (_deviceCalendars.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No calendars available. Please grant calendar permissions first.'),
-        ),
-      );
+      if (mounted) {
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No calendars available. Please grant calendar permissions first.'),
+            ),
+          );
+        } catch (e) {
+          // Ignore - widget may be deactivating
+        }
+      }
       return;
     }
 
+    // Check event counts for each calendar (async, so show loading state)
+    final Map<String, int> eventCounts = {};
+    
+    // Show dialog with loading state first
+    final dialogContext = context;
+    showDialog(
+      context: dialogContext,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Calendar'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Checking calendars for events...'),
+          ],
+        ),
+      ),
+    );
+
+    // Check event counts in background
+    try {
+      final now = DateTime.now();
+      final deviceCalendar = DeviceCalendarPlugin();
+      
+      // Log calendar details for debugging (especially in release builds)
+      for (var calendar in _deviceCalendars) {
+        Logger.debug(
+          'Calendar for event count: name="${calendar.name}", accountName="${calendar.accountName}", id="${calendar.id}"',
+          tag: 'CalendarSyncSettingsScreen',
+        );
+      }
+      
+      for (var calendar in _deviceCalendars) {
+        if (calendar.id == null) {
+          Logger.warning(
+            'Calendar has null ID: name="${calendar.name}", accountName="${calendar.accountName}"',
+            tag: 'CalendarSyncSettingsScreen',
+          );
+          continue;
+        }
+        try {
+          final result = await deviceCalendar.retrieveEvents(
+            calendar.id!,
+            RetrieveEventsParams(
+              startDate: tz.TZDateTime.from(now.subtract(const Duration(days: 90)), tz.local),
+              endDate: tz.TZDateTime.from(now.add(const Duration(days: 180)), tz.local),
+            ),
+          );
+          if (result.isSuccess && result.data != null) {
+            eventCounts[calendar.id!] = result.data!.length;
+            Logger.debug(
+              'Calendar "${calendar.name}" (${calendar.accountName}): ${result.data!.length} events',
+              tag: 'CalendarSyncSettingsScreen',
+            );
+          } else {
+            Logger.warning(
+              'Failed to retrieve events for calendar "${calendar.name}": ${result.errors.map((e) => e.toString()).join(", ")}',
+              tag: 'CalendarSyncSettingsScreen',
+            );
+          }
+        } catch (e, st) {
+          Logger.error(
+            'Error retrieving events for calendar "${calendar.name}" (ID: ${calendar.id})',
+            error: e,
+            stackTrace: st,
+            tag: 'CalendarSyncSettingsScreen',
+          );
+        }
+      }
+    } catch (e, st) {
+      Logger.error(
+        'Error checking event counts for calendars',
+        error: e,
+        stackTrace: st,
+        tag: 'CalendarSyncSettingsScreen',
+      );
+    }
+
+    // Close loading dialog
+    if (mounted) {
+      Navigator.pop(dialogContext);
+    }
+
+    // Show selection dialog with event counts
     final selected = await showDialog<Calendar>(
-      context: context,
+      context: dialogContext,
       builder: (context) => AlertDialog(
         title: const Text('Select Calendar'),
         content: SizedBox(
@@ -677,9 +1052,46 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
             itemCount: _deviceCalendars.length,
             itemBuilder: (context, index) {
               final calendar = _deviceCalendars[index];
+              final eventCount = calendar.id != null ? eventCounts[calendar.id!] : null;
+              final hasEvents = eventCount != null && eventCount > 0;
+              
+              // Build display name with fallback
+              final displayName = calendar.name?.isNotEmpty == true
+                  ? calendar.name!
+                  : (calendar.accountName?.isNotEmpty == true
+                      ? calendar.accountName!
+                      : 'Unnamed Calendar');
+              
+              // Build subtitle with account info if different from name
+              final subtitle = calendar.accountName != null && 
+                              calendar.accountName!.isNotEmpty &&
+                              calendar.name != calendar.accountName
+                  ? calendar.accountName!
+                  : null;
+              
               return ListTile(
-                title: Text(calendar.name ?? 'Unnamed Calendar'),
-                subtitle: Text(calendar.accountName ?? ''),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(displayName),
+                    ),
+                    if (eventCount != null) ...[
+                      const SizedBox(width: 8),
+                      Chip(
+                        label: Text('$eventCount events'),
+                        backgroundColor: hasEvents ? Colors.green.shade100 : Colors.grey.shade200,
+                        labelStyle: TextStyle(
+                          fontSize: 11,
+                          color: hasEvents ? Colors.green.shade900 : Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                subtitle: subtitle != null ? Text(subtitle) : null,
+                trailing: hasEvents
+                    ? Icon(Icons.check_circle, color: Colors.green.shade700, size: 20)
+                    : Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
                 onTap: () => Navigator.pop(context, calendar),
               );
             },
@@ -695,6 +1107,32 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
     );
 
     if (selected != null && selected.id != null) {
+      final eventCount = eventCounts[selected.id!];
+      if (eventCount == null || eventCount == 0) {
+        // Warn user if they selected an empty calendar
+        final confirmed = await showDialog<bool>(
+          context: dialogContext,
+          builder: (context) => AlertDialog(
+            title: const Text('Empty Calendar Selected'),
+            content: Text(
+              'The calendar "${selected.name}" appears to have no events in the next 6 months. '
+              'You may want to select a different calendar that contains events.\n\n'
+              'Do you want to continue with this calendar anyway?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+      }
       await _selectCalendar(selected.id!);
     }
   }

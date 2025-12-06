@@ -7,10 +7,13 @@ import '../../models/game_stats.dart';
 import '../../models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
-import 'chess_puzzle_screen.dart';
 import 'word_scramble_screen.dart';
 import 'family_bingo_screen.dart';
 import 'leaderboard_screen.dart';
+import '../../games/chess/screens/chess_lobby_screen.dart';
+import '../../games/tetris/screens/tetris_screen.dart';
+import '../../games/puzzle2048/screens/puzzle2048_screen.dart';
+import '../../games/slide_puzzle/screens/slide_puzzle_screen.dart';
 
 class GamesHomeScreen extends StatefulWidget {
   const GamesHomeScreen({super.key});
@@ -94,15 +97,15 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
                       ),
                     ),
                     _buildGameCard(
-                      title: 'Chess Puzzles',
-                      description: 'Solve chess puzzles solo',
+                      title: 'Chess',
+                      description: 'Play chess vs AI, family, or online',
                       icon: Icons.sports_esports,
                       color: Colors.brown,
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const ChessPuzzleScreen(),
+                            builder: (context) => const ChessLobbyScreen(),
                           ),
                         ).then((_) => _loadData());
                       },
@@ -131,6 +134,48 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => const FamilyBingoScreen(),
+                          ),
+                        ).then((_) => _loadData());
+                      },
+                    ),
+                    _buildGameCard(
+                      title: 'Tetris',
+                      description: 'Classic falling blocks puzzle',
+                      icon: Icons.gamepad,
+                      color: Colors.red,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const TetrisScreen(),
+                          ),
+                        ).then((_) => _loadData());
+                      },
+                    ),
+                    _buildGameCard(
+                      title: '2048',
+                      description: 'Combine tiles to reach 2048',
+                      icon: Icons.apps,
+                      color: Colors.blue,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const Puzzle2048Screen(),
+                          ),
+                        ).then((_) => _loadData());
+                      },
+                    ),
+                    _buildGameCard(
+                      title: 'Slide Puzzle',
+                      description: 'Classic 15-tile sliding puzzle',
+                      icon: Icons.view_module,
+                      color: Colors.teal,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SlidePuzzleScreen(),
                           ),
                         ).then((_) => _loadData());
                       },

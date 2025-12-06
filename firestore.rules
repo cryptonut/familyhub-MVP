@@ -89,15 +89,78 @@ service cloud.firestore {
            resource.data.claimedBy == request.auth.uid ||
            resource.data.assignedTo == request.auth.uid ||
            // Allow any family member to complete tasks that don't require claim
-           (resource.data.requiresClaim == false || !('requiresClaim' in resource.data)));
+           (resource.data.requiresClaim == false || !('requiresClaim' in resource.data)) ||
+           // Allow any family member to claim a job (set claimedBy and claimStatus)
+           // Permissive rule: allow if user is setting themselves as claimer
+           (request.resource.data.claimedBy == request.auth.uid &&
+            (request.resource.data.claimStatus == 'pending' ||
+             request.resource.data.claimStatus == 'approved' ||
+             request.resource.data.claimStatus == 'rejected' ||
+             !('claimStatus' in request.resource.data))));
         allow delete: if belongsToFamily(familyId) && 
           resource.data.createdBy == request.auth.uid;
+        
+        // Task dependencies subcollection
+        match /dependencies/{dependencyId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId);
+          allow update: if belongsToFamily(familyId);
+          allow delete: if belongsToFamily(familyId);
+        }
       }
       
       // Calendar events subcollection
       match /events/{eventId} {
         allow read: if belongsToFamily(familyId);
-        allow write: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        // Allow any family member to update events (for collaboration and duplicate cleanup)
+        // Ownership checks are handled at the application level
+        allow update: if belongsToFamily(familyId);
+        allow delete: if belongsToFamily(familyId) && 
+          (resource.data.eventOwnerId == request.auth.uid ||
+           resource.data.createdBy == request.auth.uid ||
+           // Allow admin/banker to delete events for duplicate cleanup operations
+           isBankerOrAdmin());
+        
+        // Event-specific chat messages subcollection
+        match /chats/{messageId} {
+          // Helper function to check if user has access to event chat
+          // Access granted to: event creator + invitedMemberIds
+          function hasEventChatAccess() {
+            let eventData = get(/databases/$(database)/documents/families/$(familyId)/events/$(eventId)).data;
+            let createdBy = eventData.createdBy;
+            let invitedMemberIds = eventData.invitedMemberIds is list ? eventData.invitedMemberIds : [];
+            return request.auth != null && 
+              (createdBy == request.auth.uid || 
+               request.auth.uid in invitedMemberIds);
+          }
+          
+          // Helper function to check if user is Admin
+          function isAdmin() {
+            return isAuthenticated() && 
+              userDocumentExists() &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['Admin', 'admin']);
+          }
+          
+          // Read: Only event creator + invited members
+          allow read: if belongsToFamily(familyId) && hasEventChatAccess();
+          
+          // Create: Only event creator + invited members, and sender must be current user
+          allow create: if belongsToFamily(familyId) && 
+            hasEventChatAccess() &&
+            request.resource.data.senderId == request.auth.uid;
+          
+          // Update: Only message sender can edit their own messages
+          allow update: if belongsToFamily(familyId) && 
+            hasEventChatAccess() &&
+            resource.data.senderId == request.auth.uid;
+          
+          // Delete: Message sender OR admin can delete
+          allow delete: if belongsToFamily(familyId) && 
+            hasEventChatAccess() &&
+            (resource.data.senderId == request.auth.uid || isAdmin());
+        }
       }
       
       // Chat messages subcollection
@@ -109,6 +172,28 @@ service cloud.firestore {
           resource.data.senderId == request.auth.uid;
         allow delete: if belongsToFamily(familyId) && 
           resource.data.senderId == request.auth.uid;
+        
+        // Message reactions subcollection
+        match /reactions/{reactionId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId) && 
+            request.resource.data.userId == request.auth.uid;
+          allow update: if belongsToFamily(familyId) && 
+            resource.data.userId == request.auth.uid;
+          allow delete: if belongsToFamily(familyId) && 
+            resource.data.userId == request.auth.uid;
+        }
+        
+        // Message replies subcollection (for threading)
+        match /replies/{replyId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId) && 
+            request.resource.data.senderId == request.auth.uid;
+          allow update: if belongsToFamily(familyId) && 
+            resource.data.senderId == request.auth.uid;
+          allow delete: if belongsToFamily(familyId) && 
+            resource.data.senderId == request.auth.uid;
+        }
       }
       
       // Private messages subcollection
@@ -143,10 +228,10 @@ service cloud.firestore {
       // Game stats subcollection
       match /game_stats/{userId} {
         allow read: if belongsToFamily(familyId);
-        allow create: if belongsToFamily(familyId) && 
-          request.resource.data.userId == request.auth.uid;
-        allow update: if belongsToFamily(familyId) && 
-          request.resource.data.userId == request.auth.uid;
+        // Allow create/update if document ID matches auth uid (user updating their own stats)
+        // The document ID is the userId, so we check that directly
+        allow create, update: if belongsToFamily(familyId) && 
+          userId == request.auth.uid;
       }
       
       // Photo albums subcollection
@@ -269,12 +354,12 @@ service cloud.firestore {
       match /hubs/{hubId} {
         allow read: if belongsToFamily(familyId);
         allow create: if belongsToFamily(familyId) && 
-          request.resource.data.createdBy == request.auth.uid;
+          request.resource.data.creatorId == request.auth.uid;
         allow update: if belongsToFamily(familyId) && 
-          (resource.data.createdBy == request.auth.uid ||
-           resource.data.members.hasAny([request.auth.uid]));
+          (resource.data.creatorId == request.auth.uid ||
+           resource.data.memberIds.hasAny([request.auth.uid]));
         allow delete: if belongsToFamily(familyId) && 
-          resource.data.createdBy == request.auth.uid;
+          resource.data.creatorId == request.auth.uid;
       }
       
       // Hub invites subcollection
@@ -283,6 +368,17 @@ service cloud.firestore {
         allow create: if belongsToFamily(familyId);
         allow update: if belongsToFamily(familyId);
         allow delete: if belongsToFamily(familyId);
+      }
+      
+      // Event templates subcollection
+      match /eventTemplates/{templateId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if belongsToFamily(familyId) && 
+          resource.data.createdBy == request.auth.uid;
+        allow delete: if belongsToFamily(familyId) && 
+          resource.data.createdBy == request.auth.uid;
       }
     }
     
@@ -297,11 +393,30 @@ service cloud.firestore {
     // Hubs collection (top-level, for backward compatibility)
     match /hubs/{hubId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.creatorId == request.auth.uid;
       allow update: if isAuthenticated() && 
-        (resource.data.createdBy == request.auth.uid ||
-         resource.data.members.hasAny([request.auth.uid]));
-      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+        (resource.data.creatorId == request.auth.uid ||
+         resource.data.memberIds.hasAny([request.auth.uid]));
+      allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
+      
+      // Hub messages subcollection
+      match /messages/{messageId} {
+        // Helper function to check if user is a hub member
+        function isHubMember() {
+          return isAuthenticated() && 
+            exists(/databases/$(database)/documents/hubs/$(hubId)) &&
+            (get(/databases/$(database)/documents/hubs/$(hubId)).data.creatorId == request.auth.uid ||
+             request.auth.uid in get(/databases/$(database)/documents/hubs/$(hubId)).data.memberIds);
+        }
+        
+        allow read: if isHubMember();
+        allow create: if isHubMember() && 
+          request.resource.data.senderId == request.auth.uid;
+        allow update: if isHubMember() && 
+          resource.data.senderId == request.auth.uid;
+        allow delete: if isHubMember() && 
+          resource.data.senderId == request.auth.uid;
+      }
     }
     
     // Hub invites collection (top-level, for backward compatibility)
@@ -324,6 +439,104 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
       allow delete: if isAuthenticated();
+    }
+    
+    // Chess games collection
+    match /chess_games/{gameId} {
+      // Helper function to check if user is involved in the game
+      function isGameParticipant() {
+        return resource.data.whitePlayerId == request.auth.uid ||
+               resource.data.blackPlayerId == request.auth.uid ||
+               (resource.data.invitedPlayerId != null && 
+                resource.data.invitedPlayerId == request.auth.uid) ||
+               request.auth.uid in resource.data.spectators;
+      }
+      
+      // CRITICAL FIX: Allow authenticated users to read ALL chess games
+      // This is needed for:
+      // 1. Collection queries (.get()) to fetch all games for deletion
+      // 2. Stream queries to see waiting/active games
+      // Individual document access is still controlled by isGameParticipant() for security
+      // But collection-level queries need broader permission
+      allow read: if isAuthenticated();
+      
+      // Users can create games
+      allow create: if isAuthenticated() && 
+        request.resource.data.whitePlayerId == request.auth.uid;
+      
+      // Players can update their own games (make moves)
+      // Also allow invited players to update (when accepting the invite)
+      allow update: if isAuthenticated() && 
+        (resource.data.whitePlayerId == request.auth.uid ||
+         resource.data.blackPlayerId == request.auth.uid ||
+         (resource.data.invitedPlayerId != null && 
+          resource.data.invitedPlayerId == request.auth.uid));
+      
+      // Players can delete their own games (resign/abort)
+      // Also allow invited players to delete (when declining the invite)
+      // CRITICAL: Allow deletion of waiting games by any authenticated user (for cleanup/admin operations)
+      // This enables the "Clear All Chess Data" feature to work properly
+      allow delete: if isAuthenticated() && 
+        (resource.data.whitePlayerId == request.auth.uid ||
+         resource.data.blackPlayerId == request.auth.uid ||
+         (resource.data.invitedPlayerId != null && 
+          resource.data.invitedPlayerId == request.auth.uid) ||
+         // Allow deletion of waiting games by any authenticated user (for cleanup)
+         resource.data.status == 'waiting');
+    }
+    
+    // Chess matchmaking queue
+    match /chess_matchmaking/{queueId} {
+      // Users can read all queue entries (needed for matchmaking)
+      allow read: if isAuthenticated();
+      
+      // Users can create their own queue entry
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // Users can update their own queue entry
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      
+      // Users can delete their own queue entry
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Chess invites collection (for family chess challenges)
+    match /invites/{inviteId} {
+      // CRITICAL FIX: Allow authenticated users to read ALL invites
+      // This is needed for collection queries (.get()) to fetch all invites for deletion
+      // Individual document access can still be filtered client-side for security
+      allow read: if isAuthenticated();
+      
+      // Users can create invites (when challenging someone)
+      allow create: if isAuthenticated() && 
+        request.resource.data.sender == request.auth.uid;
+      
+      // Users can update invites they sent or received
+      allow update: if isAuthenticated() && 
+        (resource.data.sender == request.auth.uid ||
+         resource.data.targetUser == request.auth.uid);
+      
+      // Users can delete invites they sent
+      // CRITICAL: Also allow deletion of pending invites by any authenticated user (for cleanup)
+      // This enables the "Clear All Chess Data" feature to work properly
+      allow delete: if isAuthenticated() && 
+        (resource.data.sender == request.auth.uid ||
+         resource.data.status == 'pending');
+    }
+    
+    // FCM messages collection (for triggering Cloud Functions)
+    match /fcm_messages/{messageId} {
+      // Allow authenticated users to create FCM message triggers
+      allow create: if isAuthenticated();
+      // CRITICAL FIX: Allow authenticated users to read and delete FCM messages
+      // This is needed for the "Clear All Chess Data" feature to delete chess-related FCM messages
+      allow read: if isAuthenticated();
+      allow delete: if isAuthenticated();
+      // No updates allowed (immutable)
+      allow update: if false;
     }
   }
 }

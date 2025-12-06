@@ -54,8 +54,10 @@ coverage/
 *.freezed.dart
 
 # Debug logs and logcat files
-# *.logcat - COMMENTED OUT: User wants logcat files in public repo for AI review
+*.logcat
+*.log
 debug logs/
+logs/
 
 # Android secrets (API keys, etc.)
 android/secrets.properties

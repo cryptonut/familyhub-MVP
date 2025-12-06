@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../core/services/logger_service.dart';
 import '../services/app_state.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
+import '../games/chess/services/chess_service.dart';
+import '../games/chess/models/chess_game.dart';
+import '../services/badge_service.dart';
+import '../widgets/ui_components.dart' hide Badge;
+import '../widgets/quick_actions_fab.dart';
+import '../providers/user_data_provider.dart';
+import '../services/hub_service.dart';
+import '../models/hub.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'calendar/calendar_screen.dart';
 import 'tasks/tasks_screen.dart';
-import 'chat/chat_screen.dart';
+import 'chat/chat_tabs_screen.dart';
 import 'location/location_screen.dart';
 import 'family/family_invitation_screen.dart';
 import 'family/join_family_screen.dart';
@@ -19,6 +28,8 @@ import 'settings/calendar_sync_settings_screen.dart';
 import 'settings/privacy_center_screen.dart';
 import 'games/games_home_screen.dart';
 import 'photos/photos_home_screen.dart';
+import 'hubs/my_hubs_screen.dart';
+import 'hubs/my_friends_hub_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,6 +39,576 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final ChessService _chessService = ChessService();
+  final BadgeService _badgeService = BadgeService();
+  final HubService _hubService = HubService();
+  int _waitingChessChallenges = 0;
+  StreamSubscription<List<ChessGame>>? _waitingGamesSubscription;
+  StreamSubscription<BadgeCounts>? _badgeCountsSubscription;
+  BadgeCounts _badgeCounts = BadgeCounts(
+    unreadMessages: 0,
+    pendingTasks: 0,
+    waitingGames: 0,
+    pendingApprovals: 0,
+  );
+  String? _currentFamilyId;
+  String? _currentUserId;
+  bool _isDeveloper = false;
+  bool _isAdmin = false;
+  List<Hub> _availableHubs = [];
+  String? _selectedHubId;
+  String? _currentFamilyName;
+  bool _hubsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWaitingGames();
+    _checkUserPermissions();
+    _loadBadgeCounts();
+    _loadHubsAndFamily();
+  }
+
+  void _loadBadgeCounts() {
+    _badgeCountsSubscription = _badgeService.getAllBadgeCounts().listen(
+      (counts) {
+        if (mounted) {
+          setState(() {
+            _badgeCounts = counts;
+            _waitingChessChallenges = counts.waitingGames;
+          });
+        }
+      },
+      onError: (error) {
+        Logger.warning('Error loading badge counts', error: error, tag: 'HomeScreen');
+      },
+    );
+  }
+
+  Future<void> _checkUserPermissions() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUser = authService.currentUser;
+    final userModel = await authService.getCurrentUserModel();
+    
+    if (mounted) {
+      setState(() {
+        _isDeveloper = currentUser?.email == 'simoncase78@gmail.com';
+        _isAdmin = userModel?.isAdmin() ?? false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _waitingGamesSubscription?.cancel();
+    _badgeCountsSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadHubsAndFamily() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userModel = await authService.getCurrentUserModel();
+      _currentFamilyId = userModel?.familyId;
+      
+      // Get family name - default to "Case Family" or derive from familyId
+      if (_currentFamilyId != null) {
+        // Try to get family name from hubs first, otherwise use default
+        _currentFamilyName = 'Case Family'; // Default name
+      }
+      
+      // Load all hubs
+      final hubs = await _hubService.getUserHubs();
+      
+      // Add current family as a hub option if not already in hubs
+      if (_currentFamilyId != null && !hubs.any((h) => h.id == _currentFamilyId)) {
+        // Create a virtual hub for the current family
+        final familyHub = Hub(
+          id: _currentFamilyId!,
+          name: _currentFamilyName ?? 'Case Family',
+          description: 'Your family hub',
+          creatorId: userModel?.uid ?? '',
+          memberIds: [],
+          createdAt: DateTime.now(),
+        );
+        hubs.insert(0, familyHub);
+      }
+      
+      if (mounted) {
+        setState(() {
+          _availableHubs = hubs;
+          _selectedHubId = _currentFamilyId; // Default to current family
+          _hubsLoaded = true;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading hubs and family', error: e, tag: 'HomeScreen');
+      if (mounted) {
+        setState(() {
+          _hubsLoaded = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadWaitingGames() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userModel = await authService.getCurrentUserModel();
+      final user = authService.currentUser;
+      _currentFamilyId = userModel?.familyId;
+      _currentUserId = user?.uid;
+
+      if (_currentFamilyId != null && _currentUserId != null) {
+        _waitingGamesSubscription?.cancel();
+        _waitingGamesSubscription = _chessService
+            .streamWaitingFamilyGames(_currentFamilyId!)
+            .listen((games) {
+          if (mounted) {
+            setState(() {
+              // Count games where current user is invited
+              _waitingChessChallenges = games
+                  .where((g) => g.invitedPlayerId == _currentUserId)
+                  .length;
+            });
+          }
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading waiting chess games', error: e, tag: 'HomeScreen');
+    }
+  }
+
+  Widget _buildGamesIcon(IconData icon) {
+    if (_badgeCounts.waitingGames > 0) {
+      return Badge(
+        label: Text(
+          _badgeCounts.waitingGames > 9 ? '9+' : '${_badgeCounts.waitingGames}',
+          style: const TextStyle(fontSize: 10),
+        ),
+        child: Icon(icon),
+      );
+    }
+    return Icon(icon);
+  }
+
+  Widget _buildChatIcon(IconData icon) {
+    if (_badgeCounts.unreadMessages > 0) {
+      return Badge(
+        label: Text(
+          _badgeCounts.unreadMessages > 9 ? '9+' : '${_badgeCounts.unreadMessages}',
+          style: const TextStyle(fontSize: 10),
+        ),
+        child: Icon(icon),
+      );
+    }
+    return Icon(icon);
+  }
+
+  Widget _buildHubDropdown() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    if (_availableHubs.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[800] : Colors.grey[300],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          'Family Hub',
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    final selectedHub = _availableHubs.firstWhere(
+      (hub) => hub.id == _selectedHubId,
+      orElse: () => _availableHubs.first,
+    );
+
+    return Align(
+      alignment: Alignment.center,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 200, minWidth: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[800] : Colors.grey[300],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark ? Colors.grey[700]! : Colors.grey[400]!,
+            width: 1,
+          ),
+        ),
+        child: DropdownButton<Hub>(
+          value: selectedHub,
+          isDense: true,
+          isExpanded: false,
+        underline: const SizedBox.shrink(),
+        icon: Icon(
+          Icons.arrow_drop_down,
+          color: theme.colorScheme.onSurface,
+          size: 20,
+        ),
+        dropdownColor: isDark ? Colors.grey[900] : Colors.white,
+        menuMaxHeight: 300,
+        style: TextStyle(
+          color: theme.colorScheme.onSurface,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+        items: [
+          // Add "Add New Hub" option at the top
+          DropdownMenuItem<Hub>(
+            value: null, // Special value to indicate "Add New Hub"
+            child: Row(
+              children: [
+                Icon(
+                  Icons.add,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Add New Hub',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Divider - use a disabled item that won't interfere with selection
+          DropdownMenuItem<Hub>(
+            value: null,
+            enabled: false,
+            child: Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              color: isDark ? Colors.grey[700] : Colors.grey[400],
+            ),
+          ),
+          // Existing hubs
+          ..._availableHubs.map((hub) {
+            return DropdownMenuItem<Hub>(
+              value: hub,
+              child: Text(
+                hub.name,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            );
+          }).toList(),
+        ],
+        onChanged: (Hub? newHub) {
+          if (newHub == null) {
+            // "Add New Hub" was selected - navigate to hubs screen
+            // Use a small delay to allow dropdown to close first
+            Future.delayed(const Duration(milliseconds: 100), () {
+              if (mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MyHubsScreen(),
+                  ),
+                ).then((_) {
+                  // Reload hubs when returning from hubs screen
+                  _loadHubsAndFamily();
+                });
+              }
+            });
+            return;
+          }
+          
+          // Hub was selected - navigate to hub screen
+          Logger.info('Navigating to hub: ${newHub.name} (${newHub.id})', tag: 'HomeScreen');
+          
+          // Update selected hub state
+          setState(() {
+            _selectedHubId = newHub.id;
+            _currentFamilyName = newHub.name;
+          });
+          
+          // Navigate to the hub screen
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MyFriendsHubScreen(hub: newHub),
+                ),
+              ).then((_) {
+                // Reload data when returning from hub screen
+                if (mounted) {
+                  _loadWaitingGames();
+                  _loadBadgeCounts();
+                }
+              });
+            }
+          });
+        },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildJobsIcon(IconData icon) {
+    final total = _badgeCounts.pendingTasks + _badgeCounts.pendingApprovals;
+    if (total > 0) {
+      return Badge(
+        label: Text(
+          total > 9 ? '9+' : '$total',
+          style: const TextStyle(fontSize: 10),
+        ),
+        child: Icon(icon),
+      );
+    }
+    return Icon(icon);
+  }
+
+  Future<void> _showDeveloperMenu(BuildContext context, AuthService authService) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.code, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Developer Menu'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.sync, color: Colors.blue),
+              title: const Text('Run Migration'),
+              onTap: () => Navigator.pop(context, 'migration'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.family_restroom, color: Colors.orange),
+              title: const Text('Fix Family Link'),
+              onTap: () => Navigator.pop(context, 'fix_family'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.bug_report, color: Colors.grey),
+              title: const Text('Debug User Info'),
+              onTap: () => Navigator.pop(context, 'debug'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == 'migration') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MigrationScreen(),
+        ),
+      );
+    } else if (result == 'fix_family') {
+      await _showFixFamilyDialog(context, authService);
+    } else if (result == 'debug') {
+      // Show debug information
+      final user = authService.currentUser;
+      if (user != null) {
+        UserModel? userModel;
+        try {
+          userModel = await authService.getCurrentUserModel();
+        } catch (e) {
+          Logger.warning('getCurrentUserModel failed (likely orphaned account)', error: e, tag: 'HomeScreen');
+        }
+        if (context.mounted) {
+          await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('User Debug Info'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('User ID: ${user.uid}'),
+                    const SizedBox(height: 8),
+                    Text('Email: ${user.email ?? "N/A"}'),
+                    const SizedBox(height: 8),
+                    Text('Firebase Auth Display Name: ${user.displayName ?? "N/A"}'),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text('User Document Exists: ${userModel != null ? "Yes" : "No"}'),
+                    if (userModel != null) ...[
+                      const SizedBox(height: 8),
+                      Text('Firestore Display Name: ${userModel.displayName}'),
+                      const SizedBox(height: 8),
+                      Text('Family ID: ${userModel.familyId ?? "None"}'),
+                      const SizedBox(height: 8),
+                      Text('Created At: ${userModel.createdAt}'),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          '⚠️ Orphaned Account: Auth account exists but Firestore document is missing.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await authService.forceInitializeFamilyId();
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('User document created/updated! Please refresh the app.'),
+                            backgroundColor: Colors.green,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        final errorMsg = e.toString();
+                        final isPermissionError = errorMsg.contains('permission-denied') || 
+                                                  errorMsg.contains('permission denied');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isPermissionError 
+                                ? 'Permission denied. Please ensure Firestore rules are published in Firebase Console.'
+                                : 'Error: $e'
+                            ),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 5),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Fix User Document'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showAdminMenu(BuildContext context, AuthService authService) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.admin_panel_settings, color: Colors.purple),
+            SizedBox(width: 8),
+            Text('Admin Menu'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings, color: Colors.blue),
+              title: const Text('Manage Roles'),
+              onTap: () => Navigator.pop(context, 'roles'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text('Reset Database', style: TextStyle(color: Colors.red)),
+              onTap: () => Navigator.pop(context, 'reset'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.family_restroom, color: Colors.orange),
+              title: const Text('Fix Family Link', style: TextStyle(color: Colors.orange)),
+              onTap: () => Navigator.pop(context, 'fix_family'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == 'roles') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const RoleManagementScreen(),
+        ),
+      );
+    } else if (result == 'reset') {
+      // Show warning before allowing database reset
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('⚠️ Warning'),
+          content: const Text(
+            'Database Reset will permanently delete your account and all data. '
+            'This is for development/testing only. Continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      
+      if (confirm == true && context.mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const DatabaseResetScreen(),
+          ),
+        );
+      }
+    } else if (result == 'fix_family') {
+      await _showFixFamilyDialog(context, authService);
+    }
+  }
 
   Future<void> _showFixFamilyDialog(BuildContext context, AuthService authService) async {
     // Capture outer context before showing dialog to avoid using invalid context after pop
@@ -221,138 +802,141 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, appState, _) {
         return Scaffold(
           appBar: AppBar(
-            title: GestureDetector(
-              onTap: () {
-                // Navigate to dashboard (index 0)
-                appState.setCurrentIndex(0);
-              },
-              child: const Text('Family Hub'),
+            title: const SizedBox.shrink(), // Empty title to make room for flexibleSpace
+            centerTitle: true,
+            flexibleSpace: SafeArea(
+              child: Center(
+                child: _hubsLoaded
+                    ? _buildHubDropdown()
+                    : const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+              ),
             ),
             actions: [
               PopupMenuButton(
                 icon: const Icon(Icons.more_vert),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'invite',
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_add, size: 20),
-                        SizedBox(width: 8),
-                        Text('Invite Family'),
-                      ],
+                itemBuilder: (context) {
+                  final items = <PopupMenuEntry>[
+                    const PopupMenuItem(
+                      value: 'invite',
+                      child: Row(
+                        children: [
+                          Icon(Icons.person_add, size: 20),
+                          SizedBox(width: 8),
+                          Text('Invite Family'),
+                        ],
+                      ),
                     ),
-                  ),
-        const PopupMenuItem(
-          value: 'join',
-          child: Row(
-            children: [
-              Icon(Icons.group_add, size: 20),
-              SizedBox(width: 8),
-              Text('Join Family'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'profile',
-          child: Row(
-            children: [
-              Icon(Icons.person, size: 20),
-              SizedBox(width: 8),
-              Text('Edit Profile'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'calendar_sync',
-          child: Row(
-            children: [
-              Icon(Icons.sync, size: 20),
-              SizedBox(width: 8),
-              Text('Calendar Sync'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'privacy',
-          child: Row(
-            children: [
-              Icon(Icons.privacy_tip, size: 20),
-              SizedBox(width: 8),
-              Text('Privacy Center'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'roles',
-          child: Row(
-            children: [
-              Icon(Icons.admin_panel_settings, size: 20),
-              SizedBox(width: 8),
-              Text('Manage Roles'),
-            ],
-          ),
-        ),
+                    const PopupMenuItem(
+                      value: 'join',
+                      child: Row(
+                        children: [
+                          Icon(Icons.group_add, size: 20),
+                          SizedBox(width: 8),
+                          Text('Join Family'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'profile',
+                      child: Row(
+                        children: [
+                          Icon(Icons.person, size: 20),
+                          SizedBox(width: 8),
+                          Text('Edit Profile'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'calendar_sync',
+                      child: Row(
+                        children: [
+                          Icon(Icons.sync, size: 20),
+                          SizedBox(width: 8),
+                          Text('Calendar Sync'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'privacy',
+                      child: Row(
+                        children: [
+                          Icon(Icons.privacy_tip, size: 20),
+                          SizedBox(width: 8),
+                          Text('Privacy Center'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                  ];
+                  
+                  // Admin Menu
+                  if (_isAdmin) {
+                    items.add(
                       const PopupMenuItem(
-                        value: 'migration',
+                        value: 'admin_menu',
                         child: Row(
                           children: [
-                            Icon(Icons.sync, size: 20),
+                            Icon(Icons.admin_panel_settings, size: 20, color: Colors.purple),
                             SizedBox(width: 8),
-                            Text('Run Migration'),
+                            Text('Admin Menu', style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
+                            SizedBox(width: 8),
+                            Icon(Icons.chevron_right, size: 16),
                           ],
                         ),
                       ),
+                    );
+                  }
+                  
+                  // Developer Menu
+                  if (_isDeveloper) {
+                    items.add(
                       const PopupMenuItem(
-                        value: 'reset',
+                        value: 'developer_menu',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_forever, size: 20, color: Colors.red),
+                            Icon(Icons.code, size: 20, color: Colors.orange),
                             SizedBox(width: 8),
-                            Text('Reset Database', style: TextStyle(color: Colors.red)),
+                            Text('Developer Menu', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                            SizedBox(width: 8),
+                            Icon(Icons.chevron_right, size: 16),
                           ],
                         ),
                       ),
-        const PopupMenuItem(
-          value: 'fix_family',
-          child: Row(
-            children: [
-              Icon(Icons.family_restroom, size: 20, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('Fix Family Link', style: TextStyle(color: Colors.orange)),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'force_signout',
-          child: Row(
-            children: [
-              Icon(Icons.refresh, size: 20, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('Refresh Session', style: TextStyle(color: Colors.blue)),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'debug',
-          child: Row(
-            children: [
-              Icon(Icons.bug_report, size: 20),
-              SizedBox(width: 8),
-              Text('Debug User Info'),
-            ],
-          ),
-        ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout, size: 20, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Logout', style: TextStyle(color: Colors.red)),
-                      ],
+                    );
+                  }
+                  
+                  items.add(
+                    const PopupMenuItem(
+                      value: 'force_signout',
+                      child: Row(
+                        children: [
+                          Icon(Icons.refresh, size: 20, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('Refresh Session', style: TextStyle(color: Colors.blue)),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  );
+                  
+                  items.add(
+                    const PopupMenuItem(
+                      value: 'logout',
+                      child: Row(
+                        children: [
+                          Icon(Icons.logout, size: 20, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Logout', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  );
+                  
+                  return items;
+                },
                 onSelected: (value) async {
                   if (value == 'invite') {
                     await Navigator.push(
@@ -398,85 +982,11 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (context) => const PrivacyCenterScreen(),
             ),
           );
-        } else if (value == 'roles') {
-          // Check if user is Admin before allowing role management
-          final userModel = await authService.getCurrentUserModel();
-          if (userModel != null && userModel.isAdmin()) {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const RoleManagementScreen(),
-              ),
-            );
-          } else {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Only Admins can manage roles'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          }
-        } else if (value == 'migration') {
-          // Check if user is Admin before allowing migration
-          final userModel = await authService.getCurrentUserModel();
-          if (userModel != null && userModel.isAdmin()) {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MigrationScreen(),
-              ),
-            );
-                        } else {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Only Admins can run migrations'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      } else if (value == 'reset') {
-                        // Show warning before allowing database reset
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('⚠️ Warning'),
-                            content: const Text(
-                              'Database Reset will permanently delete your account and all data. '
-                              'This is for development/testing only. Continue?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Continue'),
-                              ),
-                            ],
-                          ),
-                        );
-                        
-                        if (confirm == true && context.mounted) {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const DatabaseResetScreen(),
-                            ),
-                          );
-                        }
-                      } else if (value == 'fix_family') {
-                        // Quick fix to re-link to Kate's family
-                        await _showFixFamilyDialog(context, authService);
-                      } else if (value == 'force_signout') {
+        } else if (value == 'admin_menu') {
+          await _showAdminMenu(context, authService);
+        } else if (value == 'developer_menu') {
+          await _showDeveloperMenu(context, authService);
+        } else if (value == 'force_signout') {
                         // Force sign out to clear persisted session and refresh
                         final confirm = await showDialog<bool>(
                           context: context,
@@ -515,311 +1025,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             );
                           }
                         }
-                      } else if (value == 'debug') {
-                        // Show debug information
-                        final user = authService.currentUser;
-                        if (user != null) {
-                          UserModel? userModel;
-                          try {
-                            userModel = await authService.getCurrentUserModel();
-                          } catch (e) {
-                            // If getCurrentUserModel fails (orphaned account), userModel will be null
-                            Logger.warning('getCurrentUserModel failed (likely orphaned account)', error: e, tag: 'HomeScreen');
-                          }
-                          if (context.mounted) {
-                            await showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: const Text('User Debug Info'),
-                                content: SingleChildScrollView(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('User ID: ${user.uid}'),
-                                      const SizedBox(height: 8),
-                                      Text('Email: ${user.email ?? "N/A"}'),
-                                      const SizedBox(height: 8),
-                                      Text('Firebase Auth Display Name: ${user.displayName ?? "N/A"}'),
-                                      const SizedBox(height: 16),
-                                      const Divider(),
-                                      const SizedBox(height: 8),
-                                      Text('User Document Exists: ${userModel != null ? "Yes" : "No"}'),
-                                      if (userModel != null) ...[
-                                        const SizedBox(height: 8),
-                                        Text('Firestore Display Name: ${userModel.displayName}'),
-                                        const SizedBox(height: 8),
-                                        Text('Family ID: ${userModel.familyId ?? "None"}'),
-                                        const SizedBox(height: 8),
-                                        Text('Created At: ${userModel.createdAt}'),
-                                      ] else ...[
-                                        const SizedBox(height: 8),
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orange.shade50,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Text(
-                                            '⚠️ Orphaned Account: Auth account exists but Firestore document is missing.',
-                                            style: TextStyle(fontSize: 12),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Close'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      try {
-                                        await authService.forceInitializeFamilyId();
-                                        if (context.mounted) {
-                                          Navigator.pop(context);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('User document created/updated! Please refresh the app.'),
-                                              backgroundColor: Colors.green,
-                                              duration: Duration(seconds: 3),
-                                            ),
-                                          );
-                                        }
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          final errorMsg = e.toString();
-                                          final isPermissionError = errorMsg.contains('permission-denied') || 
-                                                                    errorMsg.contains('permission denied');
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                isPermissionError 
-                                                  ? 'Permission denied. Please ensure Firestore rules are published in Firebase Console.'
-                                                  : 'Error: $e'
-                                              ),
-                                              backgroundColor: Colors.red,
-                                              duration: const Duration(seconds: 5),
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    },
-                                    child: const Text('Fix User Document'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      try {
-                                        await authService.updateDisplayNameFromAuth();
-                                        if (context.mounted) {
-                                          Navigator.pop(context);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Display name updated! Please restart the app.'),
-                                              backgroundColor: Colors.green,
-                                              duration: Duration(seconds: 5),
-                                            ),
-                                          );
-                                        }
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Error: $e'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    child: const Text('Fix Display Name'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      try {
-                                        await authService.selfAssignAdminRole();
-                                        if (context.mounted) {
-                                          Navigator.pop(context);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Admin role added! Please restart the app.'),
-                                              backgroundColor: Colors.green,
-                                              duration: Duration(seconds: 5),
-                                            ),
-                                          );
-                                        }
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Error: $e'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
-                                        }
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orange,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    child: const Text('Add Admin Role (One-time)'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      final controller = TextEditingController();
-                                      final result = await showDialog<bool>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text('Join Family'),
-                                          content: TextField(
-                                            controller: controller,
-                                            decoration: const InputDecoration(
-                                              labelText: 'Enter Family ID',
-                                              hintText: 'Paste family ID here',
-                                              border: OutlineInputBorder(),
-                                            ),
-                                            autofocus: true,
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context, false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            ElevatedButton(
-                                              onPressed: () => Navigator.pop(context, true),
-                                              child: const Text('Join'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      
-                                      if (result == true && controller.text.trim().isNotEmpty) {
-                                        try {
-                                          await authService.joinFamilyByInvitationCode(controller.text.trim());
-                                          if (context.mounted) {
-                                            Navigator.pop(context);
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Successfully joined family! Please restart the app.'),
-                                                backgroundColor: Colors.green,
-                                                duration: Duration(seconds: 5),
-                                              ),
-                                            );
-                                          }
-                                        } catch (e) {
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('Error joining family: $e'),
-                                                backgroundColor: Colors.red,
-                                              ),
-                                            );
-                                          }
-                                        }
-                                      }
-                                      controller.dispose();
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    child: const Text('Join Family (Manual)'),
-                                  ),
-                                  if (userModel == null)
-                                    ElevatedButton(
-                                      onPressed: () async {
-                                        final passwordController = TextEditingController();
-                                        final password = await showDialog<String>(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text('Force Delete Auth Account'),
-                                            content: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Text(
-                                                  'This will delete your Firebase Auth account only (Firestore data is already missing).\n\n'
-                                                  'You will be signed out and can create a new account.\n\n'
-                                                  'This action cannot be undone.',
-                                                ),
-                                                const SizedBox(height: 16),
-                                                TextField(
-                                                  controller: passwordController,
-                                                  decoration: const InputDecoration(
-                                                    labelText: 'Enter Password to Confirm',
-                                                    hintText: 'Your account password',
-                                                    border: OutlineInputBorder(),
-                                                  ),
-                                                  obscureText: true,
-                                                  autofocus: true,
-                                                  onSubmitted: (value) => Navigator.pop(context, value),
-                                                ),
-                                              ],
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(context),
-                                                child: const Text('Cancel'),
-                                              ),
-                                              ElevatedButton(
-                                                onPressed: () => Navigator.pop(context, passwordController.text),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.red,
-                                                  foregroundColor: Colors.white,
-                                                ),
-                                                child: const Text('Delete Account'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        
-                                        if (password != null && password.isNotEmpty && context.mounted) {
-                                          try {
-                                            await authService.deleteCurrentUserAccount(
-                                              password: password,
-                                              skipFirestoreDeletion: true,
-                                            );
-                                            if (context.mounted) {
-                                              Navigator.pop(context);
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Auth account deleted. You will be signed out.'),
-                                                  backgroundColor: Colors.green,
-                                                  duration: Duration(seconds: 5),
-                                                ),
-                                              );
-                                            }
-                                          } catch (e) {
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error deleting account: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          }
-                                        }
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: const Text('Force Delete Auth Account'),
-                                    ),
-                                ],
-                              ),
-                            );
-                          }
-                        }
                       } else if (value == 'logout') {
-                    await authService.signOut();
+                        await authService.signOut();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Signed out successfully'),
+                              backgroundColor: Colors.blue,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
                   }
                 },
               ),
@@ -831,7 +1047,6 @@ class _HomeScreenState extends State<HomeScreen> {
               DashboardScreen(),
               CalendarScreen(),
               TasksScreen(),
-              ChatScreen(),
               GamesHomeScreen(),
               PhotosHomeScreen(),
               LocationScreen(),
@@ -842,38 +1057,33 @@ class _HomeScreenState extends State<HomeScreen> {
             onDestinationSelected: (index) {
               appState.setCurrentIndex(index);
             },
-            destinations: const [
-              NavigationDestination(
+            destinations: [
+              const NavigationDestination(
                 icon: Icon(Icons.dashboard_outlined),
                 selectedIcon: Icon(Icons.dashboard),
                 label: 'Dashboard',
               ),
-              NavigationDestination(
+              const NavigationDestination(
                 icon: Icon(Icons.calendar_today_outlined),
                 selectedIcon: Icon(Icons.calendar_today),
                 label: 'Calendar',
               ),
               NavigationDestination(
-                icon: Icon(Icons.task_outlined),
-                selectedIcon: Icon(Icons.task),
+                icon: _buildJobsIcon(Icons.task_outlined),
+                selectedIcon: _buildJobsIcon(Icons.task),
                 label: 'Jobs',
               ),
               NavigationDestination(
-                icon: Icon(Icons.chat_bubble_outline),
-                selectedIcon: Icon(Icons.chat_bubble),
-                label: 'Chat',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.sports_esports_outlined),
-                selectedIcon: Icon(Icons.sports_esports),
+                icon: _buildGamesIcon(Icons.sports_esports_outlined),
+                selectedIcon: _buildGamesIcon(Icons.sports_esports),
                 label: 'Games',
               ),
-              NavigationDestination(
+              const NavigationDestination(
                 icon: Icon(Icons.photo_library_outlined),
                 selectedIcon: Icon(Icons.photo_library),
                 label: 'Photos',
               ),
-              NavigationDestination(
+              const NavigationDestination(
                 icon: Icon(Icons.location_on_outlined),
                 selectedIcon: Icon(Icons.location_on),
                 label: 'Location',

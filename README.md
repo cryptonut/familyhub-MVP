@@ -4,12 +4,21 @@ All-in-one family organizer: Calendar, Tasks, Chat, Location
 
 ## 📱 Overview
 
-Family Hub is a comprehensive mobile application designed to help families stay organized and connected. The app provides four core features:
+Family Hub is a comprehensive mobile application designed to help families stay organized and connected. The app provides core features for family management:
 
 - **📅 Calendar**: Manage family events, appointments, and schedules with two-way sync to device calendars (Google, Apple, Outlook)
 - **✅ Tasks**: Create and track shared family tasks and to-dos
-- **💬 Chat**: Real-time family messaging and communication
+- **💬 Chat**: Real-time family messaging with tabs for group and individual chats
 - **📍 Location**: Share and view family member locations
+- **🎮 Games**: Play family games including Chess, Word Scramble, Bingo, Tetris, 2048, and Slide Puzzle
+- **👥 Hubs**: Organize into different hubs/families with easy switching
+- **📸 Photos**: Shared family photo albums with comments
+- **📞 Video Calls**: Hub-based video calling with Agora integration
+
+![Family Hub Dashboard](docs/screenshots/Screenshot_20251128_214919.jpg)
+*Main dashboard showing family overview and quick access to all features*
+
+> **Note**: All screenshots are located in the `docs/screenshots/` directory. These images showcase the app's user interface and key features.
 
 ## 🚀 Getting Started
 
@@ -36,6 +45,9 @@ Family Hub is a comprehensive mobile application designed to help families stay 
    - Enable Email/Password authentication
    - Set up Firestore database
 
+![Login Screen](docs/screenshots/Screenshot_20251128_215413.jpg)
+*Login screen with email/password authentication*
+
 3. **Install dependencies**
    ```bash
    flutter pub get
@@ -55,6 +67,9 @@ FamilyHub can sync events with your device calendar (Google Calendar, Apple Cale
 - **Automatic background sync**: Syncs every 30 minutes automatically
 - **Recurring events**: Full support for daily, weekly, monthly, and yearly recurring events
 - **Conflict resolution**: FamilyHub events take priority when conflicts occur
+
+![Calendar View](docs/screenshots/Screenshot_20251128_215006.jpg)
+*Calendar interface showing family events and sync status*
 
 **To enable calendar sync:**
 1. Go to Menu (⋮) → Calendar Sync
@@ -80,21 +95,33 @@ FamilyHub can sync events with your device calendar (Google Calendar, Apple Cale
 - **Activity log**: View last 8 privacy actions
 - **Turn off all**: Instantly disable all sharing with one button
 
+![Privacy Center](docs/screenshots/Screenshot_20251128_215340.jpg)
+*Privacy Center showing active shares and controls*
+
 **To access Privacy Center:**
 1. Go to Menu (⋮) → Privacy Center
 2. View active shares and recent activity
 3. Control your sharing preferences
 
 ### Family Games
-- **Three game modes**: Chess Puzzles (solo), Word Scramble (daily + random), Family Bingo (5×5 auto-generated)
+- **Six game modes**: 
+  - Chess (solo vs AI, family multiplayer, open matchmaking)
+  - Word Scramble (daily + random)
+  - Family Bingo (5×5 auto-generated)
+  - Tetris (classic falling blocks puzzle)
+  - 2048 (number combination puzzle)
+  - Slide Puzzle (classic 15-tile puzzle)
 - **Real-time leaderboard**: Compete with family members
 - **Stats tracking**: Wins, streaks, and personal bests
 - **Confetti celebrations**: Visual feedback on wins
 - **Pure fun**: No monetary rewards, just family competition
 
+![Games Lobby](docs/screenshots/Screenshot_20251128_215015.jpg)
+*Games selection screen with chess, word scramble, bingo, and puzzle games*
+
 **To play games:**
 1. Navigate to the Games tab (bottom navigation)
-2. Choose a game (Chess Puzzles, Word Scramble, or Family Bingo)
+2. Choose a game (Chess, Word Scramble, Family Bingo, Tetris, 2048, or Slide Puzzle)
 3. Play and compete on the leaderboard!
 
 ### Video Calls (Agora Integration)
@@ -103,6 +130,9 @@ FamilyHub can sync events with your device calendar (Google Calendar, Apple Cale
 - **Creator control**: Hub creators can enable/disable video calls
 - **Push notifications**: Receive call invitations via FCM
 - **Background handling**: Auto-mute when minimized, return via notification
+
+![Video Call Interface](docs/screenshots/Screenshot_20251128_215139.jpg)
+*Video call screen with participant grid and controls*
 
 **To start a video call:**
 1. Open a hub (e.g., Family Hub, My Friends)
@@ -120,6 +150,9 @@ FamilyHub can sync events with your device calendar (Google Calendar, Apple Cale
 - **View tracking**: See how many times photos have been viewed
 - **Real-time updates**: Photos and comments sync in real-time across devices
 - **Photo management**: Delete your own photos, view full-screen with zoom
+
+![Photo Albums](docs/screenshots/Screenshot_20251128_215236.jpg)
+*Photo gallery with albums and upload options*
 
 **To use Photo Albums:**
 1. Navigate to the Photos tab (bottom navigation)
@@ -238,6 +271,7 @@ flutter test --coverage
 - [x] Basic navigation and UI scaffold
 - [x] Calendar feature implementation
 - [x] Tasks feature implementation
+  ![Tasks Screen](docs/screenshots/Screenshot_20251128_215437.jpg)
 - [x] Chat feature implementation
 - [x] Location feature implementation
 - [x] User authentication (Firebase Auth)
@@ -245,12 +279,20 @@ flutter test --coverage
 - [x] Real-time data sync
 - [x] Data persistence
 - [x] Privacy Center with sharing controls
-- [x] Family Games (Chess, Word Scramble, Bingo)
+- [x] Family Games (Chess, Word Scramble, Bingo, Tetris, 2048, Slide Puzzle)
+- [x] Hub selector for switching between families/hubs
+- [x] Profile photo management with Bitmoji support
+- [x] Calendar duplicate detection and merging
+- [x] Chat tabs for All and individual member chats
 - [x] Video Calls (Agora integration)
 - [x] Family Photo Albums with comments
 - [x] Push notifications
 - [x] Family invitation system
+- [x] Chess game (solo, family, open multiplayer)
 - [ ] Google Maps integration
+
+![Chess Game](docs/screenshots/Screenshot_20251128_215449.jpg)
+*Chess game interface with real-time multiplayer support*
 
 ## 🔒 Security
 

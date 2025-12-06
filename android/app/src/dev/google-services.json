@@ -54,6 +54,54 @@
       },
       "oauth_client": [
         {
+          "client_id": "559662117534-pd7lihihfu9k46l0328bat6vhobs9cc0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.familyhub_mvp.dev",
+            "certificate_hash": "bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c"
+          }
+        },
+        {
+          "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4"
+        },
+        {
+          "current_key": "AIzaSyDyevPyG6DAvW-0iJw-88ZymBtmkLi8k0M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:559662117534:android:3c73d6ef5d0ddf6ee7c18f",
+        "android_client_info": {
+          "package_name": "com.example.familyhub_mvp.test"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "559662117534-g85j4ci8gricvad87cr51scq7u1rlrk0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.familyhub_mvp.test",
+            "certificate_hash": "bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c"
+          }
+        },
+        {
           "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
           "client_type": 3
         }

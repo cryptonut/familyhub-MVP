@@ -6,6 +6,9 @@ import '../../models/task.dart';
 import '../../services/task_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/family_wallet_service.dart';
+import '../../services/task_dependency_service.dart';
+import '../../models/task_dependency.dart';
+import '../../widgets/toast_notification.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import 'package:uuid/uuid.dart';
 
@@ -30,6 +33,8 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
   
   // Cache tasks for balance checking
   List<Task>? _cachedTasks;
+  List<Task>? _allTasks; // For dependency selection
+  List<String> _dependencyTaskIds = []; // Selected dependencies
   
   DateTime? _dueDate;
   String _priority = 'medium';
@@ -49,9 +54,22 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
       _reward = widget.task!.reward;
       _needsApproval = widget.task!.needsApproval;
       _requiresClaim = widget.task!.requiresClaim;
+      _dependencyTaskIds = widget.task!.dependencies ?? [];
       if (_reward != null) {
         _rewardController.text = _reward!.toStringAsFixed(2);
       }
+    }
+    _loadTasks();
+  }
+
+  Future<void> _loadTasks() async {
+    try {
+      final tasks = await _taskService.getTasks();
+      setState(() {
+        _allTasks = tasks;
+      });
+    } catch (e) {
+      Logger.error('Error loading tasks for dependencies', error: e, tag: 'AddEditTaskScreen');
     }
   }
 
@@ -144,6 +162,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
         reward: reward,
         needsApproval: _needsApproval,
         requiresClaim: _requiresClaim,
+        dependencies: _dependencyTaskIds,
         createdBy: widget.task?.createdBy ?? currentUserId,
         claimedBy: widget.task?.claimedBy,
         claimStatus: widget.task?.claimStatus,
@@ -217,6 +236,174 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     }
   }
 
+  Widget _buildDependenciesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Dependencies',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add Dependency'),
+              onPressed: _showDependencyPicker,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_dependencyTaskIds.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text(
+              'No dependencies. This task can be started immediately.',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          )
+        else
+          ..._dependencyTaskIds.map((taskId) {
+            final task = _allTasks?.firstWhere(
+              (t) => t.id == taskId,
+              orElse: () => Task(
+                id: taskId,
+                title: 'Unknown Task',
+                description: '',
+                createdAt: DateTime.now(),
+              ),
+            );
+            if (task == null) return const SizedBox.shrink();
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              child: ListTile(
+                leading: Icon(
+                  task.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+                  color: task.isCompleted ? Colors.green : Colors.orange,
+                ),
+                title: Text(
+                  task.title,
+                  style: TextStyle(
+                    decoration: task.isCompleted 
+                        ? TextDecoration.lineThrough 
+                        : TextDecoration.none,
+                  ),
+                ),
+                subtitle: Text(
+                  task.isCompleted 
+                      ? 'Completed - This task can now be started'
+                      : 'Pending - This task is blocked',
+                  style: TextStyle(
+                    color: task.isCompleted ? Colors.green : Colors.orange,
+                    fontSize: 12,
+                  ),
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () {
+                    setState(() {
+                      _dependencyTaskIds.remove(taskId);
+                    });
+                  },
+                ),
+              ),
+            );
+          }).toList(),
+        if (_dependencyTaskIds.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              'This task requires ${_dependencyTaskIds.length} ${_dependencyTaskIds.length == 1 ? 'task' : 'tasks'} to be completed first.',
+              style: const TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _showDependencyPicker() async {
+    if (_allTasks == null) {
+      await _loadTasks();
+    }
+    
+    final availableTasks = _allTasks?.where((task) {
+      // Don't show current task or already selected dependencies
+      return task.id != widget.task?.id && 
+             !_dependencyTaskIds.contains(task.id);
+    }).toList() ?? [];
+    
+    if (availableTasks.isEmpty) {
+      ToastNotification.info(context, 'No available tasks to add as dependencies');
+      return;
+    }
+    
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Dependencies'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: availableTasks.length,
+            itemBuilder: (context, index) {
+              final task = availableTasks[index];
+              final isSelected = _dependencyTaskIds.contains(task.id);
+              return CheckboxListTile(
+                title: Text(task.title),
+                subtitle: Text(
+                  task.isCompleted ? 'Completed' : 'Pending',
+                  style: TextStyle(
+                    color: task.isCompleted ? Colors.green : Colors.orange,
+                    fontSize: 12,
+                  ),
+                ),
+                value: isSelected,
+                onChanged: (value) {
+                  // This will be handled by the dialog result
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, <String>[]),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              // Get selected items from checkboxes
+              final selected = <String>[];
+              // This is a simplified version - in production, use a stateful dialog
+              Navigator.pop(context, selected);
+            },
+            child: const Text('Select'),
+          ),
+        ],
+      ),
+    );
+    
+    // Simplified: Show multi-select dialog
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => _DependencyPickerDialog(
+        availableTasks: availableTasks,
+        selectedIds: _dependencyTaskIds,
+      ),
+    );
+    
+    if (result != null) {
+      setState(() {
+        _dependencyTaskIds = result;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -292,6 +479,9 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
               },
             ),
             const SizedBox(height: 24),
+            // Dependencies Section
+            _buildDependenciesSection(),
+            const SizedBox(height: 24),
             TextFormField(
               controller: _rewardController,
               decoration: const InputDecoration(
@@ -350,6 +540,78 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// Dependency Picker Dialog
+class _DependencyPickerDialog extends StatefulWidget {
+  final List<Task> availableTasks;
+  final List<String> selectedIds;
+
+  const _DependencyPickerDialog({
+    required this.availableTasks,
+    required this.selectedIds,
+  });
+
+  @override
+  State<_DependencyPickerDialog> createState() => _DependencyPickerDialogState();
+}
+
+class _DependencyPickerDialogState extends State<_DependencyPickerDialog> {
+  late Set<String> _selectedIds;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIds = Set.from(widget.selectedIds);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Select Dependencies'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: widget.availableTasks.length,
+          itemBuilder: (context, index) {
+            final task = widget.availableTasks[index];
+            final isSelected = _selectedIds.contains(task.id);
+            return CheckboxListTile(
+              title: Text(task.title),
+              subtitle: Text(
+                task.isCompleted ? 'Completed' : 'Pending',
+                style: TextStyle(
+                  color: task.isCompleted ? Colors.green : Colors.orange,
+                  fontSize: 12,
+                ),
+              ),
+              value: isSelected,
+              onChanged: (value) {
+                setState(() {
+                  if (value == true) {
+                    _selectedIds.add(task.id);
+                  } else {
+                    _selectedIds.remove(task.id);
+                  }
+                });
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _selectedIds.toList()),
+          child: const Text('Done'),
+        ),
+      ],
     );
   }
 }

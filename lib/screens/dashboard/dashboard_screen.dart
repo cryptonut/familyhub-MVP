@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/services/logger_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/app_state.dart';
+import '../../providers/user_data_provider.dart';
 import '../../services/calendar_service.dart';
 import '../../services/task_service.dart';
 import '../../services/wallet_service.dart';
@@ -17,18 +18,30 @@ import '../../utils/date_utils.dart' as app_date_utils;
 import '../../utils/relationship_utils.dart';
 import '../wallet/wallet_screen.dart';
 import '../chat/private_chat_screen.dart';
+import '../chat/chat_tabs_screen.dart';
 import '../hubs/my_hubs_screen.dart';
 import '../tasks/add_edit_task_screen.dart';
 import '../tasks/refund_notification_dialog.dart';
+import '../calendar/add_edit_event_screen.dart';
 import '../wallet/approve_payout_dialog.dart';
 import '../../widgets/relationship_dialog.dart';
 import '../../widgets/ui_components.dart';
+import '../../widgets/skeletons/skeleton_widgets.dart';
+import '../../widgets/quick_actions_fab.dart';
 import '../../utils/app_theme.dart';
 import '../../services/payout_service.dart';
 import '../../models/payout_request.dart';
 import '../../services/birthday_service.dart';
+import '../../services/profile_photo_service.dart';
 import '../../screens/profile/edit_profile_screen.dart';
+import '../../widgets/chat_widget.dart';
+import '../../models/chat_message.dart';
+import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart' hide CalendarEvent;
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -44,6 +57,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final FamilyWalletService _familyWalletService = FamilyWalletService();
   final PayoutService _payoutService = PayoutService();
   final BirthdayService _birthdayService = BirthdayService();
+  final ProfilePhotoService _profilePhotoService = ProfilePhotoService();
+  final ChatService _chatService = ChatService();
+  final ImagePicker _imagePicker = ImagePicker();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -53,10 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Task> _pendingApprovals = [];
   List<Map<String, dynamic>> _refundNotifications = []; // List of refund notification documents
   List<PayoutRequest> _pendingPayoutRequests = []; // Pending payout requests (for Bankers)
-  List<UserModel> _familyMembers = [];
   Map<String, bool> _unreadMessages = {}; // Map of userId -> hasUnreadMessages
-  UserModel? _familyCreator;
-  UserModel? _currentUserModel;
   double _walletBalance = 0.0;
   double _familyWalletBalance = 0.0;
   int _activeJobsCount = 0;
@@ -64,144 +77,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _pendingApprovalsCount = 0;
   int _refundNotificationsCount = 0;
   int _pendingPayoutRequestsCount = 0;
-  bool _isLoading = true;
+  bool _isLoadingDashboardData = false; // Only for dashboard-specific data, not user data
 
   @override
   void initState() {
     super.initState();
-    _loadDashboardData();
-    // Set up periodic refresh to check for new approvals
-    _setupPeriodicRefresh();
-  }
-
-  void _setupPeriodicRefresh() {
-    // Refresh every 30 seconds to check for new approvals
-    Future.delayed(const Duration(seconds: 30), () {
+    // Load user data from provider (uses cache if available)
+    final userProvider = Provider.of<UserDataProvider>(context, listen: false);
+    userProvider.loadUserData(forceRefresh: false).then((_) {
+      // Once user data is loaded (from cache or fresh), load dashboard data
       if (mounted) {
-        _loadDashboardData();
-        _setupPeriodicRefresh(); // Schedule next refresh
+        _loadDashboardData(showCachedFirst: true);
       }
     });
   }
 
-  Future<void> _loadDashboardData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadDashboardData({bool showCachedFirst = false}) async {
+    // Get user data from provider (uses cache)
+    final userProvider = Provider.of<UserDataProvider>(context, listen: false);
     
-    // CRITICAL: Load family members FIRST, before any other operations
-    // This ensures they're available even if other operations fail
-    try {
-      final authService = AuthService();
-      final currentUserId = _auth.currentUser?.uid;
-      
-      // Get current user model first - with timeout to detect Firestore issues
-      _currentUserModel = await authService.getCurrentUserModel()
-          .timeout(const Duration(seconds: 10), onTimeout: () {
-        Logger.warning('getCurrentUserModel timeout - Firestore unavailable', tag: 'DashboardScreen');
-        return null;
-      });
-      
-      if (_currentUserModel == null) {
-        Logger.warning('⚠️ Cannot load user model - Firestore may be unavailable', tag: 'DashboardScreen');
-        // Show error and return early
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Cannot load user data. Firestore may be unavailable.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
-            ),
-          );
-        }
-        return;
+    // If showing cached first, don't show loading spinner
+    if (!showCachedFirst) {
+      setState(() => _isLoadingDashboardData = true);
+    }
+    
+    // Ensure user data is loaded (will use cache if available)
+    await userProvider.loadUserData(forceRefresh: false);
+    
+    // Get user data from provider
+    final currentUserModel = userProvider.currentUser;
+    final familyMembers = userProvider.familyMembers;
+    
+    if (currentUserModel == null) {
+      Logger.warning('⚠️ Cannot load user model - Firestore may be unavailable', tag: 'DashboardScreen');
+      if (mounted) {
+        setState(() => _isLoadingDashboardData = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot load user data. Firestore may be unavailable.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
       }
-      
-      // Get all family members (this includes current user)
-      final allFamilyMembers = await authService.getFamilyMembers()
-          .timeout(const Duration(seconds: 10), onTimeout: () {
-        Logger.warning('getFamilyMembers timeout - Firestore unavailable', tag: 'DashboardScreen');
-        return <UserModel>[];
-      });
-      
-      Logger.debug('=== LOADING FAMILY MEMBERS (PRIORITY) ===', tag: 'DashboardScreen');
-      Logger.debug('Current User ID: $currentUserId', tag: 'DashboardScreen');
-      Logger.debug('Current user model: ${_currentUserModel?.displayName} (${_currentUserModel?.uid})', tag: 'DashboardScreen');
-      Logger.debug('Current user familyId: "${_currentUserModel?.familyId}"', tag: 'DashboardScreen');
-      Logger.debug('All family members from query: ${allFamilyMembers.length}', tag: 'DashboardScreen');
-      
-      // Build the family members list immediately
-      _familyMembers = [];
-      if (allFamilyMembers.isNotEmpty) {
-        Logger.debug('✓ Using ${allFamilyMembers.length} members from query', tag: 'DashboardScreen');
-        // Sort: current user first, then others alphabetically
-        final sorted = List<UserModel>.from(allFamilyMembers);
-        sorted.sort((a, b) {
-          if (a.uid == currentUserId) return -1;
-          if (b.uid == currentUserId) return 1;
-          return a.displayName.compareTo(b.displayName);
-        });
-        _familyMembers = sorted;
-        Logger.debug('✓ Sorted list has ${_familyMembers.length} members', tag: 'DashboardScreen');
-      } else if (_currentUserModel != null) {
-        Logger.warning('⚠️ Query returned empty, adding current user only', tag: 'DashboardScreen');
-        _familyMembers.add(_currentUserModel!);
-      }
-      
-      Logger.debug('=== FAMILY MEMBERS LOADED ===', tag: 'DashboardScreen');
-      Logger.debug('_familyMembers.length: ${_familyMembers.length}', tag: 'DashboardScreen');
-      for (var member in _familyMembers) {
-        Logger.debug('  - ${member.displayName} (${member.uid}), familyId: "${member.familyId}"', tag: 'DashboardScreen');
-      }
-      
-      // Get family creator (non-critical)
-      try {
-        _familyCreator = await authService.getFamilyCreator();
-        Logger.debug('Family creator: ${_familyCreator?.displayName} (${_familyCreator?.uid})', tag: 'DashboardScreen');
-      } catch (e) {
-        Logger.warning('Error getting family creator (non-critical)', error: e, tag: 'DashboardScreen');
-        _familyCreator = null;
-      }
-    } catch (e) {
-      Logger.error('Error loading family members', error: e, tag: 'DashboardScreen');
-      final errorStr = e.toString().toLowerCase();
-      
-      // Check if this is a Firestore unavailable error
-      if (errorStr.contains('unavailable') || errorStr.contains('timeout')) {
-        Logger.warning('⚠️ Firestore unavailable - cannot load family data', tag: 'DashboardScreen');
-        // Don't set loading to false yet - we want to show an error state
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            // Keep empty lists to show error state
-          });
-          
-          // Show error message to user
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
-                'Cannot load data from Firestore. Please sign out and sign back in.',
-                style: TextStyle(color: Colors.white),
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 8),
-              action: SnackBarAction(
-                label: 'Sign Out',
-                textColor: Colors.white,
-                onPressed: () async {
-                  final authService = AuthService();
-                  await authService.signOut();
-                },
-              ),
-            ),
-          );
-        }
-        return; // Don't continue loading other data
-      }
-      
-      // Even if this fails, try to at least show current user
-      if (_currentUserModel != null && _familyMembers.isEmpty) {
-        _familyMembers = [_currentUserModel!];
-      }
+      return;
     }
     
     try {
@@ -227,10 +146,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .toList()
         ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
-      // Load active tasks with force refresh to ensure we get the latest data
-      final allTasks = await _taskService.getTasks(forceRefresh: true);
+      // Load active tasks - force refresh to ensure we get latest data
+      List<Task> allTasks = [];
+      try {
+        // Force refresh to ensure we get newly created jobs
+        allTasks = await _taskService.getTasks(forceRefresh: true);
+        Logger.debug('Dashboard: Loaded ${allTasks.length} total tasks', tag: 'DashboardScreen');
+        
+        // Debug: Log all tasks with full details
+        if (allTasks.isEmpty) {
+          Logger.warning('Dashboard: No tasks loaded from Firestore!', tag: 'DashboardScreen');
+        } else {
+          for (var task in allTasks) {
+            Logger.debug('Dashboard: Task "${task.title}" (id: ${task.id}) - reward: ${task.reward}, needsApproval: ${task.needsApproval}, isCompleted: ${task.isCompleted}, createdBy: ${task.createdBy}', tag: 'DashboardScreen');
+          }
+        }
+      } catch (e, st) {
+        Logger.error('Dashboard: Error loading tasks', error: e, stackTrace: st, tag: 'DashboardScreen');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error loading jobs: $e'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        // Continue with empty list - don't break the dashboard
+        allTasks = [];
+      }
+      // Upcoming jobs = tasks with rewards OR needsApproval that are not completed and not awaiting approval
       _upcomingTasks = allTasks
-          .where((task) => !task.isCompleted && !task.isAwaitingApproval)
+          .where((task) => 
+            ((task.reward != null && task.reward! > 0) || task.needsApproval == true) &&
+            !task.isCompleted && 
+            !task.isAwaitingApproval
+          )
           .toList();
       
       // Sort tasks by due date (if available) or creation date
@@ -268,7 +219,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final chatService = ChatService();
         final currentUserId = _auth.currentUser?.uid;
         _unreadMessages.clear();
-        for (var member in _familyMembers) {
+        for (var member in familyMembers) {
           // Skip checking unread for current user
           if (member.uid == currentUserId) continue;
           
@@ -286,13 +237,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       // Count active and completed jobs
+      // Jobs are defined as: tasks with rewards > 0 OR tasks with needsApproval (legacy jobs)
       final currentUserId = _auth.currentUser?.uid;
-      _activeJobsCount = allTasks.where((task) => 
+      
+      // Debug: Log all tasks to see their reward values
+      for (var task in allTasks) {
+        Logger.debug('Dashboard: Task "${task.title}" - reward: ${task.reward}, needsApproval: ${task.needsApproval}, isCompleted: ${task.isCompleted}, createdBy: ${task.createdBy}', tag: 'DashboardScreen');
+      }
+      
+      // Jobs are tasks with rewards OR tasks that need approval (legacy jobs)
+      final jobs = allTasks.where((task) => 
+        (task.reward != null && task.reward! > 0) || task.needsApproval == true
+      ).toList();
+      
+      Logger.debug('Dashboard: Found ${jobs.length} jobs (${allTasks.where((t) => t.reward != null && t.reward! > 0).length} with rewards, ${allTasks.where((t) => (t.reward == null || t.reward == 0) && t.needsApproval == true).length} legacy) out of ${allTasks.length} total tasks', tag: 'DashboardScreen');
+      
+      _activeJobsCount = jobs.where((task) => 
         !task.isCompleted || task.isAwaitingApproval
       ).length;
-      _completedJobsCount = allTasks.where((task) => 
+      _completedJobsCount = jobs.where((task) => 
         task.isCompleted && !task.isAwaitingApproval
       ).length;
+      
+      Logger.debug('Dashboard: Active jobs: $_activeJobsCount, Completed jobs: $_completedJobsCount', tag: 'DashboardScreen');
 
       // Get pending approvals (jobs that need creator's action)
       _pendingApprovals = allTasks.where((task) {
@@ -344,24 +311,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Logger.error('Error loading dashboard data', error: e, stackTrace: StackTrace.current, tag: 'DashboardScreen');
     } finally {
       if (mounted) {
-        Logger.debug('=== CALLING setState TO UPDATE UI ===', tag: 'DashboardScreen');
-        Logger.debug('_familyMembers.length before setState: ${_familyMembers.length}', tag: 'DashboardScreen');
         setState(() {
-          _isLoading = false;
+          _isLoadingDashboardData = false;
         });
-        Logger.debug('_familyMembers.length after setState: ${_familyMembers.length}', tag: 'DashboardScreen');
       }
+      
+      // Refresh user data in background (non-blocking)
+      userProvider.refreshInBackground();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const LoadingIndicator(message: 'Loading dashboard...');
+    // Use Consumer to listen to UserDataProvider changes
+    return Consumer<UserDataProvider>(
+      builder: (context, userProvider, child) {
+        final currentUserModel = userProvider.currentUser;
+        final familyMembers = userProvider.familyMembers;
+        final familyCreator = userProvider.familyCreator;
+        
+        // Show loading only if we have no cached data AND dashboard data is loading
+        if (currentUserModel == null && userProvider.isLoading) {
+          return const LoadingIndicator(message: 'Loading dashboard...');
+        }
+        
+        // If we have cached user data, show dashboard immediately (even if dashboard data is still loading)
+        return Scaffold(
+          body: _buildDashboardContent(
+            currentUserModel: currentUserModel,
+            familyMembers: familyMembers,
+            familyCreator: familyCreator,
+          ),
+          floatingActionButton: _buildQuickActionsFAB(),
+        );
+      },
+    );
+  }
+
+  Widget _buildQuickActionsFAB() {
+    final appState = Provider.of<AppState>(context, listen: false);
+    
+    return QuickActionsFAB(
+      actions: [
+        QuickAction(
+          label: 'Event',
+          icon: Icons.event,
+          onTap: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddEditEventScreen(),
+              ),
+            );
+            if (result == true) {
+              _loadDashboardData(showCachedFirst: false);
+            }
+          },
+        ),
+        QuickAction(
+          label: 'Job',
+          icon: Icons.task,
+          onTap: () async {
+            appState.setCurrentIndex(2); // Switch to Tasks tab
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AddEditTaskScreen(),
+              ),
+            );
+            if (result == true) {
+              _loadDashboardData(showCachedFirst: false);
+            }
+          },
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildDashboardContent({
+    required UserModel? currentUserModel,
+    required List<UserModel> familyMembers,
+    required UserModel? familyCreator,
+  }) {
+    if (_isLoadingDashboardData && currentUserModel == null) {
+      return const SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            SkeletonStatCard(),
+            SkeletonStatCard(),
+            SkeletonEventCard(),
+            SkeletonEventCard(),
+            SkeletonTaskCard(),
+            SkeletonTaskCard(),
+          ],
+        ),
+      );
     }
 
     return RefreshIndicator(
-      onRefresh: _loadDashboardData,
+      onRefresh: () => _loadDashboardData(showCachedFirst: false),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
@@ -369,8 +418,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // My Family Section (at the top)
-            _buildMyFamily(),
-            const SizedBox(height: 16),
+            _buildMyFamily(
+              currentUserModel: currentUserModel,
+              familyMembers: familyMembers,
+              familyCreator: familyCreator,
+            ),
+            const SizedBox(height: 24),
+            
+            // Family Chat Widget
+            _buildFamilyChatWidget(),
+            const SizedBox(height: 24),
             
             // Pending Approvals (prominent if there are any)
             if (_pendingApprovalsCount > 0) ...[
@@ -386,7 +443,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             
             // Pending Payout Requests (for Bankers)
             if (_pendingPayoutRequestsCount > 0) ...[
-              _buildPendingPayoutRequests(),
+              _buildPendingPayoutRequests(familyMembers),
               const SizedBox(height: 16),
             ],
             
@@ -405,7 +462,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 24),
             
             // Upcoming Tasks
-            _buildUpcomingTasks(),
+            _buildUpcomingTasks(familyMembers),
             const SizedBox(height: 24),
             
             // Wallet Balance Card (at the bottom)
@@ -505,7 +562,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildMyFamily() {
+  Widget _buildMyFamily({
+    required UserModel? currentUserModel,
+    required List<UserModel> familyMembers,
+    required UserModel? familyCreator,
+  }) {
     final currentUserId = _auth.currentUser?.uid;
     
     return ModernCard(
@@ -527,7 +588,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-                if (_familyMembers.isEmpty)
+                if (familyMembers.isEmpty)
                   Text(
                     'No members',
                     style: TextStyle(
@@ -537,7 +598,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   )
                 else
                   Text(
-                    '${_familyMembers.length} member${_familyMembers.length == 1 ? '' : 's'}',
+                    '${familyMembers.length} member${familyMembers.length == 1 ? '' : 's'}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -546,7 +607,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            if (_familyMembers.isEmpty)
+            if (familyMembers.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Center(
@@ -561,221 +622,418 @@ class _DashboardScreenState extends State<DashboardScreen> {
               )
             else
               Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: _familyMembers.map((member) {
+                spacing: 16,
+                runSpacing: 16,
+                alignment: WrapAlignment.start,
+                children: familyMembers.map((member) {
                   final isCurrentUser = member.uid == currentUserId;
                   final hasUnread = _unreadMessages[member.uid] == true;
                   
-                  // Calculate relationship from current user's perspective
-                  String? relationshipLabel;
-                  if (_currentUserModel != null && _familyCreator != null) {
-                    final relationship = RelationshipUtils.getRelationshipFromPerspective(
-                      viewer: _currentUserModel!,
-                      target: member,
-                      creator: _familyCreator,
-                      allMembers: _familyMembers,
-                    );
-                    relationshipLabel = relationship != null 
-                        ? RelationshipUtils.getRelationshipLabel(relationship)
-                        : null;
-                  }
+                  // Extract first name only
+                  String firstName = member.displayName.isNotEmpty
+                      ? member.displayName.split(' ').first
+                      : member.email.split('@')[0];
                   
-                  // Check if current user can edit relationships
-                  final canEditRelationship = _currentUserModel != null && 
-                      _familyCreator != null &&
-                      (_familyCreator!.uid == _currentUserModel!.uid || _currentUserModel!.isAdmin());
+                  // Check if current user can edit relationships (admin only)
+                  final canEditRelationship = currentUserModel != null && 
+                      familyCreator != null &&
+                      (familyCreator.uid == currentUserModel.uid || currentUserModel.isAdmin());
                   
-                  return InkWell(
-                    onTap: isCurrentUser ? () {
-                      // Navigate to My Hubs page
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MyHubsScreen(),
-                        ),
-                      );
-                    } : () async {
-                      // Navigate to chat and wait for return
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => PrivateChatScreen(
-                            recipientId: member.uid,
-                            recipientName: member.displayName,
-                          ),
-                        ),
-                      );
-                      // Refresh dashboard data when returning from chat
-                      // This updates the unread message indicators
-                      if (mounted) {
-                        _loadDashboardData();
-                      }
-                    },
-                    onLongPress: canEditRelationship && !isCurrentUser ? () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => RelationshipDialog(
-                          user: member,
-                          currentUser: _currentUserModel,
-                          familyCreator: _familyCreator,
-                          onUpdated: () {
-                            _loadDashboardData();
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: isCurrentUser
+                        ? () {
+                            // Navigate to hubs screen on tap
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MyHubsScreen(),
+                              ),
+                            );
+                          }
+                        : () {
+                            // Navigate to private chat with this member
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => PrivateChatScreen(
+                                  recipientId: member.uid,
+                                  recipientName: member.displayName.isNotEmpty
+                                      ? member.displayName
+                                      : member.email.split('@')[0],
+                                ),
+                              ),
+                            );
                           },
-                        ),
-                      );
-                    } : null,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Opacity(
-                      opacity: isCurrentUser ? 0.7 : 1.0,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isCurrentUser 
-                              ? Colors.purple.shade100 
-                              : Colors.purple.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.purple.shade200,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                    onLongPress: isCurrentUser
+                        ? () => _showProfilePhotoMenu(context, member, currentUserModel)
+                        : canEditRelationship
+                            ? () => _showRelationshipMenu(context, member, currentUserModel, familyCreator)
+                            : null,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Stack(
                           children: [
-                            Stack(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: Colors.purple.shade700,
-                                  radius: 20,
-                                  child: Text(
-                                    member.displayName.isNotEmpty
-                                        ? member.displayName[0].toUpperCase()
-                                        : member.email[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                if (hasUnread && !isCurrentUser)
-                                  Positioned(
-                                    right: 0,
-                                    top: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.notifications,
+                            CircleAvatar(
+                              radius: 32,
+                              backgroundColor: Colors.purple.shade700,
+                              backgroundImage: member.photoUrl != null && member.photoUrl!.isNotEmpty
+                                  ? NetworkImage(member.photoUrl!)
+                                  : null,
+                              child: member.photoUrl == null || member.photoUrl!.isEmpty
+                                  ? Text(
+                                      firstName.isNotEmpty
+                                          ? firstName[0].toUpperCase()
+                                          : member.email.isNotEmpty
+                                              ? member.email[0].toUpperCase()
+                                              : '?',
+                                      style: const TextStyle(
                                         color: Colors.white,
-                                        size: 12,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      member.displayName.isNotEmpty
-                                          ? member.displayName
-                                          : member.email.split('@')[0],
-                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: Colors.purple.shade900,
+                                        fontSize: 28,
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (isCurrentUser) ...[
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '(You)',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey[600],
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                if (relationshipLabel != null)
-                                  Text(
-                                    relationshipLabel,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.purple.shade700,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                if (member.roles.isNotEmpty)
-                                  Text(
-                                    member.roles.join(', ').toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.purple.shade600,
-                                    ),
-                                  ),
-                              ],
+                                    )
+                                  : null,
                             ),
-                            if (!isCurrentUser) ...[
-                              const SizedBox(width: 4),
-                              Icon(
-                                Icons.chat_bubble_outline,
-                                size: 16,
-                                color: Colors.purple.shade700,
-                              ),
-                            ],
-                            if (canEditRelationship && !isCurrentUser) ...[
-                              const SizedBox(width: 4),
-                              Tooltip(
-                                message: 'Tap to edit relationship',
-                                child: InkWell(
-                                  onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => RelationshipDialog(
-                                        user: member,
-                                        currentUser: _currentUserModel,
-                                        familyCreator: _familyCreator,
-                                        onUpdated: () {
-                                          _loadDashboardData();
-                                        },
-                                      ),
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(4),
-                                    child: Icon(
-                                      Icons.edit,
-                                      size: 16,
-                                      color: Colors.purple.shade700,
-                                    ),
+                            if (hasUnread && !isCurrentUser)
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.notifications,
+                                    color: Colors.white,
+                                    size: 12,
                                   ),
                                 ),
                               ),
-                            ],
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Text(
+                          firstName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                            color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87,
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 }).toList(),
               ),
           ],
         ),
+    );
+  }
+
+  /// Extract first name from display name
+  String _getFirstName(String displayName, String email) {
+    if (displayName.isNotEmpty) {
+      return displayName.split(' ').first;
+    }
+    return email.split('@')[0];
+  }
+
+  /// Show menu for profile photo (current user only)
+  Future<void> _showProfilePhotoMenu(BuildContext context, UserModel member, UserModel? currentUser) async {
+    if (currentUser == null || member.uid != currentUser.uid) return;
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(context, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, 'gallery'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('Enter Bitmoji URL'),
+              onTap: () => Navigator.pop(context, 'bitmoji'),
+            ),
+            if (member.photoUrl != null && member.photoUrl!.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
+                onTap: () => Navigator.pop(context, 'delete'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.cancel),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    try {
+      if (result == 'delete') {
+        await _profilePhotoService.deleteProfilePhoto();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Photo removed'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _loadDashboardData(showCachedFirst: false);
+        }
+      } else if (result == 'bitmoji') {
+        // Show dialog with options: scan QR or enter URL
+        final bitmojiChoice = await showModalBottomSheet<String>(
+          context: context,
+          builder: (context) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.qr_code_scanner),
+                  title: const Text('Scan QR Code'),
+                  onTap: () => Navigator.pop(context, 'scan'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.link),
+                  title: const Text('Enter URL'),
+                  onTap: () => Navigator.pop(context, 'enter'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cancel),
+                  title: const Text('Cancel'),
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        );
+
+        if (bitmojiChoice == null || !mounted) return;
+
+        String? url;
+
+        if (bitmojiChoice == 'scan') {
+          // Scan QR code
+          final scannedUrl = await _scanQRCode(context);
+          if (scannedUrl != null && mounted) {
+            url = scannedUrl;
+          } else {
+            return; // User cancelled or error
+          }
+        } else if (bitmojiChoice == 'enter') {
+          // Enter URL manually
+          final urlController = TextEditingController();
+          bool dialogClosed = false;
+          
+          try {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Enter Bitmoji URL'),
+                content: TextField(
+                  controller: urlController,
+                  decoration: const InputDecoration(
+                    hintText: 'https://sdk.bitmoji.com/...',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      dialogClosed = true;
+                      Navigator.pop(context, false);
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      dialogClosed = true;
+                      Navigator.pop(context, true);
+                    },
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            );
+
+            if (confirmed == true && urlController.text.trim().isNotEmpty && mounted) {
+              url = urlController.text.trim();
+            }
+          } catch (e) {
+            Logger.error('Error in bitmoji URL dialog', error: e, tag: 'DashboardScreen');
+          } finally {
+            // Only dispose if dialog was actually shown and closed
+            if (dialogClosed) {
+              urlController.dispose();
+            } else {
+              // If dialog never opened, dispose immediately
+              urlController.dispose();
+            }
+          }
+        }
+
+        // Save the URL if we have one
+        if (url != null && url.isNotEmpty && mounted) {
+          try {
+            // Validate URL
+            final uri = Uri.tryParse(url);
+            if (uri != null && (uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https'))) {
+              await _profilePhotoService.updatePhotoUrl(url);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Bitmoji URL saved'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                _loadDashboardData(showCachedFirst: false);
+              }
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Invalid URL. Please enter a valid http or https URL.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error saving URL: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        }
+      } else if (result == 'camera' || result == 'gallery') {
+        final source = result == 'camera' ? ImageSource.camera : ImageSource.gallery;
+        final pickedFile = await _imagePicker.pickImage(
+          source: source,
+          maxWidth: 800,
+          maxHeight: 800,
+          imageQuality: 85,
+        );
+
+        if (pickedFile != null && mounted) {
+          if (kIsWeb) {
+            final bytes = await pickedFile.readAsBytes();
+            await _profilePhotoService.uploadProfilePhotoWeb(bytes, pickedFile.name);
+          } else {
+            final file = File(pickedFile.path);
+            await _profilePhotoService.uploadProfilePhoto(file);
+          }
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Photo updated successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            _loadDashboardData(showCachedFirst: false);
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Scan QR code for bitmoji URL
+  Future<String?> _scanQRCode(BuildContext context) async {
+    final controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+    );
+    
+    String? scannedUrl;
+    
+    try {
+      final result = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(
+              title: const Text('Scan QR Code'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            body: MobileScanner(
+              controller: controller,
+              onDetect: (capture) {
+                final List<Barcode> barcodes = capture.barcodes;
+                if (barcodes.isNotEmpty) {
+                  final barcode = barcodes.first;
+                  if (barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
+                    scannedUrl = barcode.rawValue;
+                    Navigator.pop(context, scannedUrl);
+                  }
+                }
+              },
+            ),
+          ),
+        ),
+      );
+
+      return result ?? scannedUrl;
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  /// Show menu for relationship editing (admin only)
+  Future<void> _showRelationshipMenu(
+    BuildContext context,
+    UserModel member,
+    UserModel? currentUser,
+    UserModel? familyCreator,
+  ) async {
+    if (currentUser == null || familyCreator == null) return;
+    if (currentUser.uid != familyCreator.uid && !currentUser.isAdmin()) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => RelationshipDialog(
+        user: member,
+        currentUser: currentUser,
+        familyCreator: familyCreator,
+        onUpdated: () {
+          _loadDashboardData(showCachedFirst: false);
+        },
+      ),
     );
   }
 
@@ -1184,13 +1442,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 TextButton.icon(
                   onPressed: () async {
                     // Mark notification as read
-                    if (notification['id'] != null) {
+                    final notificationId = notification['id'] as String?;
+                    if (notificationId != null) {
                       await _firestore
                           .collection('notifications')
-                          .doc(notification['id'])
+                          .doc(notificationId)
                           .update({'read': true});
                     }
-                    _loadDashboardData();
+                    _loadDashboardData(showCachedFirst: false);
                   },
                   icon: const Icon(Icons.close, size: 18),
                   label: const Text('Dismiss'),
@@ -1202,10 +1461,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ElevatedButton.icon(
                   onPressed: () async {
                     // Mark notification as read
-                    if (notification['id'] != null) {
+                    final notificationId = notification['id'] as String?;
+                    if (notificationId != null) {
                       await _firestore
                           .collection('notifications')
-                          .doc(notification['id'])
+                          .doc(notificationId)
                           .update({'read': true});
                     }
                     // Show refund notification dialog with options
@@ -1234,7 +1494,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildPendingPayoutRequests() {
+  Widget _buildPendingPayoutRequests(List<UserModel> familyMembers) {
     return Card(
       elevation: 3,
       color: Colors.purple.shade50,
@@ -1288,7 +1548,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ..._pendingPayoutRequests.take(3).map((request) => _buildPayoutRequestCard(request)),
+            ..._pendingPayoutRequests.take(3).map((request) => _buildPayoutRequestCard(request, familyMembers)),
             if (_pendingPayoutRequests.length > 3)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -1308,9 +1568,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildPayoutRequestCard(PayoutRequest request) {
+  Widget _buildPayoutRequestCard(PayoutRequest request, List<UserModel> familyMembers) {
     // Get requester name
-    final requester = _familyMembers.firstWhere(
+    final requester = familyMembers.firstWhere(
       (m) => m.uid == request.userId,
       orElse: () => UserModel(
         uid: request.userId,
@@ -1515,7 +1775,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               );
               if (result == true && mounted) {
-                _loadDashboardData();
+                // Wait a moment for Firestore to process, then force refresh
+                await Future.delayed(const Duration(milliseconds: 500));
+                await _loadDashboardData(showCachedFirst: false);
               }
             },
             icon: const Icon(Icons.add),
@@ -1607,7 +1869,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildUpcomingTasks() {
+  Widget _buildUpcomingTasks(List<UserModel> familyMembers) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1628,12 +1890,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           )
         else
-          ..._upcomingTasks.take(5).map((task) => _buildTaskCard(task)),
+          ..._upcomingTasks.take(5).map((task) => _buildTaskCard(task, familyMembers)),
       ],
     );
   }
 
-  Widget _buildTaskCard(Task task) {
+  Widget _buildTaskCard(Task task, List<UserModel> familyMembers) {
     final isOverdue = task.dueDate != null && 
         task.dueDate!.isBefore(DateTime.now()) && 
         !task.isCompleted;
@@ -1657,7 +1919,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (isClaimed && task.claimedBy != null) {
       final claimerId = task.claimedBy!;
       // Try to find in family members first
-      final claimer = _familyMembers.firstWhere(
+      final claimer = familyMembers.firstWhere(
         (m) => m.uid == claimerId,
         orElse: () => UserModel(
           uid: claimerId,
@@ -2064,6 +2326,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFamilyChatWidget() {
+    return ChatWidget(
+      messagesStream: _chatService.getMessagesStream(),
+      onSendMessage: (messageText) async {
+        final currentUserId = _chatService.currentUserId;
+        final currentUserName = _chatService.currentUserName ?? 'You';
+        
+        if (currentUserId == null) {
+          throw Exception('User not authenticated');
+        }
+
+        final message = ChatMessage(
+          id: const Uuid().v4(),
+          senderId: currentUserId,
+          senderName: currentUserName,
+          content: messageText,
+          timestamp: DateTime.now(),
+        );
+
+        await _chatService.sendMessage(message);
+      },
+      currentUserId: _chatService.currentUserId,
+      currentUserName: _chatService.currentUserName,
+      maxHeight: 400, // Max height for embedded chat
+      onViewFullChat: () {
+        // Navigate to full chat screen (ChatTabsScreen)
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ChatTabsScreen(),
+          ),
+        );
+      },
+      emptyStateMessage: 'No messages yet. Start the conversation!',
     );
   }
 }

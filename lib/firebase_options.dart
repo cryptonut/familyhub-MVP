@@ -47,6 +47,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDnHlg-5GNajYwXWrtVLRJvOpkV0UEFcV4',
+    // NOTE: For Android, Firebase reads from google-services.json automatically
+    // This appId is only used as a fallback. The actual appId is determined
+    // by the package name and google-services.json in android/app/src/{flavor}/
+    // Dev flavor uses: 1:559662117534:android:7b3b41176f0d550ee7c18f
+    // Prod flavor uses: 1:559662117534:android:a59145c8a69587aee7c18f
     appId: '1:559662117534:android:a59145c8a69587aee7c18f',
     messagingSenderId: '559662117534',
     projectId: 'family-hub-71ff0',
@@ -54,8 +59,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDummy',
-    appId: '1:559662117534:ios:dummy',
+    apiKey: 'AIzaSyCfFAiDiGNJJHkBf8AIg8O0zAiuv_34bos',
+    appId: '1:559662117534:ios:ff9b5497b88d5719e7c18f',
     messagingSenderId: '559662117534',
     projectId: 'family-hub-71ff0',
     storageBucket: 'family-hub-71ff0.firebasestorage.app',
@@ -63,8 +68,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDummy',
-    appId: '1:559662117534:ios:dummy',
+    apiKey: 'AIzaSyCfFAiDiGNJJHkBf8AIg8O0zAiuv_34bos',
+    appId: '1:559662117534:ios:ff9b5497b88d5719e7c18f',
     messagingSenderId: '559662117534',
     projectId: 'family-hub-71ff0',
     storageBucket: 'family-hub-71ff0.firebasestorage.app',

@@ -1,0 +1,181 @@
+# FamilyHub MVP - QA Release Notes v2.2
+
+**Release Date:** December 10, 2025  
+**Version:** QA Build v2.2  
+**Branch:** `release/qa` (merged from `develop`)
+
+---
+
+## 🎉 Major Features
+
+### 📊 Gantt Chart Day View
+**Visual timeline representation of family's daily schedule**
+
+**Key Features:**
+- ✅ Interactive Gantt chart showing all events for a selected day
+- ✅ Time-based layout with hour columns (6 AM - 11 PM)
+- ✅ Events displayed as horizontal bars positioned by start/end time
+- ✅ Participant visualization with color-coded chips
+- ✅ Conflict detection - highlights when people have overlapping events
+- ✅ Family members legend showing all members with their color codes
+- ✅ Fixed left column (event labels) that stays visible when scrolling
+- ✅ Visible time indicators with hour labels and markers
+- ✅ Date picker to view any day
+- ✅ Real-time updates via Firestore streams
+- ✅ Click events to view full details
+
+**Technical Implementation:**
+- New screen: `lib/screens/calendar/gantt_chart_screen.dart`
+- Accessible from Calendar screen via timeline icon
+- Uses stacked participant chips that extend full width of event bars
+- Automatic conflict detection algorithm
+- Responsive layout for mobile and web
+
+### 👤 Event Owner Feature
+**Separate event ownership from creation, allowing ownership transfer**
+
+**Key Features:**
+- ✅ Event Owner field separate from Creator (immutable historical record)
+- ✅ Event Owner automatically set to creator on event creation
+- ✅ Event Owner can be changed by current owner or family admin
+- ✅ UI in event details screen to change owner
+- ✅ Event Owner always included as participant (unless declined)
+- ✅ Clear distinction between "Event Owner" and "Created by" in UI
+
+**Technical Implementation:**
+- New field: `CalendarEvent.eventOwnerId`
+- Backward compatible (derives from `createdBy` if not set)
+- Updated Firestore rules to allow owner/admin to update `eventOwnerId`
+- New service method: `CalendarService.updateEventOwner()`
+- Permission checks in UI (owner or admin only)
+
+---
+
+## 🐛 Bug Fixes
+
+### Gantt Chart
+- ✅ Fixed bottom overflow issues on Chrome and Android
+- ✅ Fixed right overflow issues on mobile
+- ✅ Improved time indicator styling and visibility
+- ✅ Fixed participant chips to stack vertically and extend full width
+- ✅ Fixed event creator not showing as participant (now uses Event Owner)
+- ✅ Fixed time column staying fixed when scrolling horizontally
+
+### Calendar & Events
+- ✅ Fixed event creator always included as participant
+- ✅ Improved event owner display in event details
+- ✅ Better handling of events with no owner/creator
+
+### UI/UX
+- ✅ Polished time indicators with proper hour labels
+- ✅ Better spacing and layout for event bars
+- ✅ Improved family members legend display
+- ✅ Fixed overflow issues across all platforms
+
+---
+
+## 🔧 Technical Changes
+
+### New Files
+- `lib/screens/calendar/gantt_chart_screen.dart` - Gantt chart day view screen
+
+### Updated Models
+- `CalendarEvent` - Added `eventOwnerId` field (separate from `createdBy`)
+
+### Updated Services
+- `CalendarService` - Added `updateEventOwner()` method
+- `CalendarService` - Auto-sets `eventOwnerId` from `createdBy` on event creation
+
+### Updated Screens
+- `CalendarScreen` - Added timeline icon button to navigate to Gantt chart
+- `EventDetailsScreen` - Added Event Owner display with change functionality
+- `EventDetailsScreen` - Shows both Event Owner and Creator (if different)
+- `GanttChartScreen` - New screen for day view visualization
+
+### Updated Firestore Rules
+- Events can be updated by event owner or admin
+- Admin can update `eventOwnerId` field specifically
+- Events can be deleted by event owner or creator
+
+---
+
+## 📋 Testing Checklist
+
+### Gantt Chart Day View
+- [ ] Navigate to Gantt chart from Calendar screen
+- [ ] Verify events display as horizontal bars
+- [ ] Verify time indicators are visible and readable
+- [ ] Verify participant chips show correct colors
+- [ ] Verify conflicts are highlighted in red
+- [ ] Test date picker to view different days
+- [ ] Verify left column stays fixed when scrolling
+- [ ] Test on both mobile and web
+- [ ] Click event to verify navigation to details
+
+### Event Owner
+- [ ] Create new event and verify owner is set to creator
+- [ ] View event details and verify owner is displayed
+- [ ] Change event owner (as current owner)
+- [ ] Change event owner (as admin)
+- [ ] Verify owner appears as participant in Gantt chart
+- [ ] Verify creator is still shown separately if different from owner
+
+---
+
+## 🚀 Installation & Testing
+
+### Building the QA APK
+```bash
+flutter build apk --flavor dev --dart-define=FLAVOR=dev
+```
+
+The APK will be located at:
+```
+build/app/outputs/flutter-apk/app-dev-release.apk
+```
+
+---
+
+## 📝 Notes for Testers
+
+1. **Gantt Chart**: 
+   - Access via timeline icon in Calendar screen app bar
+   - Shows all events for the selected day
+   - Red borders indicate scheduling conflicts
+   - Family members legend at top shows all members and their colors
+
+2. **Event Owner**: 
+   - Event Owner is initially set to the person who created the event
+   - Only the current Event Owner or a family Admin can change ownership
+   - Event Owner is always included as a participant in the event
+   - Creator information is preserved as a historical record
+
+3. **Conflicts**: 
+   - Conflicts are automatically detected when the same person has overlapping events
+   - Conflicting events are highlighted in red
+   - A warning banner shows all detected conflicts at the top
+
+---
+
+## 🔄 Migration Notes
+
+### Database Changes
+- New Firestore field: `events.eventOwnerId` (string, optional)
+  - If not present, system derives from `createdBy` for backward compatibility
+  - Can be updated by event owner or admin
+
+### Required Actions
+1. **Firestore Rules**: Deploy the updated rules (includes Event Owner permissions)
+2. **No data migration needed**: Existing events will automatically use `createdBy` as `eventOwnerId`
+
+---
+
+## 📞 Support
+
+For issues or questions, please contact the development team or create an issue in the repository.
+
+---
+
+**Previous Release:** QA Build v2.1 (December 1, 2025)  
+**Next Release:** Production (after QA validation)
+

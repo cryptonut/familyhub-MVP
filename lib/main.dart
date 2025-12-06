@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
+// import 'package:recaptcha_enterprise_flutter/recaptcha_enterprise_flutter.dart'; // Package not resolving - non-blocking anyway
 import 'firebase_options.dart';
 import 'core/services/logger_service.dart';
 import 'core/constants/app_constants.dart';
@@ -14,9 +17,14 @@ import 'services/app_state.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/background_sync_service.dart';
+import 'providers/user_data_provider.dart';
 import 'widgets/auth_wrapper.dart';
 import 'widgets/error_handler.dart';
 import 'utils/app_theme.dart';
+import 'services/cache_service.dart';
+import 'core/di/service_locator.dart';
+import 'games/chess/services/chess_service.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 void main() async {
   // Set up global error handling
@@ -75,8 +83,8 @@ void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize app configuration (Dev/Test/Prod)
-  Config.initialize();
+  // Initialize app configuration (Dev/Test/Prod) - must be awaited
+  await Config.initialize();
   
   // Initialize timezone data for device_calendar
   try {
@@ -85,6 +93,25 @@ void main() async {
     Logger.warning('Timezone initialization error', error: e, stackTrace: st, tag: 'main');
     // Continue - timezone errors shouldn't block app startup
   }
+  
+  // Initialize reCAPTCHA Enterprise client for manual token generation if needed
+  // NOTE: Firebase Auth on Android uses native reCAPTCHA SDK automatically
+  // This initialization is for cases where we need to manually generate tokens
+  // DISABLED: Package not resolving - Firebase Auth uses native SDK anyway
+  // if (!kIsWeb) {
+  //   try {
+  //     Logger.info('Initializing reCAPTCHA Enterprise client...', tag: 'main');
+  //     const recaptchaSiteKey = '6LeprxosAAAAACXWuPlrlx0zOyM3GpJOVhBHvJ5e';
+  //     
+  //     await RecaptchaEnterprise.initClient(recaptchaSiteKey);
+  //     Logger.info('✓ reCAPTCHA Enterprise client initialized', tag: 'main');
+  //     Logger.info('  - Site key: ${recaptchaSiteKey.substring(0, 10)}...', tag: 'main');
+  //     Logger.info('  - Firebase Auth will use native reCAPTCHA SDK automatically', tag: 'main');
+  //   } catch (e, st) {
+  //     Logger.warning('⚠ reCAPTCHA Enterprise client init failed (non-blocking)', error: e, stackTrace: st, tag: 'main');
+  //     Logger.warning('  - Firebase Auth uses native SDK, not Flutter package', tag: 'main');
+  //   }
+  // }
   
   // Initialize Firebase with comprehensive error handling
   // CRITICAL: Fail fast if Firebase initialization fails to prevent "core/no-app" errors
@@ -116,141 +143,136 @@ void main() async {
         }
       }
     } else {
-      // For Android/iOS, try with options first, fallback to auto-detection
-      // Increased timeout for Android to account for potential google-services.json processing
+      // For Android/iOS, Firebase reads from google-services.json automatically via Google Services plugin
+      // The plugin processes flavor-specific files (dev/qa/prod) at build time
+      // CRITICAL: Try without options first (reads from processed google-services.json)
+      // If that fails, fall back to explicit options (but this may use wrong flavor config)
       try {
         Logger.info('Initializing Firebase for Android/iOS...', tag: 'main');
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        ).timeout(
-          AppConstants.networkRequestTimeout,
-          onTimeout: () {
-            throw TimeoutException('Firebase initialization timed out (Android/iOS)');
-          },
-        );
-        firebaseInitialized = true;
-        Logger.info('✓ Firebase initialized for Android/iOS platform', tag: 'main');
+        
+        // Try without options first - Firebase will read from google-services.json resources
+        // This is the correct approach for flavor-specific configurations
+        try {
+          await Firebase.initializeApp().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw TimeoutException('Firebase initialization timed out');
+            },
+          );
+          firebaseInitialized = true;
+          Logger.info('Firebase initialized from google-services.json', tag: 'main');
+        } catch (autoInitError) {
+          // Fallback: Use explicit options if auto-init fails
+          Logger.warning('Auto-init failed, trying with explicit options', error: autoInitError, tag: 'main');
+          
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          ).timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw TimeoutException('Firebase initialization timed out');
+            },
+          );
+          firebaseInitialized = true;
+          Logger.warning('Firebase initialized with explicit options (fallback)', tag: 'main');
+        }
         
         // Verify Firebase Auth is accessible
         try {
           final auth = FirebaseAuth.instance;
-          Logger.debug('✓ Firebase Auth instance accessible', tag: 'main');
-          Logger.debug('  - App: ${auth.app.name}', tag: 'main');
-          Logger.debug('  - Project ID: ${auth.app.options.projectId}', tag: 'main');
-          final apiKey = auth.app.options.apiKey;
-          if (apiKey != null && apiKey.isNotEmpty) {
-            // SECURITY: Use Logger.logApiKey for safe API key logging
-            Logger.logApiKey(apiKey, tag: 'main', displayLength: AppConstants.apiKeyDisplayLength);
-          } else {
-            Logger.warning('  - ⚠️ API Key: NULL (critical issue!)', tag: 'main');
+          if (kDebugMode) {
+            Logger.debug('Firebase Auth instance accessible', tag: 'main');
+            Logger.debug('App ID: ${auth.app.options.appId}', tag: 'main');
           }
         } catch (e, st) {
-          Logger.warning('⚠ Could not verify Firebase Auth instance', error: e, stackTrace: st, tag: 'main');
+          Logger.warning('Could not verify Firebase Auth instance', error: e, stackTrace: st, tag: 'main');
         }
       } catch (e, st) {
-        Logger.warning('Firebase initialization with options failed', error: e, stackTrace: st, tag: 'main');
-        Logger.info('Attempting fallback initialization...', tag: 'main');
-        try {
-          await Firebase.initializeApp().timeout(
-            AppConstants.networkRequestTimeout,
-            onTimeout: () {
-              throw TimeoutException('Firebase fallback initialization timed out');
-            },
-          );
-          firebaseInitialized = true;
-          Logger.info('✓ Firebase initialized via fallback', tag: 'main');
-        } catch (fallbackError, fallbackSt) {
-          firebaseInitError = 'Firebase initialization failed with options and fallback: $e (fallback: $fallbackError)';
-          Logger.error('Firebase fallback initialization also failed', error: fallbackError, stackTrace: fallbackSt, tag: 'main');
-          // Don't continue - Firebase is required for the app to function
-        }
+        firebaseInitError = 'Firebase initialization failed: $e';
+        Logger.error('Firebase initialization failed', error: e, stackTrace: st, tag: 'main');
       }
     }
   } catch (e, stackTrace) {
     firebaseInitError = 'Firebase initialization error: $e';
-    Logger.error('=== FIREBASE INITIALIZATION ERROR ===', error: e, stackTrace: stackTrace, tag: 'main');
-    Logger.error('Common causes:', tag: 'main');
-    Logger.error('  - Missing google-services.json in android/app/', tag: 'main');
-    Logger.error('  - DEVELOPER_ERROR - OAuth client or SHA-1 fingerprint mismatch', tag: 'main');
-    Logger.error('  - Incorrect API key restrictions in Google Cloud Console', tag: 'main');
-    Logger.error('  - Missing or invalid firebase_options.dart', tag: 'main');
-    Logger.error('  - Network connectivity issues', tag: 'main');
+    Logger.error('Firebase initialization error', error: e, stackTrace: stackTrace, tag: 'main');
   }
 
   if (firebaseInitialized) {
     Logger.info('✓ Firebase initialized successfully', tag: 'main');
     
-    // Configure Firestore settings for Android
-    // CRITICAL FIX: Remove custom settings to prevent gRPC channel reset loops
-    // The channel reset loop (initChannel -> shutdownNow -> initChannel) was caused by
-    // forcing settings before the channel was ready. Let Firestore use defaults.
+    // Firestore will use default settings
     if (!kIsWeb) {
       try {
         final firestore = FirebaseFirestore.instance;
-        // Don't configure settings immediately - let Firestore initialize naturally
-        // This prevents the "Channel shutdownNow invoked" -> "unavailable" error cycle
-        Logger.debug('✓ Firestore instance available', tag: 'main');
-        Logger.debug('  - App: ${firestore.app.name}', tag: 'main');
-        Logger.debug('  - Project ID: ${firestore.app.options.projectId}', tag: 'main');
-        final apiKey = firestore.app.options.apiKey;
-        if (apiKey != null) {
-          // SECURITY: Use Logger.logApiKey for safe API key logging
-          Logger.logApiKey(apiKey, tag: 'main', displayLength: AppConstants.apiKeyDisplayLength);
-        } else {
-          Logger.warning('  - ⚠️ API Key: NULL (critical issue!)', tag: 'main');
+        if (kDebugMode) {
+          Logger.debug('Firestore instance available', tag: 'main');
         }
-        Logger.debug('  - Using default Firestore settings to prevent gRPC channel issues', tag: 'main');
       } catch (e, st) {
-        Logger.warning('⚠ Firestore instance error', error: e, stackTrace: st, tag: 'main');
+        Logger.warning('Firestore instance error', error: e, stackTrace: st, tag: 'main');
       }
     }
     
-    // App Check is disabled to prevent potential Android auth timeouts
-    // App Check enforcement can block requests if not properly configured
-    // This is a platform-agnostic decision, not a Chrome workaround
-    // TODO: Re-enable App Check once properly registered in Firebase Console
-    Logger.warning('⚠ App Check disabled to prevent authentication timeouts', tag: 'main');
-    /*
-    try {
-      if (kIsWeb) {
-        debugPrint('⚠ App Check skipped for web');
-      } else {
-        debugPrint('Initializing Firebase App Check (debug mode)...');
-        // Android/iOS App Check with debug provider for development
-        // Using timeout to prevent blocking
+    // Initialize App Check with reCAPTCHA Enterprise provider
+    // This provides tokens that Firebase Auth can use for verification
+    if (!kIsWeb) {
+      try {
+        Logger.info('Initializing App Check with reCAPTCHA Enterprise...', tag: 'main');
+        const recaptchaSiteKey = '6LeprxosAAAAACXWuPlrlx0zOyM3GpJOVhBHvJ5e';
+        
         await FirebaseAppCheck.instance.activate(
-          androidProvider: AndroidProvider.debug,
-          appleProvider: AppleProvider.debug,
-        ).timeout(
-          const Duration(seconds: 3),
-          onTimeout: () {
-            debugPrint('⚠ App Check init timeout - skipping');
-            return; // Return early on timeout
-          },
+          androidProvider: AndroidProvider.playIntegrity,
+          appleProvider: AppleProvider.appAttest,
         );
-        debugPrint('✓ Firebase App Check initialized');
+        Logger.info('App Check initialized', tag: 'main');
+      } catch (e, st) {
+        Logger.warning('⚠ App Check initialization failed (non-blocking)', error: e, stackTrace: st, tag: 'main');
+        Logger.warning('  - Authentication may still work without App Check', tag: 'main');
       }
-    } catch (e) {
-      debugPrint('⚠ App Check error (non-critical): $e');
-      // Continue - App Check warnings won't block auth
     }
-    */
   } else {
-    // FAIL FAST: Don't proceed if Firebase initialization failed
-    // This prevents "FirebaseException: [core/no-app]" errors during login
-    Logger.error('=== CRITICAL: Firebase initialization failed ===', tag: 'main');
-    Logger.error('Error: $firebaseInitError', tag: 'main');
-    Logger.error('The app cannot function without Firebase.', tag: 'main');
-    Logger.error('Please check:', tag: 'main');
-    Logger.error('  1. google-services.json exists and is valid (Android)', tag: 'main');
-    Logger.error('  2. API key restrictions in Google Cloud Console', tag: 'main');
-    Logger.error('  3. Network connectivity', tag: 'main');
-    Logger.error('  4. firebase_options.dart configuration', tag: 'main');
-    
-    // Run app with error screen instead of proceeding to broken login flow
+    // Don't proceed if Firebase initialization failed
+    Logger.error('Firebase initialization failed: $firebaseInitError', tag: 'main');
     runApp(FirebaseInitErrorApp(error: firebaseInitError ?? 'Unknown error'));
     return;
   }
+  
+  // Initialize Hive for offline caching
+  try {
+    await Hive.initFlutter().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        throw TimeoutException('Hive initialization timed out');
+      },
+    );
+  } catch (e, st) {
+    Logger.error('Hive initialization failed', error: e, stackTrace: st, tag: 'main');
+    // Continue - Hive is optional for offline caching
+  }
+  
+  // Initialize GetIt service locator
+  try {
+    await setupServiceLocator().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        throw TimeoutException('Service locator initialization timed out');
+      },
+    );
+  } catch (e, st) {
+    Logger.error('Service locator initialization failed', error: e, stackTrace: st, tag: 'main');
+    // Continue - some services may not be available
+  }
+  
+  // Initialize ChessService (requires Hive)
+  try {
+    final chessService = getIt<ChessService>();
+    await chessService.initialize();
+    Logger.info('✓ ChessService initialized', tag: 'main');
+  } catch (e, st) {
+    Logger.warning('⚠ ChessService initialization error', error: e, stackTrace: st, tag: 'main');
+  }
+  
+  // Initialize cache service (non-blocking)
+  _initializeCacheService();
   
   // Initialize notification service (non-blocking)
   _initializeNotificationService();
@@ -259,6 +281,32 @@ void main() async {
   _initializeBackgroundSync();
   
   runApp(const FamilyHubApp());
+}
+
+/// Initialize cache service asynchronously without blocking startup
+/// CRITICAL: This must never block Firebase Auth or app startup
+void _initializeCacheService() {
+  // Use scheduleMicrotask to ensure this runs after the current frame
+  // This prevents any file system operations from interfering with Firebase initialization
+  scheduleMicrotask(() async {
+    try {
+      // Add a small delay to ensure Firebase Auth is fully initialized first
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Initialize with aggressive timeout to prevent blocking
+      await CacheService().initialize().timeout(
+        const Duration(seconds: 2), // Reduced from 5 to 2 seconds
+        onTimeout: () {
+          Logger.warning('⚠ Cache service initialization timed out - continuing without cache', tag: 'main');
+          return; // Don't throw - just continue without cache
+        },
+      );
+      Logger.info('✓ Cache service initialized', tag: 'main');
+    } catch (e, st) {
+      Logger.warning('⚠ Cache service initialization error - continuing without cache', error: e, stackTrace: st, tag: 'main');
+      // Don't fail app startup if cache fails - cache is optional
+    }
+  });
 }
 
 /// Initialize notification service asynchronously without blocking startup
@@ -390,21 +438,50 @@ class FirebaseInitErrorApp extends StatelessWidget {
 class FamilyHubApp extends StatelessWidget {
   const FamilyHubApp({super.key});
 
+  // Global navigator key for deep linking
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
+    // Set navigator key for NotificationService
+    NotificationService.navigatorKey = navigatorKey;
+    
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppState()),
+        ChangeNotifierProvider(create: (_) => UserDataProvider()),
         Provider(create: (_) => AuthService()),
       ],
       child: ErrorHandler(
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'Family Hub',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
           home: const AuthWrapper(),
+          // Handle deep links via onGenerateRoute
+          onGenerateRoute: (settings) {
+            if (settings.name?.startsWith('/chess/invite/') ?? false) {
+              final roomId = settings.name?.split('/').last;
+              if (roomId != null) {
+                // Show invite dialog - handled by NotificationService
+                return MaterialPageRoute(
+                  builder: (_) => const Scaffold(body: Center(child: CircularProgressIndicator())),
+                );
+              }
+            } else if (settings.name?.startsWith('/chess/room/') ?? false) {
+              final roomId = settings.name?.split('/').last;
+              if (roomId != null) {
+                // Navigate to game screen
+                return MaterialPageRoute(
+                  builder: (_) => const Scaffold(body: Center(child: CircularProgressIndicator())),
+                );
+              }
+            }
+            return null;
+          },
         ),
       ),
     );

@@ -45,5 +45,26 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Calendar Permissions -->
+	<key>NSCalendarsUsageDescription</key>
+	<string>FamilyHub needs access to your calendar to sync events between the app and your device calendar.</string>
+	<key>NSCalendarsWriteOnlyUsageDescription</key>
+	<string>FamilyHub needs write access to create and update calendar events on your device.</string>
+	<!-- Photo Library Permissions -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>FamilyHub needs access to your photos to upload images to events and photo albums.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>FamilyHub needs permission to save photos to your library.</string>
+	<!-- Camera Permission -->
+	<key>NSCameraUsageDescription</key>
+	<string>FamilyHub needs camera access to take photos for events and photo albums.</string>
+	<!-- Location Permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>FamilyHub needs your location to share your whereabouts with family members and show your location on the map.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>FamilyHub needs your location in the background to provide real-time location sharing with family members.</string>
+	<!-- Microphone Permission -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>FamilyHub needs microphone access for voice messages and video calls with family members.</string>
 </dict>
 </plist>
