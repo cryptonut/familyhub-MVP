@@ -274,8 +274,8 @@ class ChessService {
   }
   
   /// Accept a chess invite
-  /// Updates invite status and publishes 'chess_start' to FCM topic
-  Future<void> acceptInvite(String roomId) async {
+  /// Updates invite status, joins the game, and publishes 'chess_start' to FCM topic
+  Future<ChessGame> acceptInvite(String roomId) async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) throw AuthException('User not logged in', code: 'not-authenticated');
@@ -294,6 +294,10 @@ class ChessService {
         throw ValidationException('This invite is not for you');
       }
       
+      // Get user model for name
+      final userModel = await _authService.getCurrentUserModel();
+      final userName = userModel?.displayName ?? 'Player';
+      
       // Update invite status
       await _firestore.collection('invites').doc(roomId).update({'status': 'accepted'});
       
@@ -301,13 +305,13 @@ class ChessService {
       _inviteTimers[roomId]?.cancel();
       _inviteTimers.remove(roomId);
       
-      // Get game to find players
-      final gameDoc = await _firestore.collection('chess_games').doc(roomId).get();
-      if (!gameDoc.exists) {
-        throw FirestoreException('Game not found', code: 'not-found');
-      }
+      // Actually join the game (this was missing!)
+      final joinedGame = await joinFamilyGame(
+        gameId: roomId,
+        blackPlayerId: currentUser.uid,
+        blackPlayerName: userName,
+      );
       
-      final gameData = gameDoc.data()!;
       final senderId = inviteData['sender'] as String;
       
       // Publish 'chess_start' to FCM topic
@@ -321,7 +325,8 @@ class ChessService {
         'createdAt': DateTime.now().toIso8601String(),
       });
       
-      Logger.info('Invite $roomId accepted', tag: 'ChessService');
+      Logger.info('Invite $roomId accepted and game joined', tag: 'ChessService');
+      return joinedGame;
     } catch (e, st) {
       Logger.error('Error accepting invite', error: e, stackTrace: st, tag: 'ChessService');
       rethrow;
@@ -382,6 +387,7 @@ class ChessService {
 
   /// Join a family game
   /// Validates that the joining player is the invited opponent (if game has an invited player)
+  /// Also updates invite status if there's a pending invite
   Future<ChessGame> joinFamilyGame({
     required String gameId,
     required String blackPlayerId,
@@ -409,6 +415,18 @@ class ChessService {
       // Prevent joining your own game
       if (game.whitePlayerId == blackPlayerId) {
         throw ValidationException('You cannot join your own game');
+      }
+
+      // Update invite status if there's a pending invite
+      final inviteDoc = await _firestore.collection('invites').doc(gameId).get();
+      if (inviteDoc.exists) {
+        final inviteData = inviteDoc.data();
+        if (inviteData?['status'] == 'pending' && inviteData?['targetUser'] == blackPlayerId) {
+          await _firestore.collection('invites').doc(gameId).update({'status': 'accepted'});
+          // Cancel timeout timer
+          _inviteTimers[gameId]?.cancel();
+          _inviteTimers.remove(gameId);
+        }
       }
 
       final updatedGame = game.copyWith(
