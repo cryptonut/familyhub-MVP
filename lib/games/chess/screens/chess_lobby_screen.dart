@@ -6,6 +6,7 @@ import '../../../services/auth_service.dart';
 import '../../../widgets/ui_components.dart';
 import '../../../utils/app_theme.dart';
 import '../models/chess_game.dart';
+import '../models/chess_game_role.dart';
 import '../services/chess_service.dart';
 import '../screens/chess_game_screen.dart';
 import '../screens/chess_solo_game_screen.dart';
@@ -30,6 +31,7 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
   StreamSubscription<List<ChessGame>>? _activeGamesSubscription;
   String? _currentFamilyId;
   String? _currentUserId;
+  final Set<String> _notifiedGameIds = {};
 
   @override
   void initState() {
@@ -60,12 +62,52 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
             .listen((games) {
           if (mounted) {
             setState(() {
-              // Filter: games where current user is invited OR games where they're not the creator
+              // Use ChessGameRole to determine which games to show
               _waitingGames = games
-                  .where((g) => 
-                      (g.invitedPlayerId == _currentUserId) || // User was invited
-                      (g.whitePlayerId != _currentUserId && g.invitedPlayerId == null) // Open invitation
-                  )
+                  .where((g) {
+                    final role = ChessGameRole.determine(g, _currentUserId!);
+                    // Show if user is involved in any way
+                    final shouldShow = role.isChallenger || role.isInvited || role.isBlackPlayer || role.isWhitePlayer;
+                    
+                    // Show notification for challenger when game is accepted
+                    if (role.isChallenger && g.status == GameStatus.active && g.blackPlayerId != null && !_notifiedGameIds.contains(g.id)) {
+                      _notifiedGameIds.add(g.id);
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && context.mounted) {
+                          final opponentName = g.blackPlayerName ?? 'Your opponent';
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text('$opponentName accepted! Tap to join'),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: Colors.green,
+                              duration: const Duration(seconds: 15),
+                              action: SnackBarAction(
+                                label: 'Join Now',
+                                textColor: Colors.white,
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChessGameScreen(gameId: g.id, mode: GameMode.family),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        }
+                      });
+                    }
+                    
+                    return shouldShow;
+                  })
                   .toList();
             });
           }
@@ -246,7 +288,9 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
 
   Widget _buildWaitingGamesAlert() {
     final user = _authService.currentUser;
-    final invitedGames = _waitingGames.where((g) => g.invitedPlayerId == user?.uid).toList();
+    if (user == null || _waitingGames.isEmpty) return const SizedBox.shrink();
+    
+    final totalGames = _waitingGames.length;
     
     return Container(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
@@ -265,9 +309,7 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  invitedGames.isNotEmpty 
-                      ? '${invitedGames.length} Challenge${invitedGames.length > 1 ? 's' : ''} Waiting!'
-                      : '${_waitingGames.length} Game${_waitingGames.length > 1 ? 's' : ''} Waiting',
+                  '$totalGames Game${totalGames > 1 ? 's' : ''} Waiting',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -278,40 +320,103 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          ...invitedGames.take(2).map((game) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${game.whitePlayerName ?? 'Someone'} challenged you!',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.orange.shade800,
+          // Show all waiting games using ChessGameRole for consistent logic
+          ..._waitingGames.take(2).map((game) {
+            final role = ChessGameRole.determine(game, user.uid);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          role.displayText,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: role.isInvited 
+                                ? Colors.orange.shade800 
+                                : role.isChallenger && game.status == GameStatus.active
+                                    ? Colors.green.shade800
+                                    : Colors.orange.shade800,
+                          ),
+                        ),
+                        if (role.subtitleText.isNotEmpty)
+                          Text(
+                            role.subtitleText,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: role.isInvited 
+                                  ? Colors.orange.shade600 
+                                  : Colors.green.shade600,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChessFamilyGameScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.play_arrow, size: 18),
-                  label: const Text('View'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange.shade700,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    color: Colors.red.shade700,
+                    onPressed: () => _deleteGame(game),
+                    tooltip: 'Delete',
                   ),
-                ),
-              ],
-            ),
-          )),
-          if (invitedGames.length > 2)
+                  const SizedBox(width: 4),
+                  if (role.canAccept || role.canJoin)
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        if (role.canAccept || role.canJoin) {
+                          if (game.status == GameStatus.active && game.blackPlayerId != null) {
+                            // Navigate directly to active game
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChessGameScreen(gameId: game.id, mode: GameMode.family),
+                              ),
+                            );
+                          } else {
+                            // Navigate to family game screen
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ChessFamilyGameScreen(),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      icon: Icon(role.buttonIcon, size: 18),
+                      label: Text(role.buttonText.isNotEmpty ? role.buttonText : 'View'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: role.buttonColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    )
+                  else
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ChessFamilyGameScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.visibility, size: 18),
+                      label: const Text('View'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }),
+          if (totalGames > 2)
             TextButton(
               onPressed: () {
                 Navigator.push(
@@ -322,7 +427,7 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
                 );
               },
               child: Text(
-                'View all ${invitedGames.length} challenges',
+                'View all $totalGames games',
                 style: TextStyle(color: Colors.orange.shade800),
               ),
             ),
@@ -423,6 +528,50 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
         builder: (context) => const ChessGameScreen(gameId: null, mode: GameMode.open),
       ),
     );
+  }
+
+  Future<void> _deleteGame(ChessGame game) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Game'),
+        content: const Text('Are you sure you want to delete this game?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _chessService.deleteGame(game.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Game deleted'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting game: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 }
 

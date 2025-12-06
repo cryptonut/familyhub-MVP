@@ -109,6 +109,11 @@ class UserDataProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Refresh data (force reload)
+  Future<void> refresh() async {
+    await loadUserData(forceRefresh: true);
+  }
+
   /// Get user model by ID (with caching)
   Future<UserModel?> getUserModel(String userId) async {
     // Check family members first (most common case)

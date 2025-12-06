@@ -274,6 +274,27 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
       if (game == null) {
         throw Exception('Game not found');
       }
+      
+      // CRITICAL: Validate both players are in the game
+      final currentUser = _authService.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+      
+      if (game.mode == GameMode.family && game.status == GameStatus.active) {
+        if (game.blackPlayerId == null) {
+          throw Exception('Game is not ready - opponent has not joined yet');
+        }
+        
+        if (!game.isPlayer(currentUser.uid)) {
+          throw Exception('You are not a player in this game');
+        }
+        
+        Logger.info(
+          'Loaded game $gameId: white=${game.whitePlayerId}, black=${game.blackPlayerId}, currentUser=${currentUser.uid}, isPlayer=${game.isPlayer(currentUser.uid)}',
+          tag: 'ChessGameScreen'
+        );
+      }
 
       _chessEngine = chess_lib.Chess();
       _chessEngine!.load(game.fen);
@@ -285,20 +306,43 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
         _isLoading = false;
       });
 
-      // Connect WebSocket for real-time updates
-      _connectWebSocket(gameId);
+      // WebSocket disabled - using Firestore streams for real-time updates
+      // _connectWebSocket(gameId);
       
       // Listen for game updates (Firestore fallback)
       _gameSubscription?.cancel();
       _gameSubscription = _chessService.streamGame(gameId).listen((updatedGame) {
         if (updatedGame != null && mounted) {
+          // Validate game state on each update
+          if (updatedGame.mode == GameMode.family && updatedGame.status == GameStatus.active) {
+            if (updatedGame.blackPlayerId == null) {
+              Logger.warning('Game update received but blackPlayerId is null', tag: 'ChessGameScreen');
+              return;
+            }
+            
+            if (currentUser != null && !updatedGame.isPlayer(currentUser.uid)) {
+              Logger.warning('Game update received but current user is not a player', tag: 'ChessGameScreen');
+              return;
+            }
+          }
+          
           setState(() {
             _game = updatedGame;
             _whiteTimeRemaining = updatedGame.whiteTimeRemaining;
             _blackTimeRemaining = updatedGame.blackTimeRemaining;
             
+            // CRITICAL: Always reload chess engine from FEN to keep in sync
             if (_chessEngine != null) {
               _chessEngine!.load(updatedGame.fen);
+              // Verify turn matches - log warning if mismatch
+              final fenTurn = updatedGame.fen.split(' ')[1] == 'w';
+              if (fenTurn != updatedGame.isWhiteTurn) {
+                Logger.warning(
+                  'Turn mismatch detected! FEN says ${fenTurn ? "white" : "black"}, but game.isWhiteTurn=${updatedGame.isWhiteTurn}. '
+                  'This could cause move validation failures.',
+                  tag: 'ChessGameScreen'
+                );
+              }
             }
           });
 
@@ -362,17 +406,25 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
     final user = _authService.currentUser;
     if (user == null) return;
     if (!_game!.isMyTurn(user.uid)) return;
+    
+    // CRITICAL: Validate both players are present
+    if (_game!.blackPlayerId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Game is not ready - opponent has not joined yet'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _isMakingMove = true);
 
     try {
-      // Validate move locally first
-      final move = _chessEngine!.move(moveUCI);
-      if (move == null) {
-        throw Exception('Invalid move');
-      }
-
-      // Make move via service
+      // Make move via service - service handles all validation
+      // Don't do local validation here - it can cause false rejections
       final updatedGame = await _chessService.makeMove(
         gameId: _game!.id,
         moveUCI: moveUCI,
@@ -391,8 +443,18 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
     } catch (e) {
       Logger.error('Error making move', error: e, tag: 'ChessGameScreen');
       if (mounted) {
+        final errorMessage = e.toString().contains('Invalid move') || e.toString().contains('ValidationException')
+            ? 'Invalid move. Please try again.'
+            : e.toString().contains('permission-denied') || e.toString().contains('network')
+                ? 'Connection error. Please check your internet and try again.'
+                : 'Error: ${e.toString()}';
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Invalid move: ${e.toString()}')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } finally {
@@ -636,13 +698,23 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
                       children: [
                         Text(
                           _game!.whitePlayerName ?? 'White',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: _game!.isWhiteTurn 
+                                ? Colors.black87  // Very dark for light blue background
+                                : Colors.grey.shade800,
+                          ),
                         ),
                         Text(
                           _formatTime(_whiteTimeRemaining),
                           style: TextStyle(
                             fontSize: 18,
-                            color: _whiteTimeRemaining < 60000 ? Colors.red : null,
+                            fontWeight: FontWeight.bold,
+                            color: _whiteTimeRemaining < 60000 
+                                ? Colors.red.shade900  // Very dark red for visibility
+                                : _game!.isWhiteTurn 
+                                    ? Colors.black87  // Very dark for light blue background
+                                    : Colors.grey.shade900, // Very dark grey
                           ),
                         ),
                       ],
@@ -658,13 +730,23 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
                       children: [
                         Text(
                           _game!.blackPlayerName ?? 'Black',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: !_game!.isWhiteTurn 
+                                ? Colors.black87  // Very dark for light blue background
+                                : Colors.grey.shade800,
+                          ),
                         ),
                         Text(
                           _formatTime(_blackTimeRemaining),
                           style: TextStyle(
                             fontSize: 18,
-                            color: _blackTimeRemaining < 60000 ? Colors.red : null,
+                            fontWeight: FontWeight.bold,
+                            color: _blackTimeRemaining < 60000 
+                                ? Colors.red.shade900  // Very dark red for visibility
+                                : !_game!.isWhiteTurn 
+                                    ? Colors.black87  // Very dark for light blue background
+                                    : Colors.grey.shade900, // Very dark grey
                           ),
                         ),
                       ],

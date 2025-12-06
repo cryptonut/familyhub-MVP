@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../core/services/logger_service.dart';
 import '../core/errors/app_exceptions.dart';
 import '../models/hub.dart';
+import '../config/config.dart';
 import 'auth_service.dart';
 import 'notification_service.dart';
 
@@ -16,10 +17,10 @@ class VideoCallService {
   final NotificationService _notificationService = NotificationService();
   final Uuid _uuid = const Uuid();
 
-  // Agora configuration - these should be set from environment variables or config
+  // Agora configuration - loaded from app config
   // For production, use Cloud Functions to generate tokens securely
-  static const String appId = 'YOUR_AGORA_APP_ID'; // TODO: Replace with actual App ID
-  static const String appCertificate = 'YOUR_AGORA_APP_CERTIFICATE'; // TODO: Replace with actual certificate
+  String? get appId => Config.current.agoraAppId;
+  String? get appCertificate => Config.current.agoraAppCertificate;
 
   RtcEngine? _engine;
   bool _isInitialized = false;
@@ -28,10 +29,16 @@ class VideoCallService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
+    if (appId == null || appId!.isEmpty) {
+      throw ValidationException(
+        'Agora App ID not configured. Please set agoraAppId in app config.',
+      );
+    }
+
     try {
       _engine = createAgoraRtcEngine();
       await _engine!.initialize(RtcEngineContext(
-        appId: appId,
+        appId: appId!,
         channelProfile: ChannelProfileType.channelProfileCommunication,
       ));
 

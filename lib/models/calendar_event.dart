@@ -15,6 +15,7 @@ class CalendarEvent {
   final String? eventOwnerId; // User ID of event owner (changeable by owner or admin)
   final List<String> photoUrls; // URLs of photos attached to event
   final String? sourceCalendar; // Calendar name/account where event originated (e.g., "Gmail", "Samsung Calendar", "FamilyHub")
+  final String? hubId; // Hub ID if event belongs to a specific hub (null = family event)
 
   CalendarEvent({
     required this.id,
@@ -33,6 +34,7 @@ class CalendarEvent {
     this.eventOwnerId,
     List<String>? photoUrls,
     this.sourceCalendar,
+    this.hubId,
   }) : invitedMemberIds = invitedMemberIds ?? const [],
        rsvpStatus = rsvpStatus ?? const {},
        photoUrls = photoUrls ?? const [];
@@ -54,6 +56,7 @@ class CalendarEvent {
         if (eventOwnerId != null) 'eventOwnerId': eventOwnerId,
         'photoUrls': photoUrls,
         if (sourceCalendar != null) 'sourceCalendar': sourceCalendar,
+        if (hubId != null) 'hubId': hubId,
       };
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) {
@@ -82,6 +85,7 @@ class CalendarEvent {
       eventOwnerId: json['eventOwnerId'] as String? ?? json['createdBy'] as String?,
       photoUrls: List<String>.from(json['photoUrls'] as List? ?? []),
       sourceCalendar: json['sourceCalendar'] as String?,
+      hubId: json['hubId'] as String?,
     );
   }
 
@@ -102,6 +106,7 @@ class CalendarEvent {
     String? eventOwnerId,
     List<String>? photoUrls,
     String? sourceCalendar,
+    String? hubId,
   }) =>
       CalendarEvent(
         id: id ?? this.id,
@@ -120,6 +125,7 @@ class CalendarEvent {
         eventOwnerId: eventOwnerId ?? this.eventOwnerId,
         photoUrls: photoUrls ?? this.photoUrls,
         sourceCalendar: sourceCalendar ?? this.sourceCalendar,
+        hubId: hubId ?? this.hubId,
       );
 }
 

@@ -50,7 +50,8 @@ class GamesService {
   Future<void> updateStats(GameStats stats) async {
     try {
       final data = stats.toJson();
-      data.remove('userId');
+      // Keep userId in data for Firestore rules validation
+      // familyId is not needed in the document data (it's in the path)
       data.remove('familyId');
       data['lastUpdated'] = DateTime.now().toIso8601String();
 
@@ -108,7 +109,8 @@ class GamesService {
   }
 
   /// Get leaderboard for family
-  Future<List<GameStats>> getLeaderboard() async {
+  /// Can be sorted by different game types
+  Future<List<GameStats>> getLeaderboard({String? gameType}) async {
     final userModel = await _authService.getCurrentUserModel();
     if (userModel?.familyId == null) return [];
 
@@ -117,9 +119,6 @@ class GamesService {
           .collection('families')
           .doc(userModel!.familyId)
           .collection('game_stats')
-          .orderBy('winsChess', descending: true)
-          .orderBy('winsScramble', descending: true)
-          .orderBy('winsBingo', descending: true)
           .get();
 
       final stats = snapshot.docs
@@ -130,12 +129,28 @@ class GamesService {
               }))
           .toList();
 
-      // Sort by total wins, then by streak
-      stats.sort((a, b) {
-        final totalWinsCompare = b.totalWins.compareTo(a.totalWins);
-        if (totalWinsCompare != 0) return totalWinsCompare;
-        return b.streakDays.compareTo(a.streakDays);
-      });
+      // Sort based on game type
+      if (gameType == 'tetris') {
+        stats.sort((a, b) => b.tetrisHighScore.compareTo(a.tetrisHighScore));
+      } else if (gameType == '2048') {
+        stats.sort((a, b) => b.puzzle2048HighScore.compareTo(a.puzzle2048HighScore));
+      } else if (gameType == 'slide') {
+        // For slide puzzle, lower time is better
+        stats.sort((a, b) {
+          if (a.slidePuzzleBestTime == 0) return 1;
+          if (b.slidePuzzleBestTime == 0) return -1;
+          return a.slidePuzzleBestTime.compareTo(b.slidePuzzleBestTime);
+        });
+      } else {
+        // Default: sort by total wins, then by streak, then by Tetris score
+        stats.sort((a, b) {
+          final totalWinsCompare = b.totalWins.compareTo(a.totalWins);
+          if (totalWinsCompare != 0) return totalWinsCompare;
+          final streakCompare = b.streakDays.compareTo(a.streakDays);
+          if (streakCompare != 0) return streakCompare;
+          return b.tetrisHighScore.compareTo(a.tetrisHighScore);
+        });
+      }
 
       return stats;
     } catch (e) {
@@ -145,7 +160,7 @@ class GamesService {
   }
 
   /// Get leaderboard stream for real-time updates
-  Stream<List<GameStats>> getLeaderboardStream() async* {
+  Stream<List<GameStats>> getLeaderboardStream({String? gameType}) async* {
     final userModel = await _authService.getCurrentUserModel();
     if (userModel?.familyId == null) {
       yield [];
@@ -166,18 +181,97 @@ class GamesService {
                 }))
             .toList();
 
-        // Sort by total wins, then by streak
-        stats.sort((a, b) {
-          final totalWinsCompare = b.totalWins.compareTo(a.totalWins);
-          if (totalWinsCompare != 0) return totalWinsCompare;
-          return b.streakDays.compareTo(a.streakDays);
-        });
+        // Sort based on game type (same logic as getLeaderboard)
+        if (gameType == 'tetris') {
+          stats.sort((a, b) => b.tetrisHighScore.compareTo(a.tetrisHighScore));
+        } else if (gameType == '2048') {
+          stats.sort((a, b) => b.puzzle2048HighScore.compareTo(a.puzzle2048HighScore));
+        } else if (gameType == 'slide') {
+          stats.sort((a, b) {
+            if (a.slidePuzzleBestTime == 0) return 1;
+            if (b.slidePuzzleBestTime == 0) return -1;
+            return a.slidePuzzleBestTime.compareTo(b.slidePuzzleBestTime);
+          });
+        } else {
+          // Default: sort by total wins, then by streak, then by Tetris score
+          stats.sort((a, b) {
+            final totalWinsCompare = b.totalWins.compareTo(a.totalWins);
+            if (totalWinsCompare != 0) return totalWinsCompare;
+            final streakCompare = b.streakDays.compareTo(a.streakDays);
+            if (streakCompare != 0) return streakCompare;
+            return b.tetrisHighScore.compareTo(a.tetrisHighScore);
+          });
+        }
 
         yield stats;
       }
     } catch (e) {
       Logger.error('Error in leaderboard stream', error: e, tag: 'GamesService');
       yield [];
+    }
+  }
+
+  /// Update Tetris high score
+  /// This method is non-blocking and won't throw errors to prevent disrupting gameplay
+  Future<void> updateTetrisHighScore(String userId, String familyId, int score, int lines) async {
+    try {
+      // Check if user is authenticated before making Firestore calls
+      if (_auth.currentUser == null) {
+        Logger.warning('Cannot update Tetris score: user not authenticated', tag: 'GamesService');
+        return;
+      }
+
+      final currentStats = await getUserStats(userId) ?? GameStats(userId: userId, familyId: familyId);
+      if (score > currentStats.tetrisHighScore) {
+        final updatedStats = currentStats.copyWith(
+          tetrisHighScore: score,
+          lastPlayed: DateTime.now(),
+          lastUpdated: DateTime.now(),
+        );
+        await updateStats(updatedStats);
+        Logger.info('Updated Tetris high score for $userId: $score', tag: 'GamesService');
+      }
+    } catch (e) {
+      // Log error but don't rethrow - don't disrupt gameplay for network issues
+      Logger.error('Error updating Tetris high score (non-blocking)', error: e, tag: 'GamesService');
+    }
+  }
+
+  /// Update 2048 puzzle high score
+  Future<void> updatePuzzle2048HighScore(String userId, String familyId, int score) async {
+    try {
+      final currentStats = await getUserStats(userId) ?? GameStats(userId: userId, familyId: familyId);
+      if (score > currentStats.puzzle2048HighScore) {
+        final updatedStats = currentStats.copyWith(
+          puzzle2048HighScore: score,
+          lastPlayed: DateTime.now(),
+          lastUpdated: DateTime.now(),
+        );
+        await updateStats(updatedStats);
+        Logger.info('Updated 2048 high score for $userId: $score', tag: 'GamesService');
+      }
+    } catch (e) {
+      Logger.error('Error updating 2048 high score', error: e, tag: 'GamesService');
+      rethrow;
+    }
+  }
+
+  /// Update slide puzzle best time (in seconds, lower is better)
+  Future<void> updateSlidePuzzleBestTime(String userId, String familyId, int timeInSeconds) async {
+    try {
+      final currentStats = await getUserStats(userId) ?? GameStats(userId: userId, familyId: familyId);
+      if (currentStats.slidePuzzleBestTime == 0 || timeInSeconds < currentStats.slidePuzzleBestTime) {
+        final updatedStats = currentStats.copyWith(
+          slidePuzzleBestTime: timeInSeconds,
+          lastPlayed: DateTime.now(),
+          lastUpdated: DateTime.now(),
+        );
+        await updateStats(updatedStats);
+        Logger.info('Updated slide puzzle best time for $userId: ${timeInSeconds}s', tag: 'GamesService');
+      }
+    } catch (e) {
+      Logger.error('Error updating slide puzzle best time', error: e, tag: 'GamesService');
+      rethrow;
     }
   }
 }

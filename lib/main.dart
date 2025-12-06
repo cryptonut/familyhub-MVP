@@ -83,8 +83,8 @@ void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize app configuration (Dev/Test/Prod)
-  Config.initialize();
+  // Initialize app configuration (Dev/Test/Prod) - must be awaited
+  await Config.initialize();
   
   // Initialize timezone data for device_calendar
   try {

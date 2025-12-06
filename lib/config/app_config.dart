@@ -14,5 +14,12 @@ abstract class AppConfig {
   
   // API endpoints (if you have backend APIs)
   String? get apiBaseUrl;
+  
+  // Agora video call configuration
+  String? get agoraAppId;
+  String? get agoraAppCertificate;
+  
+  // WebSocket endpoints
+  String? get chessWebSocketUrl;
 }
 
