@@ -87,13 +87,11 @@ class UserDataProvider extends ChangeNotifier {
       if (user != null) {
         final members = await _authService.getFamilyMembers();
         
-        // Update only if data changed
-        if (user.uid != _currentUser?.uid || members.length != _familyMembers.length) {
-          _currentUser = user;
-          _familyMembers = members;
-          _lastRefresh = DateTime.now();
-          notifyListeners();
-        }
+        // Always update with fresh data to catch profile changes (photo, name, etc.)
+        _currentUser = user;
+        _familyMembers = members;
+        _lastRefresh = DateTime.now();
+        notifyListeners();
       }
     } catch (e) {
       Logger.warning('Background refresh failed', error: e, tag: 'UserDataProvider');

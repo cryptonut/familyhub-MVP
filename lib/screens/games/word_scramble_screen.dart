@@ -50,7 +50,11 @@ class _WordScrambleScreenState extends State<WordScrambleScreen> {
   }
 
   Future<void> _checkAnswer() async {
-    if (_userGuess.toUpperCase() == _currentWord) {
+    // Normalize both strings: trim whitespace, convert to uppercase, remove extra spaces
+    final normalizedGuess = _userGuess.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+    final normalizedAnswer = _currentWord.trim().toUpperCase();
+    
+    if (normalizedGuess == normalizedAnswer) {
       setState(() {
         _isCorrect = true;
         _score++;

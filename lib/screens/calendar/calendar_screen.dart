@@ -20,7 +20,9 @@ import 'event_details_screen.dart';
 import 'gantt_chart_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+  final DateTime? initialDate;
+  
+  const CalendarScreen({super.key, this.initialDate});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -46,6 +48,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialDate != null) {
+      _focusedDay = widget.initialDate!;
+      _selectedDay = widget.initialDate!;
+    }
     _setupEventsListener();
   }
 
@@ -267,10 +273,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     startingDayOfWeek: StartingDayOfWeek.monday,
                     calendarStyle: CalendarStyle(
                       outsideDaysVisible: false,
-                      markerDecoration: const BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                      ),
                       todayDecoration: BoxDecoration(
                         color: Colors.blue.withValues(alpha: 0.3),
                         shape: BoxShape.circle,
@@ -283,6 +285,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     headerStyle: const HeaderStyle(
                       formatButtonVisible: false,
                       titleCentered: true,
+                    ),
+                    calendarBuilders: CalendarBuilders(
+                      markerBuilder: (context, date, events) {
+                        if (events.isEmpty) return const SizedBox.shrink();
+                        return Positioned(
+                          right: 1,
+                          bottom: 1,
+                          child: Container(
+                            padding: events.length > 1 
+                                ? const EdgeInsets.symmetric(horizontal: 4, vertical: 2)
+                                : const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: events.length > 1
+                                ? Text(
+                                    '${events.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
                     ),
                     onDaySelected: (selectedDay, focusedDay) {
                       setState(() {

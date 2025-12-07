@@ -211,20 +211,24 @@ class PhotoService {
       Query query = _firestore
           .collection('families')
           .doc(familyId)
-          .collection('photos')
-          .orderBy('uploadedAt', descending: true);
+          .collection('photos');
 
       if (albumId != null) {
         query = query.where('albumId', isEqualTo: albumId);
       }
 
       final snapshot = await query.get();
-      return snapshot.docs
+      final photos = snapshot.docs
           .map((doc) => FamilyPhoto.fromJson({
                 'id': doc.id,
                 ...(doc.data() as Map<String, dynamic>),
               }))
           .toList();
+          
+      // Sort in memory to avoid Firestore composite index requirements
+      photos.sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
+      
+      return photos;
     } catch (e) {
       Logger.error('Error getting photos', error: e, tag: 'PhotoService');
       return [];
@@ -236,20 +240,24 @@ class PhotoService {
     Query query = _firestore
         .collection('families')
         .doc(familyId)
-        .collection('photos')
-        .orderBy('uploadedAt', descending: true);
+        .collection('photos');
 
     if (albumId != null) {
       query = query.where('albumId', isEqualTo: albumId);
     }
 
     return query.snapshots().map((snapshot) {
-      return snapshot.docs
+      final photos = snapshot.docs
           .map((doc) => FamilyPhoto.fromJson({
                 'id': doc.id,
                 ...(doc.data() as Map<String, dynamic>),
               }))
           .toList();
+      
+      // Sort in memory
+      photos.sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
+      
+      return photos;
     });
   }
 

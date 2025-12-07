@@ -18,6 +18,8 @@ import '../../services/event_template_service.dart';
 import '../../models/event_template.dart';
 import '../../widgets/toast_notification.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
+import '../../services/hub_service.dart';
+import '../../models/hub.dart';
 
 class AddEditEventScreen extends StatefulWidget {
   final CalendarEvent? event;
@@ -42,6 +44,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
   final _authService = AuthService();
   final _syncService = CalendarSyncService();
   final _templateService = EventTemplateService();
+  final _hubService = HubService();
   final _auth = FirebaseAuth.instance;
   
   DateTime _startTime = DateTime.now();
@@ -53,6 +56,8 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
   List<UserModel> _familyMembers = [];
   bool _addToPersonalCalendar = true;
   bool _calendarSyncEnabled = false;
+  List<Hub> _availableHubs = [];
+  Set<String> _selectedHubIds = {}; // Set of selected hub IDs
   List<String> _photoUrls = [];
   List<File> _pendingPhotos = []; // For mobile
   List<Uint8List> _pendingPhotosWeb = []; // For web
@@ -106,10 +111,19 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
     try {
       final members = await _authService.getFamilyMembers();
       final userModel = await _authService.getCurrentUserModel();
+      final hubs = await _hubService.getUserHubs();
       setState(() {
         _familyMembers = members;
         _calendarSyncEnabled = userModel?.calendarSyncEnabled ?? false;
         _addToPersonalCalendar = _calendarSyncEnabled; // Default to true if sync enabled
+        _availableHubs = hubs;
+        // Load existing hubIds if editing
+        if (widget.event != null && widget.event!.hubIds.isNotEmpty) {
+          _selectedHubIds = Set<String>.from(widget.event!.hubIds);
+        } else if (widget.event != null && widget.event!.hubId != null) {
+          // Backward compatibility: if hubId is set, add it to hubIds
+          _selectedHubIds = {widget.event!.hubId!};
+        }
       });
     } catch (e) {
       // Handle error silently
@@ -191,6 +205,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
         createdBy: widget.event?.createdBy ?? _auth.currentUser?.uid, // Preserve creator when editing, set for new events
         photoUrls: _photoUrls, // Use current photo URLs
         sourceCalendar: widget.event?.sourceCalendar, // Preserve source calendar when editing
+        hubIds: _selectedHubIds.where((id) => id.isNotEmpty && id != '').toList(), // Store selected hub IDs (exclude family marker)
       );
 
       String eventId = event.id;
@@ -525,6 +540,88 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                           : member.email[0].toUpperCase(),
                       style: const TextStyle(color: Colors.white),
                     ),
+                  ),
+                );
+              }),
+            const SizedBox(height: 24),
+            
+            // Add to Calendars Section
+            const Text(
+              'Add to Calendars',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Select which hubs/family calendars this event appears on',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            // Family Calendar (always available, shown as toggle)
+            // Family calendar is represented by empty hubIds list
+            // If hubIds is empty, event appears only in family calendar
+            // If hubIds has values, event appears in those hubs (and optionally family)
+            // We'll use a special marker: if _selectedHubIds contains null or empty string, family is selected
+            // For simplicity, we'll track family separately
+            SwitchListTile(
+              title: const Text('Family Calendar'),
+              subtitle: const Text('Main family calendar'),
+              value: _selectedHubIds.isEmpty || _selectedHubIds.contains(''), // Empty = family only, or contains '' = family + hubs
+              onChanged: (value) {
+                setState(() {
+                  if (value) {
+                    // Add family calendar marker (empty string)
+                    if (!_selectedHubIds.contains('')) {
+                      _selectedHubIds.add('');
+                    }
+                  } else {
+                    // Remove family calendar - but ensure at least one selection remains
+                    if (_selectedHubIds.length == 1 && _selectedHubIds.contains('')) {
+                      // Can't deselect if it's the only selection
+                      return;
+                    }
+                    _selectedHubIds.remove('');
+                  }
+                });
+              },
+              secondary: const Icon(Icons.family_restroom),
+            ),
+            // Hub calendars
+            if (_availableHubs.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(
+                  child: Text(
+                    'No hubs available',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              ..._availableHubs.map((hub) {
+                final isSelected = _selectedHubIds.contains(hub.id);
+                return SwitchListTile(
+                  title: Text(hub.name),
+                  subtitle: Text(hub.description),
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value) {
+                        _selectedHubIds.add(hub.id);
+                      } else {
+                        _selectedHubIds.remove(hub.id);
+                        // Ensure at least family calendar is selected if no hubs remain
+                        final hasHubs = _selectedHubIds.any((id) => id.isNotEmpty && id != '');
+                        if (!hasHubs && !_selectedHubIds.contains('')) {
+                          // If no hubs selected, ensure family calendar is selected
+                          _selectedHubIds.add('');
+                        }
+                      }
+                    });
+                  },
+                  secondary: Icon(
+                    hub.icon != null 
+                        ? _getIconFromString(hub.icon!) 
+                        : Icons.group,
                   ),
                 );
               }),
@@ -922,6 +1019,26 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
       return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
     } catch (e) {
       return Colors.blue;
+    }
+  }
+
+  IconData _getIconFromString(String iconName) {
+    switch (iconName.toLowerCase()) {
+      case 'people':
+      case 'group':
+        return Icons.group;
+      case 'family':
+        return Icons.family_restroom;
+      case 'sports':
+        return Icons.sports;
+      case 'school':
+        return Icons.school;
+      case 'work':
+        return Icons.work;
+      case 'home':
+        return Icons.home;
+      default:
+        return Icons.group;
     }
   }
 

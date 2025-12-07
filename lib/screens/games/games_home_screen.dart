@@ -8,8 +8,8 @@ import '../../models/user_model.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
 import 'word_scramble_screen.dart';
-import 'family_bingo_screen.dart';
 import 'leaderboard_screen.dart';
+import 'my_stats_screen.dart';
 import '../../games/chess/screens/chess_lobby_screen.dart';
 import '../../games/tetris/screens/tetris_screen.dart';
 import '../../games/puzzle2048/screens/puzzle2048_screen.dart';
@@ -125,20 +125,6 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
                       },
                     ),
                     _buildGameCard(
-                      title: 'Family Bingo',
-                      description: '5×5 auto-generated bingo cards',
-                      icon: Icons.grid_view,
-                      color: Colors.orange,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const FamilyBingoScreen(),
-                          ),
-                        ).then((_) => _loadData());
-                      },
-                    ),
-                    _buildGameCard(
                       title: 'Tetris',
                       description: 'Classic falling blocks puzzle',
                       icon: Icons.gamepad,
@@ -241,6 +227,14 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
       margin: const EdgeInsets.all(AppTheme.spacingMD),
       color: Theme.of(context).colorScheme.primaryContainer,
       padding: const EdgeInsets.all(AppTheme.spacingMD),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MyStatsScreen(),
+          ),
+        );
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

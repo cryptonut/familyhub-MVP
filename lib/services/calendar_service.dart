@@ -426,6 +426,73 @@ class CalendarService {
     return true;
   }
 
+  // --- Conflict Detection Methods ---
+
+  /// Check if two events overlap in time
+  bool eventsOverlap(CalendarEvent event1, CalendarEvent event2) {
+    return event1.startTime.isBefore(event2.endTime) &&
+           event2.startTime.isBefore(event1.endTime);
+  }
+
+  /// Get all participants for an event (invited members with "going" RSVP + event owner)
+  Set<String> getEventParticipants(CalendarEvent event) {
+    final participants = <String>{};
+    
+    // Add event owner if exists (always include owner unless they explicitly declined)
+    final ownerId = event.eventOwnerId ?? event.createdBy;
+    if (ownerId != null) {
+      final ownerRsvp = event.rsvpStatus[ownerId];
+      if (ownerRsvp != 'declined') {
+        participants.add(ownerId);
+      }
+    }
+    
+    // Add invited members who RSVP'd "going" or have no RSVP (default to going)
+    for (final memberId in event.invitedMemberIds) {
+      final rsvp = event.rsvpStatus[memberId];
+      if (rsvp == 'going' || rsvp == null) {
+        participants.add(memberId);
+      }
+    }
+    
+    return participants;
+  }
+
+  /// Find conflicts: people who are in multiple overlapping events
+  /// Returns Map<UserId, List<CalendarEvent>>
+  Map<String, List<CalendarEvent>> findConflicts(List<CalendarEvent> events) {
+    final conflicts = <String, List<CalendarEvent>>{};
+    
+    for (int i = 0; i < events.length; i++) {
+      for (int j = i + 1; j < events.length; j++) {
+        final event1 = events[i];
+        final event2 = events[j];
+        
+        if (eventsOverlap(event1, event2)) {
+          final participants1 = getEventParticipants(event1);
+          final participants2 = getEventParticipants(event2);
+          
+          // Find common participants
+          final common = participants1.intersection(participants2);
+          
+          for (final memberId in common) {
+            if (!conflicts.containsKey(memberId)) {
+              conflicts[memberId] = [];
+            }
+            if (!conflicts[memberId]!.contains(event1)) {
+              conflicts[memberId]!.add(event1);
+            }
+            if (!conflicts[memberId]!.contains(event2)) {
+              conflicts[memberId]!.add(event2);
+            }
+          }
+        }
+      }
+    }
+    
+    return conflicts;
+  }
+
   /// Find all duplicate events grouped by their matching characteristics
   /// Returns a map where each key is a "signature" and value is list of duplicate event IDs
   Future<Map<String, List<String>>> findDuplicateEvents() async {

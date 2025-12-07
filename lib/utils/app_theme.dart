@@ -28,6 +28,11 @@ class AppTheme {
   static const double spacingLG = 24.0;
   static const double spacingXL = 32.0;
   
+  // Spacing aliases for compatibility
+  static const double spacingS = spacingSM;
+  static const double spacingM = spacingMD;
+  static const double spacingL = spacingLG;
+  
   // Border Radius
   static const double radiusXS = 4.0;
   static const double radiusSM = 8.0;
