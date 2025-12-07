@@ -58,6 +58,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
   bool _calendarSyncEnabled = false;
   List<Hub> _availableHubs = [];
   Set<String> _selectedHubIds = {}; // Set of selected hub IDs
+  bool _familyCalendarExplicitlyDeselected = false; // Track if user explicitly deselected family calendar
   List<String> _photoUrls = [];
   List<File> _pendingPhotos = []; // For mobile
   List<Uint8List> _pendingPhotosWeb = []; // For web
@@ -120,9 +121,17 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
         // Load existing hubIds if editing
         if (widget.event != null && widget.event!.hubIds.isNotEmpty) {
           _selectedHubIds = Set<String>.from(widget.event!.hubIds);
+          // Reset flag when loading existing event
+          _familyCalendarExplicitlyDeselected = false;
         } else if (widget.event != null && widget.event!.hubId != null) {
           // Backward compatibility: if hubId is set, add it to hubIds
           _selectedHubIds = {widget.event!.hubId!};
+          // Reset flag when loading existing event
+          _familyCalendarExplicitlyDeselected = false;
+        } else {
+          // New event: default to family calendar selected
+          _selectedHubIds.add(''); // Default to family calendar for new events
+          _familyCalendarExplicitlyDeselected = false;
         }
       });
     } catch (e) {
@@ -573,6 +582,8 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                     if (!_selectedHubIds.contains('')) {
                       _selectedHubIds.add('');
                     }
+                    // Reset flag when user explicitly selects family calendar
+                    _familyCalendarExplicitlyDeselected = false;
                   } else {
                     // Remove family calendar - but ensure at least one selection remains
                     if (_selectedHubIds.length == 1 && _selectedHubIds.contains('')) {
@@ -580,6 +591,8 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                       return;
                     }
                     _selectedHubIds.remove('');
+                    // Mark that user explicitly deselected family calendar
+                    _familyCalendarExplicitlyDeselected = true;
                   }
                 });
               },
@@ -609,10 +622,10 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                         _selectedHubIds.add(hub.id);
                       } else {
                         _selectedHubIds.remove(hub.id);
-                        // Ensure at least family calendar is selected if no hubs remain
+                        // Only auto-add family calendar if it wasn't explicitly deselected by user
                         final hasHubs = _selectedHubIds.any((id) => id.isNotEmpty && id != '');
-                        if (!hasHubs && !_selectedHubIds.contains('')) {
-                          // If no hubs selected, ensure family calendar is selected
+                        if (!hasHubs && !_selectedHubIds.contains('') && !_familyCalendarExplicitlyDeselected) {
+                          // If no hubs selected and family calendar wasn't explicitly deselected, ensure family calendar is selected
                           _selectedHubIds.add('');
                         }
                       }
