@@ -473,7 +473,8 @@ class NotificationService {
         }
       } else if (action == 'chess_start') {
         final roomId = data['roomId'] as String?;
-        final players = data['players'] as List?;
+        final playersData = data['players'];
+        final players = playersData is List ? (playersData as List).cast<String>() : null;
         final currentUser = _auth.currentUser;
         
         // Check if current user is a player

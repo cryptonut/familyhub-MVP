@@ -1,0 +1,38 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow all authenticated users (basic security for now)
+    // This ensures all photo uploads work immediately
+    
+    // Regular photos (photo albums)
+    match /photos/{familyId}/{photoId} {
+      allow read, write, delete: if request.auth != null;
+    }
+    
+    // Thumbnails
+    match /thumbnails/{familyId}/{photoId} {
+      allow read, write, delete: if request.auth != null;
+    }
+    
+    // Voice messages
+    match /families/{familyId}/voice_messages/{fileName} {
+      allow read, write, delete: if request.auth != null;
+    }
+    
+    // Event photos
+    match /eventPhotos/{familyId}/{eventId}/{photoId} {
+      allow read, write, delete: if request.auth != null;
+    }
+    
+    // Profile photos - NEW PATH (fixes avatar upload unauthorized error)
+    // Path: profile_photos/{userId}/{photoId}.jpg
+    match /profile_photos/{userId}/{photoId} {
+      // Allow read for all authenticated users (profiles are visible to family)
+      allow read: if request.auth != null;
+      
+      // Allow write/delete only for the user's own profile photo
+      allow write, delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+

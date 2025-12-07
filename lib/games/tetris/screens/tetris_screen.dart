@@ -478,37 +478,15 @@ class _TetrisScreenState extends State<TetrisScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Score and Lines
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Column(
-                    children: [
-                      const Text('Score', style: TextStyle(fontSize: 16)),
-                      Text('$_score', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  Column(
-                    children: [
-                      const Text('Lines', style: TextStyle(fontSize: 16)),
-                      Text('$_lines', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            // Game Board with Next Piece
+            // Game Board with Next Piece and Stats
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   // Calculate available width
                   final availableWidth = constraints.maxWidth;
-                  final nextPieceWidth = 80.0;
+                  final rightColumnWidth = 100.0;
                   final spacing = 8.0;
-                  final boardMaxWidth = availableWidth - nextPieceWidth - spacing - 32; // Account for padding
+                  final boardMaxWidth = availableWidth - rightColumnWidth - spacing - 32; // Account for padding
                   
                   return Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -562,10 +540,10 @@ class _TetrisScreenState extends State<TetrisScreen> {
                         ),
                       ),
                       
-                      // Next Piece Preview
+                      // Right Column: Next Piece Preview + Score + Lines
                       SizedBox(width: spacing),
                       Container(
-                        width: nextPieceWidth,
+                        width: rightColumnWidth,
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: Colors.grey[900],
@@ -574,7 +552,9 @@ class _TetrisScreenState extends State<TetrisScreen> {
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
+                            // Next Piece Preview
                             Text(
                               'NEXT',
                               style: TextStyle(
@@ -606,6 +586,56 @@ class _TetrisScreenState extends State<TetrisScreen> {
                                   },
                                 ),
                               ),
+                            
+                            const SizedBox(height: 16),
+                            
+                            // Score
+                            Column(
+                              children: [
+                                Text(
+                                  'SCORE',
+                                  style: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$_score',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            
+                            const SizedBox(height: 12),
+                            
+                            // Lines
+                            Column(
+                              children: [
+                                Text(
+                                  'LINES',
+                                  style: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$_lines',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),

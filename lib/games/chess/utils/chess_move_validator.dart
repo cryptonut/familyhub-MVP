@@ -41,19 +41,25 @@ class ChessMoveValidator {
   /// 1. Creating a copy of the game
   /// 2. Attempting the move
   /// 3. Checking if the FEN actually changed
-  /// 4. Verifying the move didn't leave the king in check
+  /// 4. The chess library's move() already validates that moves don't leave own king in check
   static bool _isValidMove(chess_lib.Chess game, String from, String to) {
     try {
+      // Basic validation: check piece exists and is correct color
+      final piece = game.get(from);
+      if (piece == null) return false;
+      if (piece.color != game.turn) return false;
+      
       // Create a copy to test the move
       final testGame = chess_lib.Chess();
       testGame.load(game.fen);
       
       final originalFen = testGame.fen;
+      final originalTurn = testGame.turn;
       
-      // Try to make the move
+      // Try to make the move - the chess library validates legality
       final moveResult = testGame.move({'from': from, 'to': to});
       if (moveResult == null) {
-        return false; // Move was rejected
+        return false; // Move was rejected by chess library (invalid move)
       }
       
       // CRITICAL: Check if FEN actually changed
@@ -63,30 +69,23 @@ class ChessMoveValidator {
         return false; // Move didn't actually change the board
       }
       
-      // Verify the piece at 'from' was actually the right color
-      final originalPiece = game.get(from);
-      if (originalPiece == null || originalPiece.color != game.turn) {
-        return false;
-      }
-      
-      // Verify the move is legal (doesn't leave own king in check)
-      // The chess library should handle this, but we double-check
-      final isInCheck = testGame.in_check;
-      final isCheckmate = testGame.in_checkmate;
-      final isStalemate = testGame.in_stalemate;
-      
-      // If the move results in our own king being in check, it's invalid
-      // But wait - we need to check if it's the opponent's king in check, not ours
-      // Actually, the chess library's in_check should be for the current player
-      // Let's verify by checking if the turn changed
-      final turnChanged = testGame.turn != game.turn;
-      if (!turnChanged) {
+      // Verify the turn changed (move was actually executed)
+      final newTurn = testGame.turn;
+      if (newTurn == originalTurn) {
         Logger.warning('ChessMoveValidator: Move $from->$to did not change turn!', tag: 'ChessMoveValidator');
         return false;
       }
       
+      // The chess library's move() method already validates:
+      // - Piece movement rules
+      // - No moves that leave own king in check
+      // - Castling rules
+      // - En passant rules
+      // So if move() returned non-null and FEN changed, the move is legal
+      
       return true;
     } catch (e) {
+      Logger.warning('ChessMoveValidator: Exception validating move $from->$to: $e', tag: 'ChessMoveValidator');
       // Move is invalid if it throws an exception
       return false;
     }

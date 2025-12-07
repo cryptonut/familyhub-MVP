@@ -121,7 +121,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
           // Check if user can create job with this reward (checks role and balance)
           final canCreate = await _familyWalletService.canCreateJobWithReward(rewardValue, _cachedTasks!);
           
-          if (!canCreate['canCreate'] as bool) {
+          if (!(canCreate['canCreate'] as bool)) {
             throw ValidationException(canCreate['reason'] as String, code: 'validation-failed');
           }
           

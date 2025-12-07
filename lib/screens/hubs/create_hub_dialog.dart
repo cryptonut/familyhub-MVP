@@ -109,7 +109,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
                   return InkWell(
                     onTap: () {
                       setState(() {
-                        _selectedIcon = iconData['value'];
+                        _selectedIcon = iconData['value'] as String?;
                       });
                     },
                     borderRadius: BorderRadius.circular(8),

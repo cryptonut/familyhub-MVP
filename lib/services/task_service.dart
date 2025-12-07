@@ -161,7 +161,7 @@ class TaskService {
         // Check if user can create job with this reward
         final canCreate = await _familyWalletService.canCreateJobWithReward(rewardAmount, allTasks);
         
-        if (!canCreate['canCreate'] as bool) {
+        if (!(canCreate['canCreate'] as bool)) {
           throw ValidationException(canCreate['reason'] as String);
         }
         
@@ -360,7 +360,7 @@ class TaskService {
       final completerId = _auth.currentUser?.uid;
       if (needsApproval && creatorId != null && completerId != null && creatorId != completerId) {
         _notificationService.notifyJobCompleted(taskId, jobTitle, completerId).catchError((e, st) {
-          Logger.warning('Error sending completion notification', error: e, stackTrace: st, tag: 'TaskService');
+          Logger.warning('Error sending completion notification', error: e, stackTrace: st as StackTrace?, tag: 'TaskService');
         });
       }
       

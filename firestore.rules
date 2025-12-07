@@ -37,6 +37,13 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['banker', 'admin']);
     }
     
+    // Helper function to check if user is Admin (safely handles missing document)
+    function isAdmin() {
+      return isAuthenticated() && 
+        userDocumentExists() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin', 'Admin']);
+    }
+    
     // Users collection - users can read/write their own data
     match /users/{userId} {
       // Users can read their own document
@@ -98,7 +105,9 @@ service cloud.firestore {
              request.resource.data.claimStatus == 'rejected' ||
              !('claimStatus' in request.resource.data))));
         allow delete: if belongsToFamily(familyId) && 
-          resource.data.createdBy == request.auth.uid;
+          (resource.data.createdBy == request.auth.uid ||
+           // Allow admin to delete any job for cleanup/admin operations
+           isAdmin());
         
         // Task dependencies subcollection
         match /dependencies/{dependencyId} {
@@ -379,6 +388,47 @@ service cloud.firestore {
           resource.data.createdBy == request.auth.uid;
         allow delete: if belongsToFamily(familyId) && 
           resource.data.createdBy == request.auth.uid;
+      }
+      
+      // Shopping lists subcollection
+      match /shoppingLists/{listId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId) && 
+          request.resource.data.creatorId == request.auth.uid;
+        allow update: if belongsToFamily(familyId);
+        allow delete: if belongsToFamily(familyId);
+        
+        // Shopping items subcollection
+        match /items/{itemId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId);
+          allow update: if belongsToFamily(familyId);
+          allow delete: if belongsToFamily(familyId);
+        }
+      }
+      
+      // Smart recurring lists subcollection
+      match /smartRecurringLists/{listId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId);
+        allow update: if belongsToFamily(familyId);
+        allow delete: if belongsToFamily(familyId);
+      }
+      
+      // Shopping receipts subcollection
+      match /shoppingReceipts/{receiptId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId);
+        allow update: if belongsToFamily(familyId);
+        allow delete: if belongsToFamily(familyId);
+      }
+      
+      // Location requests subcollection
+      match /locationRequests/{requestId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId);
+        allow update: if belongsToFamily(familyId);
+        allow delete: if belongsToFamily(familyId);
       }
     }
     

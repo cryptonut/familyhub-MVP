@@ -112,8 +112,12 @@ class _DeleteUserScreenState extends State<DeleteUserScreen> {
     try {
       _addLog('Starting deletion for user: $userId');
       
+      // Get user model to retrieve familyId
+      final userModel = await _authService.getUserModel(userId);
+      final familyId = userModel?.familyId;
+      
       // Delete user data
-      await _authService.deleteUserById(userId);
+      await _authService.deleteUserData(userId, familyId);
       
       _addLog('✅ User deleted successfully!');
       _addLog('Note: Firebase Auth account (if exists) must be deleted manually from Firebase Console');
