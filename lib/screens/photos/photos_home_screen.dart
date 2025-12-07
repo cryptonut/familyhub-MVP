@@ -219,34 +219,57 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: album.coverPhotoId != null
-                  ? FutureBuilder<FamilyPhoto?>(
-                      future: _photoService.getPhoto(_familyId!, album.coverPhotoId!),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData && snapshot.data != null) {
-                          return CachedNetworkImage(
-                            imageUrl: snapshot.data!.thumbnailUrl ?? snapshot.data!.imageUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey[300],
-                              child: const Center(child: CircularProgressIndicator()),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.photo, size: 48),
-                            ),
-                          );
-                        }
-                        return Container(
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.folder, size: 48),
-                        );
-                      },
-                    )
-                  : Container(
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.folder, size: 48),
-                    ),
+              child: FutureBuilder<List<FamilyPhoto>>(
+                // Fetch up to 4 photos for preview
+                future: _photoService.getPhotos(_familyId!, albumId: album.id),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return Container(
+                      color: Colors.grey[200],
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  
+                  final photos = snapshot.data!;
+                  if (photos.isEmpty) {
+                    return Container(
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.folder_open, size: 48, color: Colors.grey),
+                    );
+                  }
+                  
+                  // Take up to 4 photos
+                  final previewPhotos = photos.take(4).toList();
+                  
+                  if (previewPhotos.length == 1) {
+                    return _buildPreviewImage(previewPhotos[0]);
+                  } else {
+                    return Column(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Expanded(child: _buildPreviewImage(previewPhotos[0])),
+                              const SizedBox(width: 1),
+                              Expanded(child: previewPhotos.length > 1 ? _buildPreviewImage(previewPhotos[1]) : Container(color: Colors.grey[200])),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Expanded(child: previewPhotos.length > 2 ? _buildPreviewImage(previewPhotos[2]) : Container(color: Colors.grey[200])),
+                              const SizedBox(width: 1),
+                              Expanded(child: previewPhotos.length > 3 ? _buildPreviewImage(previewPhotos[3]) : Container(color: Colors.grey[200])),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                },
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(8),
@@ -274,6 +297,20 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewImage(FamilyPhoto photo) {
+    return CachedNetworkImage(
+      imageUrl: photo.thumbnailUrl ?? photo.imageUrl,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        color: Colors.grey[200],
+      ),
+      errorWidget: (context, url, error) => Container(
+        color: Colors.grey[200],
+        child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
       ),
     );
   }

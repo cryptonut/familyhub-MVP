@@ -39,8 +39,16 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
   @override
   void initState() {
     super.initState();
+    // Don't auto-default to current date - require explicit selection
     _selectedDate = widget.initialDate ?? DateTime.now();
-    _loadData();
+    // If no initial date provided, show date picker immediately
+    if (widget.initialDate == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _selectDate();
+      });
+    } else {
+      _loadData();
+    }
   }
 
   Future<void> _loadData() async {
@@ -105,11 +113,30 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
+      // Add event indicators - we'll need to load events first
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.blue,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     
-    if (picked != null && picked != _selectedDate) {
+    if (picked != null) {
       setState(() => _selectedDate = picked);
       await _loadData();
+    } else if (widget.initialDate == null) {
+      // If user cancelled and no initial date was provided, go back
+      if (mounted) {
+        Navigator.pop(context);
+      }
     }
   }
 
@@ -271,25 +298,28 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                       ),
                       if (conflicts.isNotEmpty)
                         Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.orange,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.warning, size: 16, color: Colors.white),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    '${conflicts.length} conflict${conflicts.length > 1 ? 's' : ''}',
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                    overflow: TextOverflow.ellipsis,
+                          child: GestureDetector(
+                            onTap: () => _showConflictsDialog(conflicts),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.warning, size: 16, color: Colors.white),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      '${conflicts.length} conflict${conflicts.length > 1 ? 's' : ''}',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -370,16 +400,33 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                   ),
                 
                 // Conflicts warning
+                // Conflicts warning - optimized for light/dark mode contrast
                 if (conflicts.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.all(12),
-                    color: Colors.orange.shade50,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.orange.shade900.withOpacity(0.3)
+                          : Colors.orange.shade50,
+                      border: Border.all(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.orange.shade700
+                            : Colors.orange.shade300,
+                        width: 1,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           '⚠️ Scheduling Conflicts Detected:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.orange.shade200
+                                : Colors.orange.shade900,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         ...conflicts.entries.map((entry) {
@@ -389,7 +436,12 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                             padding: const EdgeInsets.only(bottom: 4),
                             child: Text(
                               '• $memberName: $eventTitles',
-                              style: const TextStyle(fontSize: 12),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.orange.shade100
+                                    : Colors.orange.shade800,
+                              ),
                             ),
                           );
                         }),
@@ -784,6 +836,82 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                     ),
                   ),
                 ),
+        ],
+      ),
+    );
+  }
+
+  void _showConflictsDialog(Map<String, List<CalendarEvent>> conflicts) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Scheduling Conflicts'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'The following family members have overlapping events:',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...conflicts.entries.map((entry) {
+                final memberName = _memberNames[entry.key] ?? 'Unknown';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        memberName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...entry.value.map((event) {
+                        final startTime = DateFormat('h:mm a').format(event.startTime);
+                        final endTime = DateFormat('h:mm a').format(event.endTime);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: _parseColor(event.color),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${event.title} ($startTime - $endTime)',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );

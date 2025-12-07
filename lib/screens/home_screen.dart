@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Added
+import 'package:geolocator/geolocator.dart'; // Added
 import 'dart:async';
 import '../core/services/logger_service.dart';
 import '../services/app_state.dart';
 import '../services/auth_service.dart';
+import '../services/location_service.dart'; // Added
 import '../models/user_model.dart';
 import '../games/chess/services/chess_service.dart';
 import '../games/chess/models/chess_game.dart';
@@ -30,6 +33,7 @@ import 'games/games_home_screen.dart';
 import 'photos/photos_home_screen.dart';
 import 'hubs/my_hubs_screen.dart';
 import 'hubs/my_friends_hub_screen.dart';
+import '../services/task_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,9 +46,13 @@ class _HomeScreenState extends State<HomeScreen> {
   final ChessService _chessService = ChessService();
   final BadgeService _badgeService = BadgeService();
   final HubService _hubService = HubService();
+  final LocationService _locationService = LocationService(); // Added
+  
   int _waitingChessChallenges = 0;
   StreamSubscription<List<ChessGame>>? _waitingGamesSubscription;
   StreamSubscription<BadgeCounts>? _badgeCountsSubscription;
+  StreamSubscription<QuerySnapshot>? _locationRequestSubscription; // Added
+  
   BadgeCounts _badgeCounts = BadgeCounts(
     unreadMessages: 0,
     pendingTasks: 0,
@@ -67,6 +75,126 @@ class _HomeScreenState extends State<HomeScreen> {
     _checkUserPermissions();
     _loadBadgeCounts();
     _loadHubsAndFamily();
+    _listenForLocationRequests(); // Added
+  }
+
+  void _listenForLocationRequests() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final userId = authService.currentUser?.uid;
+    if (userId == null) return;
+
+    _locationRequestSubscription?.cancel();
+    _locationRequestSubscription = FirebaseFirestore.instance
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .where('type', isEqualTo: 'location_request')
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data() as Map<String, dynamic>;
+          _showLocationRequestDialog(change.doc.id, data);
+        }
+      }
+    });
+  }
+
+  Future<void> _showLocationRequestDialog(String notificationId, Map<String, dynamic> data) async {
+    final senderName = data['senderName'] ?? 'Someone';
+    
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.share_location, color: Colors.blue),
+            const SizedBox(width: 8),
+            const Text('Location Request'),
+          ],
+        ),
+        content: Text('$senderName is requesting your location. Do you want to share it?'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await FirebaseFirestore.instance.collection('notifications').doc(notificationId).update({
+                  'read': true,
+                  'status': 'declined',
+                });
+              } catch (e) {
+                Logger.warning('Error updating notification', error: e, tag: 'HomeScreen');
+              }
+            },
+            child: const Text('Deny'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              // Show sharing indicator
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Sharing location...')),
+                );
+              }
+              
+              // Share location
+              final success = await _shareLocation();
+              
+              // Mark as read/accepted
+              try {
+                await FirebaseFirestore.instance.collection('notifications').doc(notificationId).update({
+                  'read': true,
+                  'status': success ? 'accepted' : 'failed',
+                });
+              } catch (e) {
+                Logger.warning('Error updating notification', error: e, tag: 'HomeScreen');
+              }
+              
+              if (mounted && success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Location shared successfully'), backgroundColor: Colors.green),
+                );
+              }
+            },
+            child: const Text('Share Location'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _shareLocation() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        final requested = await Geolocator.requestPermission();
+        if (requested == LocationPermission.denied) return false;
+      }
+      
+      if (permission == LocationPermission.deniedForever) return false;
+
+      final position = await Geolocator.getCurrentPosition();
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userId = authService.currentUser?.uid;
+      
+      if (userId != null) {
+        await _locationService.updateMemberLocation(
+          userId,
+          position.latitude,
+          position.longitude,
+        );
+        return true;
+      }
+      return false;
+    } catch (e) {
+      Logger.error('Error sharing location', error: e, tag: 'HomeScreen');
+      return false;
+    }
   }
 
   void _loadBadgeCounts() {
@@ -102,6 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _waitingGamesSubscription?.cancel();
     _badgeCountsSubscription?.cancel();
+    _locationRequestSubscription?.cancel(); // Added
     super.dispose();
   }
 
@@ -523,6 +652,150 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _showJobsMenu(BuildContext context, AuthService authService) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.task, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Jobs'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.cleaning_services, color: Colors.orange),
+              title: const Text('Cleanup Duplicates', style: TextStyle(color: Colors.orange)),
+              onTap: () => Navigator.pop(context, 'cleanup'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text('Delete Duplicate Document', style: TextStyle(color: Colors.red)),
+              onTap: () => Navigator.pop(context, 'delete_duplicate'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_sweep, color: Colors.red),
+              title: const Text('Delete Duplicates by Task ID', style: TextStyle(color: Colors.red)),
+              onTap: () => Navigator.pop(context, 'delete_duplicate_by_id'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == 'cleanup') {
+      // Handle cleanup
+      final taskService = TaskService();
+      try {
+        await taskService.cleanupDuplicates();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Duplicates cleaned up'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } else if (result == 'delete_duplicate') {
+      // Handle delete duplicate document
+      if (context.mounted) {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete Duplicate Document?'),
+            content: const Text(
+              'This will delete the duplicate document "WpIg6mn4ZGQvVpSFGLcX" '
+              'that is causing the stuck task issue. This action cannot be undone.'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+        if (confirm == true) {
+          // Implementation would go here - need TaskService
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Delete duplicate document functionality needs to be implemented in TaskService'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      }
+    } else if (result == 'delete_duplicate_by_id') {
+      // Handle delete duplicates by task ID
+      if (context.mounted) {
+        final taskIdController = TextEditingController();
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete Duplicates by Task ID'),
+            content: TextField(
+              controller: taskIdController,
+              decoration: const InputDecoration(
+                labelText: 'Task ID',
+                hintText: 'Enter task ID to delete duplicates',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+        if (confirm == true && taskIdController.text.isNotEmpty) {
+          // Implementation would go here - need TaskService
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Delete duplicates by task ID functionality needs to be implemented in TaskService'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+        taskIdController.dispose();
+      }
+    }
+  }
+
   Future<void> _showAdminMenu(BuildContext context, AuthService authService) async {
     final result = await showDialog<String>(
       context: context,
@@ -552,6 +825,12 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('Fix Family Link', style: TextStyle(color: Colors.orange)),
               onTap: () => Navigator.pop(context, 'fix_family'),
             ),
+            ListTile(
+              leading: const Icon(Icons.task, color: Colors.blue),
+              title: const Text('Jobs', style: TextStyle(color: Colors.blue)),
+              trailing: const Icon(Icons.chevron_right, size: 16),
+              onTap: () => Navigator.pop(context, 'jobs'),
+            ),
           ],
         ),
         actions: [
@@ -570,6 +849,8 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context) => const RoleManagementScreen(),
         ),
       );
+    } else if (result == 'jobs') {
+      await _showJobsMenu(context, authService);
     } else if (result == 'reset') {
       // Show warning before allowing database reset
       final confirm = await showDialog<bool>(
@@ -1059,9 +1340,9 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             destinations: [
               const NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: 'Dashboard',
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: 'Home',
               ),
               const NavigationDestination(
                 icon: Icon(Icons.calendar_today_outlined),

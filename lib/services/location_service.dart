@@ -113,4 +113,24 @@ class LocationService {
       'lastSeen': member.lastSeen?.toIso8601String(),
     });
   }
+
+  /// Request a location update from a family member
+  /// Creates a notification for the target user
+  Future<void> requestLocationUpdate(String targetUserId) async {
+    final currentUser = await _authService.getCurrentUserModel();
+    if (currentUser == null) throw AuthException('User not authenticated', code: 'not-authenticated');
+    
+    // Create notification
+    await _firestore.collection('notifications').add({
+      'userId': targetUserId,
+      'type': 'location_request',
+      'title': 'Location Request',
+      'body': '${currentUser.displayName} is requesting your location',
+      'senderId': currentUser.uid,
+      'senderName': currentUser.displayName,
+      'createdAt': DateTime.now().toIso8601String(),
+      'read': false,
+      'status': 'pending', // pending, accepted, declined
+    });
+  }
 }

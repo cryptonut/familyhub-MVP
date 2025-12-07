@@ -15,7 +15,8 @@ class CalendarEvent {
   final String? eventOwnerId; // User ID of event owner (changeable by owner or admin)
   final List<String> photoUrls; // URLs of photos attached to event
   final String? sourceCalendar; // Calendar name/account where event originated (e.g., "Gmail", "Samsung Calendar", "FamilyHub")
-  final String? hubId; // Hub ID if event belongs to a specific hub (null = family event)
+  final String? hubId; // Hub ID if event belongs to a specific hub (null = family event) - DEPRECATED: use hubIds
+  final List<String> hubIds; // List of hub IDs where this event appears (empty = family calendar only)
 
   CalendarEvent({
     required this.id,
@@ -35,9 +36,11 @@ class CalendarEvent {
     List<String>? photoUrls,
     this.sourceCalendar,
     this.hubId,
+    List<String>? hubIds,
   }) : invitedMemberIds = invitedMemberIds ?? const [],
        rsvpStatus = rsvpStatus ?? const {},
-       photoUrls = photoUrls ?? const [];
+       photoUrls = photoUrls ?? const [],
+       hubIds = hubIds ?? const [];
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -56,7 +59,8 @@ class CalendarEvent {
         if (eventOwnerId != null) 'eventOwnerId': eventOwnerId,
         'photoUrls': photoUrls,
         if (sourceCalendar != null) 'sourceCalendar': sourceCalendar,
-        if (hubId != null) 'hubId': hubId,
+        if (hubId != null) 'hubId': hubId, // Keep for backward compatibility
+        if (hubIds.isNotEmpty) 'hubIds': hubIds,
       };
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) {
@@ -85,7 +89,8 @@ class CalendarEvent {
       eventOwnerId: json['eventOwnerId'] as String? ?? json['createdBy'] as String?,
       photoUrls: List<String>.from(json['photoUrls'] as List? ?? []),
       sourceCalendar: json['sourceCalendar'] as String?,
-      hubId: json['hubId'] as String?,
+      hubId: json['hubId'] as String?, // Keep for backward compatibility
+      hubIds: List<String>.from(json['hubIds'] as List? ?? []),
     );
   }
 
@@ -107,6 +112,7 @@ class CalendarEvent {
     List<String>? photoUrls,
     String? sourceCalendar,
     String? hubId,
+    List<String>? hubIds,
   }) =>
       CalendarEvent(
         id: id ?? this.id,
@@ -126,6 +132,7 @@ class CalendarEvent {
         photoUrls: photoUrls ?? this.photoUrls,
         sourceCalendar: sourceCalendar ?? this.sourceCalendar,
         hubId: hubId ?? this.hubId,
+        hubIds: hubIds ?? this.hubIds,
       );
 }
 

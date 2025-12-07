@@ -23,6 +23,7 @@ import '../hubs/my_hubs_screen.dart';
 import '../tasks/add_edit_task_screen.dart';
 import '../tasks/refund_notification_dialog.dart';
 import '../calendar/add_edit_event_screen.dart';
+import '../calendar/scheduling_conflicts_screen.dart';
 import '../wallet/approve_payout_dialog.dart';
 import '../../widgets/relationship_dialog.dart';
 import '../../widgets/ui_components.dart';
@@ -30,6 +31,7 @@ import '../../widgets/skeletons/skeleton_widgets.dart';
 import '../../widgets/quick_actions_fab.dart';
 import '../../utils/app_theme.dart';
 import '../../services/payout_service.dart';
+import '../../services/recurrence_service.dart'; // Added for conflict detection
 import '../../models/payout_request.dart';
 import '../../services/birthday_service.dart';
 import '../../services/profile_photo_service.dart';
@@ -77,6 +79,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _pendingApprovalsCount = 0;
   int _refundNotificationsCount = 0;
   int _pendingPayoutRequestsCount = 0;
+  int _conflictCount = 0;
   bool _isLoadingDashboardData = false; // Only for dashboard-specific data, not user data
 
   @override
@@ -88,8 +91,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Once user data is loaded (from cache or fresh), load dashboard data
       if (mounted) {
         _loadDashboardData(showCachedFirst: true);
+        _loadConflicts();
       }
     });
+  }
+
+  Future<void> _loadConflicts() async {
+    try {
+      final now = DateTime.now();
+      final tomorrow = now.add(const Duration(days: 1));
+      
+      final todayEvents = await _calendarService.getEventsForDate(now);
+      final tomorrowEvents = await _calendarService.getEventsForDate(tomorrow);
+      
+      final combinedEvents = [...todayEvents, ...tomorrowEvents];
+      final uniqueEvents = {for (var e in combinedEvents) e.id: e}.values.toList();
+      
+      final conflicts = _calendarService.findConflicts(uniqueEvents);
+      
+      int count = 0;
+      for (var list in conflicts.values) {
+        count += list.length;
+      }
+      
+      if (mounted) {
+        setState(() {
+          _conflictCount = count;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading conflicts', error: e, tag: 'DashboardScreen');
+    }
   }
 
   Future<void> _loadDashboardData({bool showCachedFirst = false}) async {
@@ -417,14 +449,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // My Family Section (at the top)
+            // My Family (Avatars)
             _buildMyFamily(
               currentUserModel: currentUserModel,
               familyMembers: familyMembers,
               familyCreator: familyCreator,
             ),
-            const SizedBox(height: 24),
-            
+            const SizedBox(height: 16),
+
+            // Conflict Warning
+            if (_conflictCount > 0) ...[
+              _buildConflictWarning(),
+              const SizedBox(height: 16),
+            ],
+
             // Family Chat Widget
             _buildFamilyChatWidget(),
             const SizedBox(height: 24),
@@ -562,6 +600,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildConflictWarning() {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const SchedulingConflictsScreen()),
+        ).then((_) => _loadDashboardData());
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Scheduling Conflicts Detected',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange.shade900,
+                    ),
+                  ),
+                  Text(
+                    '$_conflictCount overlaps found today or tomorrow',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange.shade800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: Colors.orange.shade800),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMyFamily({
     required UserModel? currentUserModel,
     required List<UserModel> familyMembers,
@@ -569,170 +655,129 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     final currentUserId = _auth.currentUser?.uid;
     
-    return ModernCard(
-      padding: const EdgeInsets.all(AppTheme.spacingMD),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-            Row(
-              children: [
-                Icon(Icons.people, 
-                    color: Colors.purple.shade700, size: 28),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'My Family',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                if (familyMembers.isEmpty)
-                  Text(
-                    'No members',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  )
-                else
-                  Text(
-                    '${familyMembers.length} member${familyMembers.length == 1 ? '' : 's'}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (familyMembers.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Center(
-                  child: Text(
-                    'No family members yet',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              )
-            else
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                alignment: WrapAlignment.start,
-                children: familyMembers.map((member) {
-                  final isCurrentUser = member.uid == currentUserId;
-                  final hasUnread = _unreadMessages[member.uid] == true;
-                  
-                  // Extract first name only
-                  String firstName = member.displayName.isNotEmpty
-                      ? member.displayName.split(' ').first
-                      : member.email.split('@')[0];
-                  
-                  // Check if current user can edit relationships (admin only)
-                  final canEditRelationship = currentUserModel != null && 
-                      familyCreator != null &&
-                      (familyCreator.uid == currentUserModel.uid || currentUserModel.isAdmin());
-                  
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: isCurrentUser
-                        ? () {
-                            // Navigate to hubs screen on tap
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const MyHubsScreen(),
-                              ),
-                            );
-                          }
-                        : () {
-                            // Navigate to private chat with this member
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => PrivateChatScreen(
-                                  recipientId: member.uid,
-                                  recipientName: member.displayName.isNotEmpty
-                                      ? member.displayName
-                                      : member.email.split('@')[0],
-                                ),
-                              ),
-                            );
-                          },
-                    onLongPress: isCurrentUser
-                        ? () => _showProfilePhotoMenu(context, member, currentUserModel)
-                        : canEditRelationship
-                            ? () => _showRelationshipMenu(context, member, currentUserModel, familyCreator)
-                            : null,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 32,
-                              backgroundColor: Colors.purple.shade700,
-                              backgroundImage: member.photoUrl != null && member.photoUrl!.isNotEmpty
-                                  ? NetworkImage(member.photoUrl!)
-                                  : null,
-                              child: member.photoUrl == null || member.photoUrl!.isEmpty
-                                  ? Text(
-                                      firstName.isNotEmpty
-                                          ? firstName[0].toUpperCase()
-                                          : member.email.isNotEmpty
-                                              ? member.email[0].toUpperCase()
-                                              : '?',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 28,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            if (hasUnread && !isCurrentUser)
-                              Positioned(
-                                right: 0,
-                                top: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.notifications,
-                                    color: Colors.white,
-                                    size: 12,
-                                  ),
-                                ),
-                              ),
-                          ],
+    if (familyMembers.isEmpty) {
+      return const SizedBox.shrink(); // Don't show anything if no members
+    }
+
+    // Just the scrollable list of avatars (horizontal scroll if needed, or Wrap)
+    // Using SingleChildScrollView for horizontal scrolling like a "Stories" bar
+    // Wrapped in Center to center the list when it's smaller than screen width
+    return Center(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min, // Shrink to fit children
+          children: familyMembers.map((member) {
+          final isCurrentUser = member.uid == currentUserId;
+          final hasUnread = _unreadMessages[member.uid] == true;
+          
+          // Extract first name only
+          String firstName = member.displayName.isNotEmpty
+              ? member.displayName.split(' ').first
+              : member.email.split('@')[0];
+          
+          // Check if current user can edit relationships (admin only)
+          final canEditRelationship = currentUserModel != null && 
+              familyCreator != null &&
+              (familyCreator.uid == currentUserModel.uid || currentUserModel.isAdmin());
+          
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: isCurrentUser
+                  ? () {
+                      // Navigate to hubs screen on tap
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MyHubsScreen(),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          firstName,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14,
-                            color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87,
+                      );
+                    }
+                  : () {
+                      // Navigate to private chat with this member
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PrivateChatScreen(
+                            recipientId: member.uid,
+                            recipientName: member.displayName.isNotEmpty
+                                ? member.displayName
+                                : member.email.split('@')[0],
                           ),
                         ),
-                      ],
+                      );
+                    },
+              onLongPress: isCurrentUser
+                  ? () => _showProfilePhotoMenu(context, member, currentUserModel)
+                  : canEditRelationship
+                      ? () => _showRelationshipMenu(context, member, currentUserModel, familyCreator)
+                      : null,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 32,
+                        backgroundColor: Colors.purple.shade700,
+                        backgroundImage: member.photoUrl != null && member.photoUrl!.isNotEmpty
+                            ? NetworkImage(member.photoUrl!)
+                            : null,
+                        child: member.photoUrl == null || member.photoUrl!.isEmpty
+                            ? Text(
+                                firstName.isNotEmpty
+                                    ? firstName[0].toUpperCase()
+                                    : member.email.isNotEmpty
+                                        ? member.email[0].toUpperCase()
+                                        : '?',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 28,
+                                ),
+                              )
+                            : null,
+                      ),
+                      if (hasUnread && !isCurrentUser)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.notifications,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    firstName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87,
                     ),
-                  );
-                }).toList(),
+                  ),
+                ],
               ),
-          ],
-        ),
-    );
-  }
+            ),
+          );
+        }).toList(),
+      ),
+    ),
+  );
+}
 
   /// Extract first name from display name
   String _getFirstName(String displayName, String email) {
@@ -1727,67 +1772,127 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildQuickStats() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                'Active Jobs',
-                _activeJobsCount.toString(),
-                Icons.task_alt,
-                Colors.orange,
-                tabIndex: 0,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                'Completed',
-                _completedJobsCount.toString(),
-                Icons.check_circle,
-                Colors.green,
-                tabIndex: 1,
-              ),
-            ),
-            if (_pendingApprovalsCount > 0) ...[
-              const SizedBox(width: 12),
+    return ModernCard(
+      padding: EdgeInsets.zero, // Remove padding here, apply to InkWell children
+      child: Column(
+        children: [
+          Row(
+            children: [
               Expanded(
-                child: _buildStatCard(
-                  'Approvals',
-                  _pendingApprovalsCount.toString(),
-                  Icons.notifications_active,
-                  Colors.orange,
+                child: InkWell(
+                  onTap: () {
+                    final appState = Provider.of<AppState>(context, listen: false);
+                    // Navigate to Tasks tab (index 2), Active tab (0)
+                    appState.setCurrentIndexWithTasksTab(2, 0);
+                  },
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppTheme.spacingMD),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.task_alt, color: Colors.orange.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              _activeJobsCount.toString(),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Active Jobs',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Container(width: 1, height: 60, color: Colors.grey.shade200), // Divider
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    final appState = Provider.of<AppState>(context, listen: false);
+                    // Navigate to Tasks tab (index 2), Completed tab (1)
+                    appState.setCurrentIndexWithTasksTab(2, 1);
+                  },
+                  borderRadius: const BorderRadius.only(topRight: Radius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppTheme.spacingMD),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              _completedJobsCount.toString(),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Completed',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
-          ],
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AddEditTaskScreen(),
+          ),
+          const Divider(height: 1),
+          // Row 3: Add Job button
+          Padding(
+            padding: const EdgeInsets.all(AppTheme.spacingMD),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AddEditTaskScreen(),
+                    ),
+                  );
+                  if (result == true && mounted) {
+                    // Wait a moment for Firestore to process, then force refresh
+                    await Future.delayed(const Duration(milliseconds: 500));
+                    await _loadDashboardData(showCachedFirst: false);
+                  }
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Job'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-              );
-              if (result == true && mounted) {
-                // Wait a moment for Firestore to process, then force refresh
-                await Future.delayed(const Duration(milliseconds: 500));
-                await _loadDashboardData(showCachedFirst: false);
-              }
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Add Job'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

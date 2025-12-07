@@ -4,6 +4,7 @@ import '../../services/games_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/game_stats.dart';
 import '../../models/user_model.dart';
+import 'my_stats_screen.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -92,7 +93,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           color: isMe ? Colors.blue.shade50 : null,
-          child: ListTile(
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MyStatsScreen(userId: stats.userId),
+                ),
+              );
+            },
+            child: ListTile(
             leading: Stack(
               children: [
                 CircleAvatar(
@@ -176,11 +186,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ),
                 ),
                 Text(
-                  '${stats.winsChess}C ${stats.winsScramble}S ${stats.winsBingo}B',
+                  '${stats.winsChess}C ${stats.winsScramble}S',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
+          ),
           ),
         );
       },

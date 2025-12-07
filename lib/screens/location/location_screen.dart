@@ -195,6 +195,26 @@ class _LocationScreenState extends State<LocationScreen> {
     );
   }
 
+  Future<void> _requestLocation(FamilyMember member) async {
+    try {
+      await _locationService.requestLocationUpdate(member.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Location requested from ${member.name}'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -252,6 +272,7 @@ class _LocationScreenState extends State<LocationScreen> {
 
   Widget _buildMemberCard(FamilyMember member) {
     final hasLocation = member.latitude != null && member.longitude != null;
+    final isCurrentUser = FirebaseAuth.instance.currentUser?.uid == member.id;
 
     return ModernCard(
       margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
@@ -260,7 +281,7 @@ class _LocationScreenState extends State<LocationScreen> {
         leading: CircleAvatar(
           backgroundColor: Colors.blue,
           child: Text(
-            member.name[0].toUpperCase(),
+            member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
             style: const TextStyle(color: Colors.white),
           ),
         ),
@@ -294,15 +315,23 @@ class _LocationScreenState extends State<LocationScreen> {
               ),
           ],
         ),
-        trailing: hasLocation
-            ? IconButton(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!isCurrentUser)
+              IconButton(
+                icon: const Icon(Icons.share_location),
+                onPressed: () => _requestLocation(member),
+                tooltip: 'Request location',
+              ),
+            if (hasLocation)
+              IconButton(
                 icon: const Icon(Icons.map),
-                onPressed: () {
-                  _showLocationDetails(member);
-                },
+                onPressed: () => _showLocationDetails(member),
                 tooltip: 'View on map',
-              )
-            : null,
+              ),
+          ],
+        ),
       ),
     );
   }

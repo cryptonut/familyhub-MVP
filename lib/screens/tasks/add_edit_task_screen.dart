@@ -14,8 +14,9 @@ import 'package:uuid/uuid.dart';
 
 class AddEditTaskScreen extends StatefulWidget {
   final Task? task;
+  final bool readOnly;
 
-  const AddEditTaskScreen({super.key, this.task});
+  const AddEditTaskScreen({super.key, this.task, this.readOnly = false});
 
   @override
   State<AddEditTaskScreen> createState() => _AddEditTaskScreenState();
@@ -409,12 +410,13 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.task != null ? 'Edit Job' : 'New Job'),
+        title: Text(widget.task != null ? (widget.readOnly ? 'View Job' : 'Edit Job') : 'New Job'),
         actions: [
-          TextButton(
-            onPressed: _saveTask,
-            child: const Text('Save'),
-          ),
+          if (!widget.readOnly)
+            TextButton(
+              onPressed: _saveTask,
+              child: const Text('Save'),
+            ),
         ],
       ),
       body: Form(
@@ -424,6 +426,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
           children: [
             TextFormField(
               controller: _titleController,
+              enabled: !widget.readOnly,
               decoration: const InputDecoration(
                 labelText: 'Title',
                 border: OutlineInputBorder(),
@@ -438,6 +441,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _descriptionController,
+              enabled: !widget.readOnly,
               decoration: const InputDecoration(
                 labelText: 'Description',
                 border: OutlineInputBorder(),
@@ -452,11 +456,13 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                     ? app_date_utils.AppDateUtils.formatDate(_dueDate!)
                     : 'No due date',
               ),
-              trailing: IconButton(
-                icon: const Icon(Icons.calendar_today),
-                onPressed: _selectDueDate,
-              ),
-              onTap: _selectDueDate,
+              trailing: widget.readOnly 
+                  ? null 
+                  : IconButton(
+                      icon: const Icon(Icons.calendar_today),
+                      onPressed: _selectDueDate,
+                    ),
+              onTap: widget.readOnly ? null : _selectDueDate,
             ),
             const SizedBox(height: 8),
             const Text(
@@ -469,14 +475,17 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                 return ButtonSegment<String>(
                   value: priority,
                   label: Text(priority.toUpperCase()),
+                  enabled: !widget.readOnly,
                 );
               }).toList(),
               selected: {_priority},
-              onSelectionChanged: (Set<String> newSelection) {
-                setState(() {
-                  _priority = newSelection.first;
-                });
-              },
+              onSelectionChanged: widget.readOnly 
+                  ? null 
+                  : (Set<String> newSelection) {
+                      setState(() {
+                        _priority = newSelection.first;
+                      });
+                    },
             ),
             const SizedBox(height: 24),
             // Dependencies Section
@@ -484,6 +493,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
             const SizedBox(height: 24),
             TextFormField(
               controller: _rewardController,
+              enabled: !widget.readOnly,
               decoration: const InputDecoration(
                 labelText: 'Reward (AUD)',
                 hintText: '0.00',
@@ -516,13 +526,15 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                     : 'Job completion requires approval from creator',
               ),
               value: _needsApproval,
-              onChanged: _reward != null && _reward! > 0
-                  ? null // Disabled if reward is set (always needs approval)
-                  : (value) {
-                      setState(() {
-                        _needsApproval = value ?? false;
-                      });
-                    },
+              onChanged: widget.readOnly 
+                  ? null 
+                  : (_reward != null && _reward! > 0
+                      ? null // Disabled if reward is set (always needs approval)
+                      : (value) {
+                          setState(() {
+                            _needsApproval = value ?? false;
+                          });
+                        }),
             ),
             const SizedBox(height: 8),
             CheckboxListTile(
@@ -531,11 +543,13 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                 'Job must be claimed before it can be completed',
               ),
               value: _requiresClaim,
-              onChanged: (value) {
-                setState(() {
-                  _requiresClaim = value ?? false;
-                });
-              },
+              onChanged: widget.readOnly 
+                  ? null 
+                  : (value) {
+                      setState(() {
+                        _requiresClaim = value ?? false;
+                      });
+                    },
             ),
           ],
         ),

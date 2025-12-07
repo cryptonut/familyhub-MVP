@@ -603,185 +603,15 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Jobs'),
+        title: const SizedBox.shrink(), // Remove title - redundant with bottom navigation
         actions: [
-          PopupMenuButton(
-            icon: const Icon(Icons.more_vert),
-            itemBuilder: (context) {
-              Logger.debug('Building AppBar menu with 4 items', tag: 'TasksScreen');
-              return [
-                const PopupMenuItem(
-                  value: 'refresh',
-                  child: Row(
-                    children: [
-                      Icon(Icons.refresh),
-                      SizedBox(width: 8),
-                      Text('Refresh'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'cleanup',
-                  child: Row(
-                    children: [
-                      Icon(Icons.cleaning_services, color: Colors.orange),
-                      SizedBox(width: 8),
-                      Text('Cleanup Duplicates', style: TextStyle(color: Colors.orange)),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete_duplicate',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_forever, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete Duplicate Document', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete_duplicate_by_id',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_sweep, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete Duplicates by Task ID', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ];
-            },
-            onSelected: (value) async {
-              Logger.debug('AppBar menu selected: $value', tag: 'TasksScreen');
-              if (value == 'refresh') {
-                Logger.debug('Manual refresh triggered', tag: 'TasksScreen');
-                await _loadTasks(forceRefresh: true);
-              } else if (value == 'cleanup') {
-                try {
-                  await _taskService.cleanupDuplicates();
-                  await Future.delayed(const Duration(milliseconds: 500));
-                  await _loadTasks(forceRefresh: true);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Duplicates cleaned up'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              } else if (value == 'delete_duplicate') {
-                // Delete the specific duplicate document by document ID
-                if (mounted) {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Delete Duplicate Document?'),
-                      content: const Text(
-                        'This will delete the duplicate document "WpIg6mn4ZGQvVpSFGLcX" '
-                        'that is causing the stuck task issue. This action cannot be undone.'
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                        ),
-                      ],
-                    ),
-                  );
-                  
-                  if (confirm == true) {
-                    try {
-                      await _taskService.deleteDocumentByDocId('WpIg6mn4ZGQvVpSFGLcX');
-                      await Future.delayed(const Duration(milliseconds: 1000));
-                      await _loadTasks(forceRefresh: true);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Duplicate document deleted'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error deleting: $e'),
-                            backgroundColor: Colors.red,
-                            duration: const Duration(seconds: 5),
-                          ),
-                        );
-                      }
-                    }
-                  }
-                }
-              } else if (value == 'delete_duplicate_by_id') {
-                // Delete duplicates by querying for the task ID
-                if (mounted) {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Delete Duplicates by Task ID?'),
-                      content: const Text(
-                        'This will find and delete all duplicate documents for task ID '
-                        '"e237c1e4-90a6-4154-aaf9-eb4c4375663a" (keeping only the one where '
-                        'document ID matches task ID). This action cannot be undone.'
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                        ),
-                      ],
-                    ),
-                  );
-                  
-                  if (confirm == true) {
-                    try {
-                      await _taskService.deleteDuplicateByTaskId('e237c1e4-90a6-4154-aaf9-eb4c4375663a');
-                      await Future.delayed(const Duration(milliseconds: 1000));
-                      await _loadTasks(forceRefresh: true);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Duplicates deleted'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error deleting: $e'),
-                            backgroundColor: Colors.red,
-                            duration: const Duration(seconds: 5),
-                          ),
-                        );
-                      }
-                    }
-                  }
-                }
-              }
+          // Refresh button only - other items moved to Admin > Jobs menu
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: () async {
+              Logger.debug('Manual refresh triggered', tag: 'TasksScreen');
+              await _loadTasks(forceRefresh: true);
             },
           ),
         ],
@@ -859,38 +689,95 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Search bar - more compact
+          // Search bar - improved contrast and submit icon
           SizedBox(
             height: 40,
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(fontSize: 14),
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
               decoration: InputDecoration(
                 hintText: 'Search jobs...',
-                hintStyle: const TextStyle(fontSize: 14),
-                prefixIcon: const Icon(Icons.search, size: 20),
+                hintStyle: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
                 suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () {
-                          setState(() {
-                            _searchController.clear();
-                            _searchQuery = '';
-                          });
-                        },
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.search,
+                              size: 20,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            tooltip: 'Search',
+                            onPressed: () {
+                              // Trigger search (already handled by onChanged, but can add explicit search here)
+                              setState(() {
+                                // Search is already active via onChanged
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.clear,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () {
+                              setState(() {
+                                _searchController.clear();
+                                _searchQuery = '';
+                              });
+                            },
+                          ),
+                        ],
                       )
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 filled: true,
-                fillColor: Colors.grey.shade100,
+                fillColor: Theme.of(context).colorScheme.surface,
                 isDense: true,
               ),
               onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              onSubmitted: (value) {
+                // Explicitly trigger search on submit
                 setState(() {
                   _searchQuery = value;
                 });
@@ -1318,7 +1205,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
             leftActions: leftActions,
             rightActions: rightActions,
             onTap: isCompleted
-                ? null
+                ? () => _viewTaskDetails(task)
                 : () => _editTask(task),
             child: ModernCard(
             margin: const EdgeInsets.symmetric(vertical: AppTheme.spacingXS),
@@ -1878,8 +1765,16 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
   }
 
   Future<void> _viewTaskDetails(Task task) async {
-    // For now, just edit the task. Can create a details screen later
-    await _editTask(task);
+    await Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            AddEditTaskScreen(task: task, readOnly: true),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
   }
 
   Future<void> _deleteTaskWithUndo(Task task) async {
