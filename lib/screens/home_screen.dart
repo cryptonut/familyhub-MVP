@@ -28,6 +28,7 @@ import 'settings/calendar_sync_settings_screen.dart';
 import 'settings/privacy_center_screen.dart';
 import 'games/games_home_screen.dart';
 import 'photos/photos_home_screen.dart';
+import 'shopping/shopping_home_screen.dart';
 import 'hubs/my_hubs_screen.dart';
 import 'hubs/my_friends_hub_screen.dart';
 
@@ -1049,6 +1050,7 @@ class _HomeScreenState extends State<HomeScreen> {
               TasksScreen(),
               GamesHomeScreen(),
               PhotosHomeScreen(),
+              ShoppingHomeScreen(),
               LocationScreen(),
             ],
           ),
@@ -1082,6 +1084,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icon(Icons.photo_library_outlined),
                 selectedIcon: Icon(Icons.photo_library),
                 label: 'Photos',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.shopping_bag_outlined),
+                selectedIcon: Icon(Icons.shopping_bag),
+                label: 'Shopping',
               ),
               const NavigationDestination(
                 icon: Icon(Icons.location_on_outlined),

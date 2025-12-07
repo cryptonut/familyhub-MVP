@@ -178,5 +178,10 @@ class UserModel {
   bool isAdmin() => hasRole('admin');
   bool isBanker() => hasRole('banker');
   bool isApprover() => hasRole('approver');
+  bool isShopper() => hasRole('shopper');
+  
+  /// Check if user can perform shopping actions (mark items as got/unavailable)
+  /// By default, all adults (admins, bankers, approvers) can shop, plus anyone with shopper role
+  bool canShop() => isAdmin() || isBanker() || isApprover() || isShopper();
 }
 
