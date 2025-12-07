@@ -30,6 +30,7 @@ import 'games/games_home_screen.dart';
 import 'photos/photos_home_screen.dart';
 import 'hubs/my_hubs_screen.dart';
 import 'hubs/my_friends_hub_screen.dart';
+import 'shopping/shopping_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1050,6 +1051,7 @@ class _HomeScreenState extends State<HomeScreen> {
               GamesHomeScreen(),
               PhotosHomeScreen(),
               LocationScreen(),
+              ShoppingScreen(),
             ],
           ),
           bottomNavigationBar: NavigationBar(
@@ -1087,6 +1089,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icon(Icons.location_on_outlined),
                 selectedIcon: Icon(Icons.location_on),
                 label: 'Location',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.shopping_bag_outlined),
+                selectedIcon: Icon(Icons.shopping_bag),
+                label: 'Shopping',
               ),
             ],
           ),

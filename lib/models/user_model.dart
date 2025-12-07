@@ -178,5 +178,6 @@ class UserModel {
   bool isAdmin() => hasRole('admin');
   bool isBanker() => hasRole('banker');
   bool isApprover() => hasRole('approver');
+  bool isShopper() => hasRole('shopper');
 }
 
