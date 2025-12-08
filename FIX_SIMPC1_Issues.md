@@ -136,7 +136,62 @@ firebase login
 firebase projects:list
 ```
 
+## NUCLEAR OPTION - Switch to SSH (Bypasses All Credential Issues)
+
+If credential managers keep interfering, **just use SSH keys** - it's actually simpler:
+
+1. **Check your remote URL:**
+   ```powershell
+   git remote -v
+   ```
+
+2. **Generate SSH key (if you don't have one):**
+   ```powershell
+   ssh-keygen -t ed25519 -C "your.email@example.com"
+   # Press Enter 3 times (no passphrase needed, or set one)
+   ```
+
+3. **Copy public key:**
+   ```powershell
+   cat ~/.ssh/id_ed25519.pub | clip
+   ```
+
+4. **Add to GitHub:**
+   - Go to: https://github.com/settings/keys
+   - Click "New SSH key"
+   - Paste the key, give it a name like "SIMPC1", save
+
+5. **Test SSH connection:**
+   ```powershell
+   ssh -T git@github.com
+   # Should say "Hi username! You've successfully authenticated..."
+   ```
+
+6. **Switch remote to SSH:**
+   ```powershell
+   git remote set-url origin git@github.com:cryptonut/familyhub-MVP.git
+   ```
+
+7. **Test it:**
+   ```powershell
+   git fetch origin
+   git push origin develop
+   ```
+
+**That's it. No credential managers, no PAT tokens, no prompts. Just works.**
+
+## Alternative: Embed PAT in URL (Quick but less secure)
+
+If you MUST use HTTPS and PAT token, embed it in the URL:
+
+```powershell
+git remote set-url origin https://YOUR_USERNAME:YOUR_PAT_TOKEN@github.com/cryptonut/familyhub-MVP.git
+```
+
+Replace `YOUR_USERNAME` and `YOUR_PAT_TOKEN` with actual values. This bypasses all credential prompts.
+
 ## Notes
 - After setting up, you should be able to commit, push, and deploy from SIMPC1
 - If you encounter issues, check that you're using the same GitHub account and Firebase project as the main PC
+- **SSH keys are the most reliable solution** - no credential manager interference
 
