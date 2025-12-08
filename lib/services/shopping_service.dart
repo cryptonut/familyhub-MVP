@@ -365,7 +365,7 @@ class ShoppingService {
     });
 
     await _updateListItemCounts(familyId, listId);
-    await _incrementPurchaseCount(familyId, itemId);
+    await _incrementPurchaseCount(familyId, listId, itemId);
 
     Logger.info('markItemGotIt: Marked item $itemId as purchased', tag: 'ShoppingService');
   }
@@ -480,13 +480,28 @@ class ShoppingService {
     }
   }
 
-  Future<void> _incrementPurchaseCount(String familyId, String itemId) async {
+  Future<void> _incrementPurchaseCount(String familyId, String listId, String itemId) async {
     // Store purchase history for smart suggestions
     try {
+      // Get the item to store its name
+      final itemDoc = await _firestore
+          .collection('families/$familyId/shoppingLists/$listId/items')
+          .doc(itemId)
+          .get();
+      
+      if (!itemDoc.exists) {
+        Logger.warning('_incrementPurchaseCount: Item not found', tag: 'ShoppingService');
+        return;
+      }
+      
+      final itemName = itemDoc.data()?['name'] as String? ?? itemId;
+      
+      // Use normalized name as key for purchase history
       await _firestore
           .collection('families/$familyId/purchaseHistory')
-          .doc(itemId)
+          .doc(itemName.toLowerCase().replaceAll(' ', '_')) // Normalize name for key
           .set({
+        'name': itemName,
         'lastPurchased': DateTime.now().toIso8601String(),
         'purchaseCount': FieldValue.increment(1),
       }, SetOptions(merge: true));
@@ -731,14 +746,6 @@ class ShoppingService {
           .limit(20)
           .get();
 
-      // Get recent items from completed lists
-      final listsSnapshot = await _firestore
-          .collection('families/$familyId/shoppingLists')
-          .where('isArchived', isEqualTo: false)
-          .orderBy('updatedAt', descending: true)
-          .limit(5)
-          .get();
-
       final suggestedItems = <ShoppingItem>[];
       final seenNames = <String>{};
 
@@ -784,8 +791,8 @@ class ShoppingService {
       final receiptsSnapshot = await _firestore
           .collection('families/$familyId/receipts')
           .where('isVerified', isEqualTo: true)
-          .where('purchaseDate', isGreaterThanOrEqualTo: start.toIso8601String())
-          .where('purchaseDate', isLessThanOrEqualTo: end.toIso8601String())
+          .where('purchaseDate', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+          .where('purchaseDate', isLessThanOrEqualTo: Timestamp.fromDate(end))
           .get();
 
       double totalSpending = 0;
@@ -1014,21 +1021,28 @@ class ShoppingService {
     );
 
     // Add items from smart list
+    final categories = await getCategories();
     for (var itemName in smartList.itemNames) {
       final categoryId = suggestCategory(itemName);
       final category = categoryId != null
-          ? (await getCategories()).firstWhere(
+          ? categories.firstWhere(
               (c) => c.id == categoryId,
-              orElse: () => ShoppingCategory.defaultCategories.firstWhere((c) => c.id == 'other'),
+              orElse: () => categories.firstWhere(
+                (c) => c.id == 'other',
+                orElse: () => ShoppingCategory.defaultCategories.firstWhere((c) => c.id == 'other'),
+              ),
             )
-          : null;
+          : categories.firstWhere(
+              (c) => c.id == 'other',
+              orElse: () => ShoppingCategory.defaultCategories.firstWhere((c) => c.id == 'other'),
+            );
 
       await addShoppingItem(
         listId: newList.id,
         name: itemName,
         quantity: 1,
-        categoryId: category?.id,
-        categoryName: category?.name,
+        categoryId: category.id,
+        categoryName: category.name,
       );
     }
 
