@@ -313,16 +313,21 @@ void _initializeCacheService() {
 void _initializeNotificationService() {
   Future.microtask(() async {
     try {
+      // Add delay to ensure Firebase Auth is ready first
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
       final notificationService = NotificationService();
+      // Increased timeout to 15 seconds - FCM token generation can be slow
       await notificationService.initialize().timeout(
-        AppConstants.backgroundTaskTimeout,
+        const Duration(seconds: 15),
         onTimeout: () {
-          throw TimeoutException('Notification service initialization timed out');
+          Logger.warning('⚠ Notification service initialization timed out - continuing without notifications', tag: 'main');
+          return; // Don't throw - just continue without notifications
         },
       );
       Logger.info('✓ Notification service initialized', tag: 'main');
     } catch (e, st) {
-      Logger.warning('⚠ Notification service initialization error', error: e, stackTrace: st, tag: 'main');
+      Logger.warning('⚠ Notification service initialization error - continuing without notifications', error: e, stackTrace: st, tag: 'main');
       // Don't fail app startup if notifications fail
     }
   });
