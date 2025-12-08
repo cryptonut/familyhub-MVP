@@ -416,7 +416,23 @@ service cloud.firestore {
       }
       
       // Shopping receipts subcollection
-      match /shoppingReceipts/{receiptId} {
+      match /receipts/{receiptId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId);
+        allow update: if belongsToFamily(familyId);
+        allow delete: if belongsToFamily(familyId);
+      }
+      
+      // Shopping categories subcollection
+      match /shoppingCategories/{categoryId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId);
+        allow update: if belongsToFamily(familyId);
+        allow delete: if belongsToFamily(familyId);
+      }
+      
+      // Purchase history subcollection (for smart suggestions)
+      match /purchaseHistory/{itemId} {
         allow read: if belongsToFamily(familyId);
         allow create: if belongsToFamily(familyId);
         allow update: if belongsToFamily(familyId);

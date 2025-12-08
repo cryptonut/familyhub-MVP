@@ -89,6 +89,10 @@ dependencies:
   record: ^5.1.2
   audioplayers: ^6.1.0
   just_audio: ^0.9.40
+  
+  # Shopping Feature - Receipt OCR & Voice Input
+  google_mlkit_text_recognition: ^0.14.0
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:
