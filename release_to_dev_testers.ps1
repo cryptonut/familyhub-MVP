@@ -56,24 +56,24 @@ $branchName = git branch --show-current
 $recentCommits = git log -5 --pretty=format:"- %s (%an)" --abbrev-commit
 
 if ([string]::IsNullOrEmpty($Notes)) {
-    $releaseNotes = "🚀 FamilyHub Dev Build - Ready for Testing!`n`n" +
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n`n" +
-                    "📦 BUILD INFO:`n" +
+    $releaseNotes = "FamilyHub Dev Build - Ready for Testing!`n`n" +
+                    "========================================`n`n" +
+                    "BUILD INFO:`n" +
                     "   Branch: $branchName`n" +
                     "   Commit: $commitHash`n" +
                     "   Build #: $commitCount`n" +
                     "   Deployed: $(Get-Date -Format 'yyyy-MM-dd HH:mm')`n`n" +
-                    "👤 LATEST CHANGES:`n" +
+                    "LATEST CHANGES:`n" +
                     "   $commitMessage`n" +
                     "   By: $commitAuthor on $commitDate`n`n" +
-                    "📝 RECENT UPDATES:`n" +
+                    "RECENT UPDATES:`n" +
                     "$recentCommits`n`n" +
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`n`n" +
-                    "💡 TESTING NOTES:`n" +
+                    "========================================`n`n" +
+                    "TESTING NOTES:`n" +
                     "   - This is a development build from the develop branch`n" +
                     "   - Please report any issues you encounter`n" +
                     "   - Your feedback helps us improve!`n`n" +
-                    "Thank you for testing! 🙏"
+                    "Thank you for testing!"
 } else {
     $releaseNotes = $Notes
 }
@@ -117,10 +117,24 @@ if ($LASTEXITCODE -ne 0) {
 # Step 9: Build dev APK
 Write-Host "`n[INFO] Building dev release APK..." -ForegroundColor Yellow
 Write-Host "   This may take a few minutes..." -ForegroundColor Gray
-flutter build apk --release --flavor dev --dart-define=FLAVOR=dev
+Write-Host "   Showing build progress...`n" -ForegroundColor Cyan
+
+# Build with verbose output to show progress
+flutter build apk --release --flavor dev --dart-define=FLAVOR=dev --verbose 2>&1 | ForEach-Object {
+    # Show real-time output
+    Write-Host $_ -ForegroundColor Gray
+    
+    # Highlight important build steps
+    if ($_ -match "Running Gradle task|Building|Compiling|Assembling|Signing|BUILD SUCCESSFUL") {
+        Write-Host $_ -ForegroundColor Cyan
+    }
+    if ($_ -match "BUILD FAILED|ERROR|FAILURE") {
+        Write-Host $_ -ForegroundColor Red
+    }
+}
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "[ERROR] Build failed!" -ForegroundColor Red
+    Write-Host "`n[ERROR] Build failed!" -ForegroundColor Red
     exit 1
 }
 
