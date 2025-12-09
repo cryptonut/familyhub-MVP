@@ -107,7 +107,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final combinedEvents = [...todayEvents, ...tomorrowEvents];
       final uniqueEvents = {for (var e in combinedEvents) e.id: e}.values.toList();
       
-      final conflicts = _calendarService.findConflicts(uniqueEvents);
+      final allConflicts = _calendarService.findConflicts(uniqueEvents);
+      // Filter out ignored conflicts
+      final conflicts = await _calendarService.filterIgnoredConflicts(allConflicts);
       
       int count = 0;
       for (var list in conflicts.values) {
@@ -606,7 +608,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const SchedulingConflictsScreen()),
-        ).then((_) => _loadDashboardData());
+        ).then((_) {
+          _loadConflicts(); // Reload conflicts after returning
+          _loadDashboardData();
+        });
       },
       child: Container(
         width: double.infinity,

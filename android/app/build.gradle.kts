@@ -30,6 +30,13 @@ android {
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
+    
+    // Fix for incremental compilation cache issues with different drive roots
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        kotlinOptions {
+            incremental = false
+        }
+    }
 
     defaultConfig {
         // You can update the following values to match your application needs.
@@ -42,6 +49,9 @@ android {
         // Inject Google Maps API key from secrets.properties
         val googleMapsApiKey = secretsProperties["GOOGLE_MAPS_API_KEY"] as String? ?: ""
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
+        
+        // Explicitly enable core library desugaring for all flavors
+        multiDexEnabled = true
     }
 
     // Product flavors for Dev/Test/Prod environments

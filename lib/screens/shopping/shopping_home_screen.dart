@@ -26,7 +26,7 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
   final ShoppingService _shoppingService = ShoppingService();
   List<ShoppingList> _lists = [];
   List<SmartRecurringList> _smartLists = [];
-  bool _isLoading = true;
+  bool _isLoading = false; // Start false - stream will update immediately
   bool _showSmartLists = true;
   Map<String, String> _userNames = {};
   StreamSubscription<List<ShoppingList>>? _listsSubscription;
@@ -39,8 +39,23 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
   }
 
   void _subscribeToLists() {
+    // Don't resubscribe if already subscribed - prevents empty lists on navigation
+    if (_listsSubscription != null) {
+      Logger.debug('ShoppingHomeScreen: Already subscribed, skipping resubscription', tag: 'ShoppingHomeScreen');
+      return;
+    }
+    
     _listsSubscription = _shoppingService.streamShoppingLists().listen(
       (lists) async {
+        Logger.debug('ShoppingHomeScreen: Received ${lists.length} lists from stream (had ${_lists.length})', tag: 'ShoppingHomeScreen');
+        
+        // Only preserve if stream emits empty AND we have lists (might be transient error)
+        // If stream emits fewer lists (deletion), always update to reflect current state
+        if (lists.isEmpty && _lists.isNotEmpty) {
+          Logger.debug('ShoppingHomeScreen: Received empty list but have ${_lists.length} existing - preserving (might be transient)', tag: 'ShoppingHomeScreen');
+          return;
+        }
+        
         // Load user names for creators
         final userIds = lists.map((l) => l.creatorId).toSet();
         await _loadUserNames(userIds);
@@ -50,12 +65,16 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
             _lists = lists;
             _isLoading = false;
           });
+          Logger.debug('ShoppingHomeScreen: Updated state with ${_lists.length} lists', tag: 'ShoppingHomeScreen');
         }
       },
       onError: (error) {
         Logger.error('Lists stream error', error: error, tag: 'ShoppingHomeScreen');
         if (mounted) {
-          setState(() => _isLoading = false);
+          setState(() {
+            // Don't clear lists on error - keep existing ones
+            _isLoading = false;
+          });
           ToastNotification.error(context, 'Error loading shopping lists');
         }
       },
@@ -88,6 +107,16 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
       final lists = await _shoppingService.getShoppingLists(forceRefresh: forceRefresh);
       final smartLists = await _shoppingService.getSmartRecurringLists(forceRefresh: forceRefresh);
       
+      // Don't overwrite with empty result - stream will handle updates
+      // Only update if we got actual data
+      if (lists.isEmpty && _lists.isNotEmpty) {
+        Logger.debug('_loadLists: Got empty result but have ${_lists.length} existing lists - preserving (stream will update)', tag: 'ShoppingHomeScreen');
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+      
       // Load user names for creators
       final userIds = lists.map((l) => l.creatorId).toSet();
       await _loadUserNames(userIds);
@@ -103,6 +132,8 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
       Logger.error('_loadLists error', error: e, stackTrace: st, tag: 'ShoppingHomeScreen');
       if (mounted) {
         setState(() => _isLoading = false);
+        // Don't clear lists on error - preserve existing ones
+        // Stream will handle updates when connection is restored
         ToastNotification.error(context, 'Error loading shopping lists');
       }
     }
@@ -143,9 +174,17 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
     );
 
     if (result != null) {
-      await _loadLists(forceRefresh: true);
+      // Optimistically add to UI immediately
       if (mounted) {
+        setState(() {
+          _lists = [result, ..._lists]..sort((a, b) {
+            if (a.isDefault && !b.isDefault) return -1;
+            if (!a.isDefault && b.isDefault) return 1;
+            return b.createdAt.compareTo(a.createdAt);
+          });
+        });
         ToastNotification.success(context, 'List "${result.name}" created');
+        // Stream will update automatically to confirm - UI already updated optimistically
         // Navigate to the new list
         Navigator.push(
           context,
@@ -164,9 +203,9 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
     );
 
     if (result != null) {
-      await _loadLists(forceRefresh: true);
       if (mounted) {
         ToastNotification.success(context, 'List updated');
+        // Stream will update automatically - no need to reload
       }
     }
   }
@@ -193,13 +232,28 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
 
     if (confirm == true) {
       try {
+        // Optimistically remove from UI immediately
+        if (mounted) {
+          setState(() {
+            _lists = _lists.where((l) => l.id != list.id).toList();
+          });
+        }
+        
         await _shoppingService.deleteShoppingList(list.id);
-        await _loadLists(forceRefresh: true);
         if (mounted) {
           ToastNotification.success(context, 'List deleted');
+          // Stream will update automatically to confirm - UI already updated optimistically
         }
       } catch (e) {
+        // If delete failed, restore the list
         if (mounted) {
+          setState(() {
+            _lists = [..._lists, list]..sort((a, b) {
+              if (a.isDefault && !b.isDefault) return -1;
+              if (!a.isDefault && b.isDefault) return 1;
+              return b.createdAt.compareTo(a.createdAt);
+            });
+          });
           ToastNotification.error(context, 'Error deleting list: $e');
         }
       }
@@ -209,9 +263,9 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
   Future<void> _setAsDefault(ShoppingList list) async {
     try {
       await _shoppingService.updateShoppingList(list.copyWith(isDefault: true));
-      await _loadLists(forceRefresh: true);
       if (mounted) {
         ToastNotification.success(context, '"${list.name}" set as default');
+        // Stream will update automatically - no need to reload
       }
     } catch (e) {
       if (mounted) {
@@ -223,9 +277,9 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
   Future<void> _createListFromSmartList(SmartRecurringList smartList) async {
     try {
       final newList = await _shoppingService.createListFromSmartRecurringList(smartList.id);
-      await _loadLists(forceRefresh: true);
       if (mounted) {
         ToastNotification.success(context, 'List created from "${smartList.name}"');
+        // Stream will update automatically - no need to reload
         // Navigate to the new list
         Navigator.push(
           context,
@@ -380,6 +434,7 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
                 (context, index) {
                   final list = _lists[index];
                   return Padding(
+                    key: ValueKey(list.id), // Key prevents widget recreation issues
                     padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingM),
                     child: _buildListCard(list),
                   );
@@ -462,7 +517,7 @@ class _ShoppingHomeScreenState extends State<ShoppingHomeScreen> {
             builder: (context) => ShoppingListDetailScreen(list: list),
           ),
         );
-        _loadLists(forceRefresh: true);
+        // Stream handles updates automatically - no need to reload
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+// import 'package:speech_to_text/speech_to_text.dart' as stt; // Temporarily disabled due to Kotlin compilation errors
 import '../../core/services/logger_service.dart';
 import '../../models/shopping_list.dart';
 import '../../models/shopping_item.dart';
@@ -40,8 +40,8 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
   bool _showCompleted = false;
   String? _currentUserId;
   
-  // Speech to text
-  final stt.SpeechToText _speech = stt.SpeechToText();
+  // Speech to text - TEMPORARILY DISABLED
+  // final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
 
   @override
@@ -128,7 +128,7 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
         continue;
       }
       
-      final category = item.categoryName ?? 'Other';
+      final category = item.categoryName.isNotEmpty ? item.categoryName : 'Other';
       _groupedItems.putIfAbsent(category, () => []);
       _groupedItems[category]!.add(item);
     }
@@ -160,6 +160,7 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
     final name = _quickAddController.text.trim();
     if (name.isEmpty) return;
 
+    ShoppingItem? tempItem;
     try {
       final suggestedCategory = _shoppingService.suggestCategory(name);
       final category = _categories.firstWhere(
@@ -170,6 +171,28 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
         ),
       );
 
+      // Create item optimistically
+      tempItem = ShoppingItem(
+        id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        listId: widget.list.id,
+        name: name,
+        categoryId: category.id,
+        categoryName: category.name,
+        addedBy: _currentUserId ?? '',
+        createdAt: DateTime.now(),
+      );
+
+      // Optimistically add to UI immediately
+      if (mounted) {
+        setState(() {
+          _items = [tempItem!, ..._items];
+          _groupItems();
+        });
+        _quickAddController.clear();
+        _quickAddFocusNode.requestFocus();
+      }
+
+      // Actually add to Firestore
       await _shoppingService.addShoppingItem(
         listId: widget.list.id,
         name: name,
@@ -177,10 +200,14 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
         categoryName: category.name,
       );
 
-      _quickAddController.clear();
-      _quickAddFocusNode.requestFocus();
+      // Stream will update with the real item - UI already updated optimistically
     } catch (e) {
-      if (mounted) {
+      // If add failed, remove the optimistic item
+      if (mounted && tempItem != null) {
+        setState(() {
+          _items = _items.where((i) => i.id != tempItem!.id).toList();
+          _groupItems();
+        });
         ToastNotification.error(context, 'Error adding item: $e');
       }
     }
@@ -369,6 +396,10 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
   }
 
   Future<void> _startListening() async {
+    // TEMPORARILY DISABLED - speech_to_text Kotlin errors
+    ToastNotification.warning(context, 'Speech recognition temporarily disabled');
+    return;
+    /* DISABLED
     bool available = await _speech.initialize(
       onStatus: (status) {
         Logger.debug('Speech status: $status', tag: 'ShoppingListDetailScreen');
@@ -405,10 +436,11 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
         ToastNotification.warning(context, 'Speech recognition not available');
       }
     }
+    */ // END DISABLED
   }
 
   void _stopListening() {
-    _speech.stop();
+    // _speech.stop();
     setState(() => _isListening = false);
   }
 

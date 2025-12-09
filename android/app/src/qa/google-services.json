@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "559662117534-mivlnu7unp9040281qitblfmvscl2apc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.familyhub_mvp",
+            "certificate_hash": "55ef286e1cb7a4cf1c40dcd0eb4f96660cf8cb21"
+          }
+        },
+        {
           "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -40,6 +48,13 @@
             {
               "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "559662117534-etqpe82imrqa0joqk3k53arb6fivk5sc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.family"
+              }
             }
           ]
         }
@@ -53,6 +68,14 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "559662117534-m4u6jasnjtj9gu0md4qro9id0apkd3sp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.familyhub_mvp.dev",
+            "certificate_hash": "55ef286e1cb7a4cf1c40dcd0eb4f96660cf8cb21"
+          }
+        },
         {
           "client_id": "559662117534-pd7lihihfu9k46l0328bat6vhobs9cc0.apps.googleusercontent.com",
           "client_type": 1,
@@ -80,6 +103,13 @@
             {
               "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "559662117534-etqpe82imrqa0joqk3k53arb6fivk5sc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.family"
+              }
             }
           ]
         }
@@ -102,6 +132,14 @@
           }
         },
         {
+          "client_id": "559662117534-q86ikekuh654ciu2k30iin4448497mue.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.familyhub_mvp.test",
+            "certificate_hash": "55ef286e1cb7a4cf1c40dcd0eb4f96660cf8cb21"
+          }
+        },
+        {
           "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -120,6 +158,13 @@
             {
               "client_id": "559662117534-hg5gqh36n8nin0h7qlacnom9dcj4omaf.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "559662117534-etqpe82imrqa0joqk3k53arb6fivk5sc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.family"
+              }
             }
           ]
         }

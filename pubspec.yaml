@@ -1,7 +1,7 @@
 name: familyhub_mvp
 description: 'All-in-one family organizer: Calendar, Tasks, Chat, Location'
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -89,6 +89,7 @@ dependencies:
   record: ^5.1.2
   audioplayers: ^6.1.0
   just_audio: ^0.9.40
+  # speech_to_text: ^6.3.0  # Temporarily disabled due to Kotlin compilation errors
 
 dev_dependencies:
   flutter_test:
