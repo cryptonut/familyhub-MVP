@@ -99,12 +99,23 @@ Write-Host "[OK] Dev configuration found" -ForegroundColor Green
 Write-Host "   App ID: $appId" -ForegroundColor Gray
 Write-Host "   Package: $packageName" -ForegroundColor Gray
 
-# Step 7: Clean previous build
+# Step 7: Clean previous build and kill any lingering processes
 Write-Host "`n[INFO] Cleaning previous build..." -ForegroundColor Yellow
+
+# Kill any lingering Gradle/Java processes that might lock files
+Write-Host "   Checking for lingering build processes..." -ForegroundColor Gray
+Get-Process -Name "java","gradle" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
+
+# Clean Flutter build
 flutter clean
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[WARN] Warning: Flutter clean had issues, continuing anyway..." -ForegroundColor Yellow
 }
+
+# Wait a moment for file system to release locks
+Start-Sleep -Seconds 2
+Write-Host "[OK] Cleanup complete" -ForegroundColor Green
 
 # Step 8: Get dependencies
 Write-Host "`n[INFO] Getting dependencies..." -ForegroundColor Yellow
@@ -114,20 +125,46 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 9: Build dev APK
+# Step 9: Build dev APK with retry logic
 Write-Host "`n[INFO] Building dev release APK..." -ForegroundColor Yellow
 Write-Host "   This may take a few minutes..." -ForegroundColor Gray
 Write-Host "   Build progress will be shown below...`n" -ForegroundColor Cyan
 
-# Build APK - let Flutter output directly to console for real-time progress
-flutter build apk --release --flavor dev --dart-define=FLAVOR=dev
+$maxRetries = 3
+$retryCount = 0
+$buildSuccess = $false
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "`n[ERROR] Build failed!" -ForegroundColor Red
-    exit 1
+while ($retryCount -lt $maxRetries -and -not $buildSuccess) {
+    if ($retryCount -gt 0) {
+        Write-Host "`n[WARN] Previous build failed, retrying ($retryCount/$maxRetries)..." -ForegroundColor Yellow
+        Write-Host "   Killing any locked processes and waiting..." -ForegroundColor Gray
+        Get-Process -Name "java","gradle" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 3
+    }
+    
+    # Build APK - let Flutter output directly to console for real-time progress
+    flutter build apk --release --flavor dev --dart-define=FLAVOR=dev
+    
+    if ($LASTEXITCODE -eq 0) {
+        $buildSuccess = $true
+        Write-Host "`n[OK] Build completed successfully!" -ForegroundColor Green
+    } else {
+        $retryCount++
+        if ($retryCount -lt $maxRetries) {
+            Write-Host "`n[WARN] Build failed, will retry..." -ForegroundColor Yellow
+        }
+    }
 }
 
-Write-Host "`n[OK] Build completed successfully!" -ForegroundColor Green
+if (-not $buildSuccess) {
+    Write-Host "`n[ERROR] Build failed after $maxRetries attempts!" -ForegroundColor Red
+    Write-Host "   Possible causes:" -ForegroundColor Yellow
+    Write-Host "   - Files locked by another process (IDE, antivirus, etc.)" -ForegroundColor Gray
+    Write-Host "   - Insufficient disk space" -ForegroundColor Gray
+    Write-Host "   - Build configuration errors" -ForegroundColor Gray
+    Write-Host "   Try: Close IDE/editors and run again" -ForegroundColor Gray
+    exit 1
+}
 
 # Step 10: Verify APK was created
 $apkPath = "build\app\outputs\flutter-apk\app-dev-release.apk"
