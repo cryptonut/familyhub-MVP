@@ -390,6 +390,14 @@ service cloud.firestore {
           resource.data.createdBy == request.auth.uid;
       }
       
+      // Shopping categories subcollection
+      match /shoppingCategories/{categoryId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId);
+        allow update: if belongsToFamily(familyId);
+        allow delete: if belongsToFamily(familyId);
+      }
+      
       // Shopping lists subcollection
       match /shoppingLists/{listId} {
         allow read: if belongsToFamily(familyId);

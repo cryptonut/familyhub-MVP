@@ -81,8 +81,9 @@ class _SchedulingConflictsScreenState extends State<SchedulingConflictsScreen> {
         e.endTime.isAfter(start) && e.startTime.isBefore(end)
       ).toList();
       
-      // 3. Find conflicts
-      _conflicts = _calendarService.findConflicts(_allEvents);
+      // 3. Find conflicts and filter ignored ones
+      final allConflicts = _calendarService.findConflicts(_allEvents);
+      _conflicts = await _calendarService.filterIgnoredConflicts(allConflicts);
       
     } catch (e) {
       debugPrint('Error loading conflicts: $e');
@@ -254,11 +255,15 @@ class _SchedulingConflictsScreenState extends State<SchedulingConflictsScreen> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: () {
-                        // Ignore logic here
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Conflict ignored')),
-                        );
+                      onPressed: () async {
+                        await _calendarService.ignoreConflict(userId, events);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Conflict ignored')),
+                          );
+                          // Reload data to remove ignored conflict
+                          _loadData();
+                        }
                       },
                       child: const Text('Ignore'),
                     ),

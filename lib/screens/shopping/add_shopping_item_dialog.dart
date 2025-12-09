@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+// import 'package:speech_to_text/speech_to_text.dart' as stt; // Temporarily disabled
 import '../../core/services/logger_service.dart';
 import '../../models/shopping_category.dart';
 import '../../models/shopping_item.dart';
@@ -33,8 +33,8 @@ class _AddShoppingItemDialogState extends State<AddShoppingItemDialog> {
   ShoppingCategory? _selectedCategory;
   bool _isLoading = false;
   
-  // Speech to text
-  final stt.SpeechToText _speech = stt.SpeechToText();
+  // Speech to text - TEMPORARILY DISABLED
+  // final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   bool _speechAvailable = false;
 
@@ -85,7 +85,8 @@ class _AddShoppingItemDialogState extends State<AddShoppingItemDialog> {
   }
 
   Future<void> _initSpeech() async {
-    _speechAvailable = await _speech.initialize();
+    // _speechAvailable = await _speech.initialize();
+    _speechAvailable = false; // Disabled
     if (mounted) setState(() {});
   }
 
@@ -93,7 +94,7 @@ class _AddShoppingItemDialogState extends State<AddShoppingItemDialog> {
   void dispose() {
     _nameController.dispose();
     _notesController.dispose();
-    _speech.cancel();
+    // _speech.cancel();
     super.dispose();
   }
 
@@ -114,6 +115,12 @@ class _AddShoppingItemDialogState extends State<AddShoppingItemDialog> {
   }
 
   Future<void> _startListening() async {
+    // DISABLED
+    if (mounted) {
+      ToastNotification.warning(context, 'Speech recognition temporarily disabled');
+    }
+    return;
+    /* DISABLED
     if (!_speechAvailable) {
       if (mounted) {
         ToastNotification.warning(context, 'Speech recognition not available');
@@ -135,10 +142,11 @@ class _AddShoppingItemDialogState extends State<AddShoppingItemDialog> {
       pauseFor: const Duration(seconds: 3),
       cancelOnError: true,
     );
+    */ // END DISABLED
   }
 
   void _stopListening() {
-    _speech.stop();
+    // _speech.stop();
     setState(() => _isListening = false);
   }
 

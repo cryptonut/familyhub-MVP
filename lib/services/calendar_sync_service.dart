@@ -250,18 +250,22 @@ class CalendarSyncService {
   Event _familyHubEventToDeviceEvent(CalendarEvent fhEvent, String calendarId, {String? deviceEventId}) {
     final event = Event(calendarId);
     event.eventId = deviceEventId;
-    event.title = fhEvent.title;
-    event.description = _addFhEventIdToDescription(fhEvent.description, fhEvent.id);
+    // Ensure all required fields are non-null (device_calendar plugin requires non-null strings)
+    event.title = fhEvent.title.isNotEmpty ? fhEvent.title : 'Untitled Event';
+    event.description = _addFhEventIdToDescription(fhEvent.description ?? '', fhEvent.id);
     event.start = _toTZDateTime(fhEvent.startTime);
     event.end = _toTZDateTime(fhEvent.endTime);
-    event.location = fhEvent.location;
+    event.location = fhEvent.location ?? ''; // Empty string instead of null
     
     if (fhEvent.invitedMemberIds.isNotEmpty) {
-      event.attendees = fhEvent.invitedMemberIds.map((id) {
-        final attendee = Attendee();
-        attendee.name = id;
-        return attendee;
-      }).toList();
+      event.attendees = fhEvent.invitedMemberIds
+          .where((id) => id.isNotEmpty) // Filter out empty IDs
+          .map((id) {
+            final attendee = Attendee();
+            attendee.name = id; // ID should be non-empty after filter
+            return attendee;
+          })
+          .toList();
     }
 
     // Handle recurrence - Note: device_calendar recurrence support may vary by platform

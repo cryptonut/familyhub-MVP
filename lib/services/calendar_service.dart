@@ -493,6 +493,72 @@ class CalendarService {
     return conflicts;
   }
 
+  /// Generate a unique key for a conflict (userId + sorted event IDs)
+  String _getConflictKey(String userId, List<CalendarEvent> events) {
+    final eventIds = events.map((e) => e.id).toList()..sort();
+    return '$userId-${eventIds.join('-')}';
+  }
+
+  /// Mark a conflict as ignored
+  Future<void> ignoreConflict(String userId, List<CalendarEvent> events) async {
+    try {
+      final conflictKey = _getConflictKey(userId, events);
+      final currentUserId = _auth.currentUser?.uid;
+      if (currentUserId == null) return;
+
+      await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('ignoredConflicts')
+          .doc(conflictKey)
+          .set({
+        'userId': userId,
+        'eventIds': events.map((e) => e.id).toList(),
+        'ignoredAt': FieldValue.serverTimestamp(),
+      });
+
+      Logger.debug('Ignored conflict: $conflictKey', tag: 'CalendarService');
+    } catch (e, st) {
+      Logger.error('Error ignoring conflict', error: e, stackTrace: st, tag: 'CalendarService');
+    }
+  }
+
+  /// Get all ignored conflict keys for the current user
+  Future<Set<String>> getIgnoredConflictKeys() async {
+    try {
+      final currentUserId = _auth.currentUser?.uid;
+      if (currentUserId == null) return {};
+
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('ignoredConflicts')
+          .get();
+
+      return snapshot.docs.map((doc) => doc.id).toSet();
+    } catch (e, st) {
+      Logger.error('Error getting ignored conflicts', error: e, stackTrace: st, tag: 'CalendarService');
+      return {};
+    }
+  }
+
+  /// Filter out ignored conflicts from a conflicts map
+  Future<Map<String, List<CalendarEvent>>> filterIgnoredConflicts(
+    Map<String, List<CalendarEvent>> conflicts,
+  ) async {
+    final ignoredKeys = await getIgnoredConflictKeys();
+    final filtered = <String, List<CalendarEvent>>{};
+
+    for (var entry in conflicts.entries) {
+      final conflictKey = _getConflictKey(entry.key, entry.value);
+      if (!ignoredKeys.contains(conflictKey)) {
+        filtered[entry.key] = entry.value;
+      }
+    }
+
+    return filtered;
+  }
+
   /// Find all duplicate events grouped by their matching characteristics
   /// Returns a map where each key is a "signature" and value is list of duplicate event IDs
   Future<Map<String, List<String>>> findDuplicateEvents() async {

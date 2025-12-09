@@ -53,18 +53,33 @@ class ShoppingService {
       final collectionPath = 'families/$familyId/shoppingLists';
       Logger.debug('getShoppingLists: Loading from $collectionPath', tag: 'ShoppingService');
 
-      final snapshot = await _firestore
-          .collection(collectionPath)
-          .where('isArchived', isEqualTo: false)
-          .orderBy('isDefault', descending: true)
-          .orderBy('createdAt', descending: true)
-          .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
+      // Query all lists and filter archived in memory (handles missing isArchived field)
+      // If composite index is missing, fall back to simple query
+      QuerySnapshot snapshot;
+      try {
+        snapshot = await _firestore
+            .collection(collectionPath)
+            .orderBy('isDefault', descending: true)
+            .orderBy('createdAt', descending: true)
+            .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
+      } catch (e) {
+        // If composite index missing, use simpler query
+        Logger.warning('getShoppingLists: Composite index missing, using simple query', error: e, tag: 'ShoppingService');
+        snapshot = await _firestore
+            .collection(collectionPath)
+            .orderBy('createdAt', descending: true)
+            .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
+      }
 
       final lists = snapshot.docs.map((doc) {
         try {
+          final data = doc.data() as Map<String, dynamic>? ?? {};
+          // Filter out archived lists (handle missing isArchived field as false)
+          final isArchived = data['isArchived'] as bool? ?? false;
+          if (isArchived) return null;
           return ShoppingList.fromJson({
             'id': doc.id,
-            ...doc.data(),
+            ...data,
           });
         } catch (e, st) {
           Logger.warning('getShoppingLists: Error parsing list ${doc.id}', error: e, stackTrace: st, tag: 'ShoppingService');
@@ -82,23 +97,87 @@ class ShoppingService {
 
   /// Stream shopping lists for real-time updates
   Stream<List<ShoppingList>> streamShoppingLists() {
-    return Stream.fromFuture(_familyId).asyncExpand((familyId) {
-      if (familyId == null) {
-        return Stream.value(<ShoppingList>[]);
-      }
-
+    // Use cached familyId immediately if available - simple one-shot fix
+    final cachedId = _cachedFamilyId;
+    if (cachedId != null) {
+      Logger.debug('streamShoppingLists: Using cached familyId: $cachedId', tag: 'ShoppingService');
       return _firestore
-          .collection('families/$familyId/shoppingLists')
-          .where('isArchived', isEqualTo: false)
+          .collection('families/$cachedId/shoppingLists')
           .orderBy('isDefault', descending: true)
           .orderBy('createdAt', descending: true)
           .snapshots()
-          .map((snapshot) => snapshot.docs
-              .map((doc) => ShoppingList.fromJson({
-                    'id': doc.id,
-                    ...doc.data(),
-                  }))
-              .toList());
+          .map((snapshot) {
+            Logger.debug('streamShoppingLists: Received ${snapshot.docs.length} documents', tag: 'ShoppingService');
+            final lists = snapshot.docs
+                .map((doc) {
+                  try {
+                    final data = doc.data();
+                    final isArchived = data['isArchived'] as bool? ?? false;
+                    if (isArchived) return null;
+                    return ShoppingList.fromJson({'id': doc.id, ...data});
+                  } catch (e, st) {
+                    Logger.warning('streamShoppingLists: Error parsing list ${doc.id}', error: e, stackTrace: st, tag: 'ShoppingService');
+                    return null;
+                  }
+                })
+                .whereType<ShoppingList>()
+                .toList();
+            return lists;
+          })
+          .handleError((error) {
+            Logger.warning('streamShoppingLists: Query error', error: error, tag: 'ShoppingService');
+            return <ShoppingList>[];
+          });
+    }
+    
+    // Fallback: get familyId async if not cached
+    return Stream.fromFuture(_familyId).asyncExpand((initialFamilyId) {
+      if (initialFamilyId == null) {
+        Logger.warning('streamShoppingLists: Initial familyId is null - returning empty stream', tag: 'ShoppingService');
+        return Stream.value(<ShoppingList>[]);
+      }
+
+      Logger.debug('streamShoppingLists: Starting stream with familyId: $initialFamilyId', tag: 'ShoppingService');
+      
+      // Stream shopping lists for this family - don't restart on auth changes
+      return _firestore
+          .collection('families/$initialFamilyId/shoppingLists')
+          .orderBy('isDefault', descending: true)
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .map((snapshot) {
+            Logger.debug('streamShoppingLists: Received ${snapshot.docs.length} documents', tag: 'ShoppingService');
+            final lists = snapshot.docs
+                .map((doc) {
+                  try {
+                    final data = doc.data();
+                    // Filter out archived lists (handle missing isArchived field as false)
+                    final isArchived = data['isArchived'] as bool? ?? false;
+                    if (isArchived) {
+                      Logger.debug('streamShoppingLists: Filtering out archived list ${doc.id}', tag: 'ShoppingService');
+                      return null;
+                    }
+                    final list = ShoppingList.fromJson({
+                      'id': doc.id,
+                      ...data,
+                    });
+                    Logger.debug('streamShoppingLists: Parsed list "${list.name}" (${doc.id})', tag: 'ShoppingService');
+                    return list;
+                  } catch (e, st) {
+                    Logger.warning('streamShoppingLists: Error parsing list ${doc.id}', error: e, stackTrace: st, tag: 'ShoppingService');
+                    return null;
+                  }
+                })
+                .whereType<ShoppingList>()
+                .toList();
+            Logger.debug('streamShoppingLists: Returning ${lists.length} lists', tag: 'ShoppingService');
+            return lists;
+          })
+          .handleError((error) {
+            // If composite index missing or other query error, log and return empty list
+            Logger.warning('streamShoppingLists: Query error (may need composite index)', error: error, tag: 'ShoppingService');
+            return <ShoppingList>[];
+          });
     });
   }
 
@@ -151,6 +230,7 @@ class ShoppingService {
       createdAt: now,
       isDefault: isDefault,
       sharedWith: sharedWith ?? [],
+      isArchived: false, // Explicitly set to ensure it appears in queries
     );
 
     await _firestore
@@ -251,22 +331,55 @@ class ShoppingService {
 
   /// Stream items for real-time updates
   Stream<List<ShoppingItem>> streamShoppingItems(String listId) {
+    // Use cached familyId immediately if available - same pattern as lists stream
+    final cachedId = _cachedFamilyId;
+    if (cachedId != null) {
+      Logger.debug('streamShoppingItems: Using cached familyId: $cachedId', tag: 'ShoppingService');
+      return _firestore
+          .collection('families/$cachedId/shoppingLists/$listId/items')
+          .orderBy('categoryName')
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .map((snapshot) {
+            Logger.debug('streamShoppingItems: Received ${snapshot.docs.length} items', tag: 'ShoppingService');
+            return snapshot.docs
+                .map((doc) => ShoppingItem.fromJson({
+                      'id': doc.id,
+                      ...doc.data(),
+                    }))
+                .toList();
+          })
+          .handleError((error) {
+            Logger.warning('streamShoppingItems: Query error', error: error, tag: 'ShoppingService');
+            return <ShoppingItem>[];
+          });
+    }
+    
+    // Fallback: get familyId async if not cached
     return Stream.fromFuture(_familyId).asyncExpand((familyId) {
       if (familyId == null) {
         return Stream.value(<ShoppingItem>[]);
       }
 
+      Logger.debug('streamShoppingItems: Starting stream with familyId: $familyId', tag: 'ShoppingService');
       return _firestore
           .collection('families/$familyId/shoppingLists/$listId/items')
           .orderBy('categoryName')
           .orderBy('createdAt', descending: true)
           .snapshots()
-          .map((snapshot) => snapshot.docs
-              .map((doc) => ShoppingItem.fromJson({
-                    'id': doc.id,
-                    ...doc.data(),
-                  }))
-              .toList());
+          .map((snapshot) {
+            Logger.debug('streamShoppingItems: Received ${snapshot.docs.length} items', tag: 'ShoppingService');
+            return snapshot.docs
+                .map((doc) => ShoppingItem.fromJson({
+                      'id': doc.id,
+                      ...doc.data(),
+                    }))
+                .toList();
+          })
+          .handleError((error) {
+            Logger.warning('streamShoppingItems: Query error', error: error, tag: 'ShoppingService');
+            return <ShoppingItem>[];
+          });
     });
   }
 
@@ -807,8 +920,8 @@ class ShoppingService {
               (storeSpending[receipt.storeName!] ?? 0) + (receipt.total ?? 0);
         }
 
-        for (var item in receipt.items) {
-          itemCounts[item.name] = (itemCounts[item.name] ?? 0) + item.quantity;
+        for (var item in receipt.items ?? []) {
+          itemCounts[item.name] = (itemCounts[item.name] ?? 0) + (item.quantity as int);
           
           priceHistory.putIfAbsent(item.name, () => []);
           priceHistory[item.name]!.add({
