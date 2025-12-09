@@ -77,27 +77,50 @@ if ($javaProcesses) {
     Write-Host "   [OK] No active build processes" -ForegroundColor Green
 }
 
-# Step 5: Verify all changes are committed
+# Step 5: Check for modified tracked files (ignore untracked)
 Write-Host "`n[INFO] Checking Git status..." -ForegroundColor Yellow
-$gitStatus = git status --porcelain
-if ($gitStatus) {
-    Write-Host "[WARN] Uncommitted changes detected:" -ForegroundColor Yellow
-    $gitStatus | Select-Object -First 10 | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
-    if (($gitStatus | Measure-Object).Count -gt 10) {
-        Write-Host "   ... and $((($gitStatus | Measure-Object).Count) - 10) more" -ForegroundColor Gray
+
+# Use timeout for git status (quick operation, but can hang)
+$gitStatusJob = Start-Job -ScriptBlock { git status --porcelain 2>&1 }
+$gitStatusResult = Wait-Job -Job $gitStatusJob -Timeout 10
+
+if ($gitStatusResult) {
+    $gitStatusOutput = Receive-Job -Job $gitStatusJob
+    Remove-Job -Job $gitStatusJob -Force
+    $modifiedFiles = $gitStatusOutput | Where-Object { $_ -match '^[MADRC]' }  # Only tracked files
+    $untrackedFiles = $gitStatusOutput | Where-Object { $_ -match '^\?\?' }   # Untracked files
+} else {
+    Write-Host "[WARN] Git status timed out, assuming clean repository" -ForegroundColor Yellow
+    Stop-Job -Job $gitStatusJob -Force
+    Remove-Job -Job $gitStatusJob -Force
+    $modifiedFiles = @()
+    $untrackedFiles = @()
+}
+
+if ($modifiedFiles) {
+    Write-Host "[WARN] Modified tracked files detected:" -ForegroundColor Yellow
+    $modifiedFiles | Select-Object -First 10 | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
+    if (($modifiedFiles | Measure-Object).Count -gt 10) {
+        Write-Host "   ... and $((($modifiedFiles | Measure-Object).Count) - 10) more" -ForegroundColor Gray
     }
     Write-Host ""
-    $commit = Read-Host "   Commit all changes now? (Y/N)"
+    $commit = Read-Host "   Commit tracked changes now? (Y/N) - Untracked files will be copied as-is"
     if ($commit -eq "Y" -or $commit -eq "y") {
-        git add -A
+        git add -u  # Only add tracked files
         git commit -m "chore: Pre-migration commit before moving to C: drive"
-        Write-Host "   [OK] Changes committed" -ForegroundColor Green
+        Write-Host "   [OK] Tracked changes committed" -ForegroundColor Green
     } else {
-        Write-Host "[ERROR] Please commit or stash changes before migrating" -ForegroundColor Red
+        Write-Host "[ERROR] Please commit or stash tracked file changes before migrating" -ForegroundColor Red
         exit 1
     }
 }
-Write-Host "   [OK] Git repository clean" -ForegroundColor Green
+
+if ($untrackedFiles) {
+    $untrackedCount = ($untrackedFiles | Measure-Object).Count
+    Write-Host "   [INFO] $untrackedCount untracked file(s) will be copied as-is" -ForegroundColor Gray
+}
+
+Write-Host "   [OK] Ready to migrate" -ForegroundColor Green
 
 # Step 6: Define source and destination
 $sourcePath = $currentPath.ToString()
