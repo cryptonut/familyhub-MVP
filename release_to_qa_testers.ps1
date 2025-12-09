@@ -256,22 +256,9 @@ Write-Host ""
 # Prepare release notes - replace newlines with spaces for command line
 $releaseNotesSingleLine = $releaseNotes -replace "`r`n|`n|`r", " "
 
-$distributeOutput = firebase appdistribution:distribute $apkPath --app $appId --groups "qa-testers" --release-notes "$releaseNotesSingleLine" 2>&1
-
-# Wait for Firebase CLI to complete (up to 10 minutes for large uploads)
-$timeout = 600
-$elapsed = 0
-$interval = 5
-
-while (-not $distributeOutput -and $elapsed -lt $timeout) {
-    Start-Sleep -Seconds $interval
-    $elapsed += $interval
-    if (($elapsed % 30) -eq 0) {
-        Write-Host "   Still uploading... ($($elapsed)s elapsed)" -ForegroundColor Gray
-    }
-}
-
-$distributeOutput | Out-Host
+# Distribute to Firebase - output will stream directly to console
+Write-Host "   Uploading APK (this may take a few minutes for 265MB)...`n" -ForegroundColor Cyan
+firebase appdistribution:distribute $apkPath --app $appId --groups "qa-testers" --release-notes "$releaseNotesSingleLine"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
