@@ -1,5 +1,51 @@
 # Windows Settings That Enable Auto-Approval for Agents
 
+## ⚠️ WORKING PC CONFIGURATION (Baseline for Comparison)
+
+**This is the configuration on the WORKING PC where auto-approval works. Compare SIMPC1 against these values:**
+
+### System Settings
+- **UAC (User Account Control)**:
+  - `EnableLUA`: `1` (enabled)
+  - `ConsentPromptBehaviorAdmin`: `5` (Prompt for consent for non-Windows binaries)
+  - `EnableSmartScreen`: (empty/not set)
+
+- **Developer Mode**: ✅ **ENABLED**
+  - `AllowDevelopmentWithoutDevLicense`: `1` (ENABLED)
+  - **Location**: Settings → Privacy & Security → For developers → Developer Mode = ON
+
+- **PowerShell Execution Policy**:
+  - `MachinePolicy`: Undefined
+  - `UserPolicy`: Undefined
+  - `Process`: Undefined
+  - `CurrentUser`: **RemoteSigned** ⚠️ (This is important!)
+  - `LocalMachine`: Undefined
+
+- **User Account**:
+  - User is member of **Administrators** group
+  - NOT running as elevated administrator (normal user mode)
+
+### Cursor Configuration
+- **Version**: `2.1.50`
+- **Install Location**: `C:\Program Files\cursor\`
+- **Process Count**: 10 Cursor processes running
+- **PowerShell Version**: `5.1.19041.6456` (Windows PowerShell Desktop)
+
+### Git Configuration
+- **Credential Helper**: `manager` (Git Credential Manager)
+- **Remote URL**: HTTPS (`https://github.com/cryptonut/familyhub-MVP`)
+
+---
+
+## 🎯 KEY FINDING: Developer Mode is ENABLED
+
+**The most likely setting that enables auto-approval is:**
+- ✅ **Developer Mode = ON** (Settings → Privacy & Security → For developers)
+
+This setting allows apps to execute without the same restrictions and may be what enables Cursor agents to auto-approve commands.
+
+---
+
 ## The Setting You Changed (But Can't Find)
 
 You mentioned changing a PC setting on the working PC to enable auto-approval. Here are the most likely locations:
@@ -125,24 +171,43 @@ Based on "PC setting" that enables auto-approval:
 
 ## Quick Check Commands for SIMPC1
 
-Run these on SIMPC1 and compare with working PC:
+Run these on SIMPC1 and compare with working PC values above:
 
 ```powershell
-# 1. Check UAC level
+# 1. Check UAC level (Working PC: ConsentPromptBehaviorAdmin = 5)
 (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System").ConsentPromptBehaviorAdmin
 
-# 2. Check Developer Mode
+# 2. Check Developer Mode (Working PC: AllowDevelopmentWithoutDevLicense = 1) ⚠️ MOST IMPORTANT
 Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue
+# If this returns nothing or 0, Developer Mode is OFF - THIS IS LIKELY THE ISSUE!
 
-# 3. Check SmartScreen
+# 3. Check SmartScreen (Working PC: empty/not set)
 Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableSmartScreen" -ErrorAction SilentlyContinue
 
-# 4. Check PowerShell execution policy
+# 4. Check PowerShell execution policy (Working PC: CurrentUser = RemoteSigned)
 Get-ExecutionPolicy -List
 
-# 5. Check if Cursor is in Windows Defender exclusions (if accessible)
+# 5. Check admin group membership (Working PC: User is in Administrators)
+whoami /groups | Select-String "Administrators"
+
+# 6. Check if Cursor is in Windows Defender exclusions (if accessible)
 Get-MpPreference | Select-Object -ExpandProperty ExclusionPath -ErrorAction SilentlyContinue
+
+# 7. Check Cursor version (Working PC: 2.1.50)
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object {$_.DisplayName -match "Cursor"} | Select-Object DisplayName, DisplayVersion
 ```
+
+## 🔧 Quick Fix for SIMPC1
+
+**If Developer Mode is OFF on SIMPC1, enable it:**
+
+1. Open **Settings** (Win + I)
+2. Go to **Privacy & Security → For developers**
+3. Toggle **Developer Mode** to **ON**
+4. Restart Cursor
+5. Test auto-approval
+
+This is the most likely fix!
 
 ## How to Find It on Working PC
 
