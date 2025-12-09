@@ -112,11 +112,11 @@ If these don't load, your network is blocking Firebase.
 
 **Fix (5 minutes):**
 1. Open [Firebase Console](https://console.firebase.google.com/)
-2. Select your project: **family-hub-71ff0**
+2. Select your Firebase project
 3. Click ⚙️ **Project Settings**
 4. Scroll to **Your apps** → Android app
 5. Click **Add fingerprint**
-6. Paste your SHA-1: `BB:7A:6A:5F:57:F1:DD:0D:ED:14:2A:5C:6F:26:14:FD:54:C3:C7:1C`
+6. Paste your SHA-1 fingerprint (see "How to Get Your SHA-1" below)
 7. Click **Save**
 8. **WAIT 2-3 MINUTES** (Firebase needs time to propagate)
 9. Restart app completely (force close)
@@ -214,9 +214,9 @@ Look for `SHA1:` under `Variant: debug`
 2. **Setup Personal Access Token:**
    - Go to: https://github.com/settings/tokens?type=beta
    - Create new fine-grained token
-   - Select repository: `cryptonut/familyhub-MVP`
+   - Select your repository
    - Permissions: **Contents** → Read and write
-   - Copy token (starts with `github_pat_...`)
+   - Copy token (starts with `github_pat_...` - save it immediately, you won't see it again!)
 
 3. **Store credentials:**
    ```powershell
@@ -734,7 +734,7 @@ Registry profile path pointing to wrong location or corrupted profile state.
 ## 📚 Additional Resources
 
 - **Firebase Console:** https://console.firebase.google.com/
-- **GitHub Repository:** https://github.com/cryptonut/familyhub-MVP
+- **GitHub Tokens:** https://github.com/settings/tokens
 - **Flutter Docs:** https://docs.flutter.dev/
 - **Firebase Docs:** https://firebase.google.com/docs
 
