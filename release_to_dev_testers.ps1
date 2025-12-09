@@ -90,14 +90,32 @@ if (-not (Test-Path $googleServicesPath)) {
     exit 1
 }
 
-# Step 6: Get App ID from google-services.json
+# Step 6: Get App ID from google-services.json for DEV flavor
 $json = Get-Content $googleServicesPath | ConvertFrom-Json
-$appId = $json.client[0].client_info.mobilesdk_app_id
-$packageName = $json.client[0].client_info.android_client_info.package_name
+
+# Find the client entry with dev package name
+$devClient = $json.client | Where-Object { $_.client_info.android_client_info.package_name -eq "com.example.familyhub_mvp.dev" }
+
+if (-not $devClient) {
+    Write-Host "[ERROR] Dev package name not found in google-services.json!" -ForegroundColor Red
+    Write-Host "   Expected package: com.example.familyhub_mvp.dev" -ForegroundColor Yellow
+    Write-Host "   Available packages:" -ForegroundColor Yellow
+    $json.client | ForEach-Object { Write-Host "     - $($_.client_info.android_client_info.package_name)" -ForegroundColor Gray }
+    exit 1
+}
+
+$appId = $devClient.client_info.mobilesdk_app_id
+$packageName = $devClient.client_info.android_client_info.package_name
 
 Write-Host "[OK] Dev configuration found" -ForegroundColor Green
 Write-Host "   App ID: $appId" -ForegroundColor Gray
 Write-Host "   Package: $packageName" -ForegroundColor Gray
+
+# Verify package matches expected dev package
+if ($packageName -ne "com.example.familyhub_mvp.dev") {
+    Write-Host "[ERROR] Package mismatch! Expected 'com.example.familyhub_mvp.dev' but found '$packageName'" -ForegroundColor Red
+    exit 1
+}
 
 # Step 7: Aggressive cleanup to prevent file locking issues
 Write-Host "`n[INFO] Preparing build environment..." -ForegroundColor Yellow
