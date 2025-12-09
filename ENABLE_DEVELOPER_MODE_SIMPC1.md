@@ -10,27 +10,29 @@
 
 ## Step-by-Step Instructions for SIMPC1
 
-### Method 1: Via Windows Settings (Easiest)
+### ⚠️ PRIMARY METHOD: Via PowerShell (Use This - Settings UI Not Available)
 
-1. **Open Windows Settings**
-   - Press `Win + I`
-   - OR: Click Start → Settings
+**Run PowerShell as Administrator** on SIMPC1:
 
-2. **Navigate to Developer Settings**
-   - Click **Privacy & Security** (left sidebar)
-   - Scroll down and click **For developers**
+1. **Open PowerShell as Admin**
+   - Press `Win + X`
+   - Click **"Windows PowerShell (Admin)"** or **"Terminal (Admin)"**
+   - Click **Yes** if prompted by UAC
 
-3. **Enable Developer Mode**
-   - Find the toggle for **"Developer Mode"**
-   - Turn it **ON**
-   - Windows may prompt you to confirm - click **Yes**
+2. **Run This Command**:
+   ```powershell
+   Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" -Name "AllowDevelopmentWithoutDevLicense" -Value 1 -Type DWord
+   ```
 
-4. **Restart Cursor**
-   - Close Cursor completely
-   - Reopen Cursor
-   - Test auto-approval
+3. **Verify It Worked**:
+   ```powershell
+   Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" -Name "AllowDevelopmentWithoutDevLicense"
+   ```
+   Should return: `AllowDevelopmentWithoutDevLicense : 1`
 
-### Method 2: Via Registry (If Settings UI doesn't work)
+4. **Restart Cursor** (completely close and reopen)
+
+### Method 2: Via Registry (Alternative if PowerShell doesn't work)
 
 1. **Open Registry Editor**
    - Press `Win + R`
@@ -48,22 +50,19 @@
    - Set **Value data** to: `1`
    - Click **OK**
 
-4. **Restart Computer** (or at least restart Cursor)
+4. **Restart Cursor** (completely close and reopen)
 
-### Method 3: Via PowerShell (Quick Command)
+### Method 3: Via Windows Settings (May Not Be Available)
 
-Run PowerShell **as Administrator** on SIMPC1:
+**Note**: This option may not be available on all Windows versions (like SIMPC1).
 
-```powershell
-# Enable Developer Mode
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" -Name "AllowDevelopmentWithoutDevLicense" -Value 1 -Type DWord
+If you can find it:
+1. **Open Windows Settings** (`Win + I`)
+2. Go to **Privacy & Security → For developers**
+3. Toggle **Developer Mode** to **ON**
+4. Restart Cursor
 
-# Verify it's enabled
-Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" -Name "AllowDevelopmentWithoutDevLicense"
-# Should return: AllowDevelopmentWithoutDevLicense : 1
-```
-
-Then **restart Cursor**.
+**If you don't see "For developers" section**: Use Method 1 (PowerShell) instead.
 
 ## Verify Developer Mode is Enabled
 
