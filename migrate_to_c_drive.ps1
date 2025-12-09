@@ -45,16 +45,37 @@ if ($cFreeGB -lt ($projectSizeGB * 1.5)) {
 
 Write-Host "   [OK] Sufficient space available" -ForegroundColor Green
 
-# Step 4: Verify no active processes
+# Step 4: Check for active processes and handle gracefully
 Write-Host "`n[INFO] Checking for active processes..." -ForegroundColor Yellow
 $javaProcesses = Get-Process -Name "java","gradle*" -ErrorAction SilentlyContinue
 if ($javaProcesses) {
     Write-Host "[WARN] Found active Java/Gradle processes:" -ForegroundColor Yellow
     $javaProcesses | ForEach-Object { Write-Host "   - $($_.ProcessName) (PID: $($_.Id))" -ForegroundColor Gray }
-    Write-Host "   Please close these before migrating" -ForegroundColor Yellow
-    exit 1
+    Write-Host ""
+    Write-Host "   Waiting 10 seconds for processes to finish..." -ForegroundColor Cyan
+    Start-Sleep -Seconds 10
+    
+    # Check again
+    $javaProcesses = Get-Process -Name "java","gradle*" -ErrorAction SilentlyContinue
+    if ($javaProcesses) {
+        Write-Host "   Processes still running. Attempting to terminate..." -ForegroundColor Yellow
+        $javaProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 3
+        
+        # Final check
+        $javaProcesses = Get-Process -Name "java","gradle*" -ErrorAction SilentlyContinue
+        if ($javaProcesses) {
+            Write-Host "[ERROR] Could not stop all processes. Please close them manually." -ForegroundColor Red
+            exit 1
+        } else {
+            Write-Host "   [OK] Processes terminated" -ForegroundColor Green
+        }
+    } else {
+        Write-Host "   [OK] Processes finished" -ForegroundColor Green
+    }
+} else {
+    Write-Host "   [OK] No active build processes" -ForegroundColor Green
 }
-Write-Host "   [OK] No active build processes" -ForegroundColor Green
 
 # Step 5: Verify all changes are committed
 Write-Host "`n[INFO] Checking Git status..." -ForegroundColor Yellow
