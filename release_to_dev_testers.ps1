@@ -99,23 +99,34 @@ Write-Host "[OK] Dev configuration found" -ForegroundColor Green
 Write-Host "   App ID: $appId" -ForegroundColor Gray
 Write-Host "   Package: $packageName" -ForegroundColor Gray
 
-# Step 7: Clean previous build and kill any lingering processes
-Write-Host "`n[INFO] Cleaning previous build..." -ForegroundColor Yellow
+# Step 7: Aggressive cleanup to prevent file locking issues
+Write-Host "`n[INFO] Preparing build environment..." -ForegroundColor Yellow
 
 # Kill any lingering Gradle/Java processes that might lock files
-Write-Host "   Checking for lingering build processes..." -ForegroundColor Gray
-Get-Process -Name "java","gradle" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
+Write-Host "   Killing any lingering Java/Gradle processes..." -ForegroundColor Gray
+$javaProcesses = Get-Process -Name "java" -ErrorAction SilentlyContinue
+$gradleProcesses = Get-Process -Name "gradle*" -ErrorAction SilentlyContinue
 
-# Clean Flutter build
-flutter clean
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[WARN] Warning: Flutter clean had issues, continuing anyway..." -ForegroundColor Yellow
+if ($javaProcesses -or $gradleProcesses) {
+    Write-Host "   Found processes to kill: $($javaProcesses.Count + $gradleProcesses.Count)" -ForegroundColor Yellow
+    $javaProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+    $gradleProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 3
+    Write-Host "   [OK] Processes terminated" -ForegroundColor Green
+} else {
+    Write-Host "   [OK] No lingering processes found" -ForegroundColor Green
 }
 
-# Wait a moment for file system to release locks
+# Clean Flutter build to ensure fresh start
+Write-Host "   Cleaning Flutter build cache..." -ForegroundColor Gray
+flutter clean
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "   [WARN] Flutter clean had issues, continuing anyway..." -ForegroundColor Yellow
+}
+
+# Additional wait for file system to fully release locks
 Start-Sleep -Seconds 2
-Write-Host "[OK] Cleanup complete" -ForegroundColor Green
+Write-Host "[OK] Build environment ready" -ForegroundColor Green
 
 # Step 8: Get dependencies
 Write-Host "`n[INFO] Getting dependencies..." -ForegroundColor Yellow
@@ -130,19 +141,27 @@ Write-Host "`n[INFO] Building dev release APK..." -ForegroundColor Yellow
 Write-Host "   This may take a few minutes..." -ForegroundColor Gray
 Write-Host "   Build progress will be shown below...`n" -ForegroundColor Cyan
 
-$maxRetries = 3
+$maxRetries = 2
 $retryCount = 0
 $buildSuccess = $false
 
 while ($retryCount -lt $maxRetries -and -not $buildSuccess) {
     if ($retryCount -gt 0) {
-        Write-Host "`n[WARN] Previous build failed, retrying ($retryCount/$maxRetries)..." -ForegroundColor Yellow
-        Write-Host "   Killing any locked processes and waiting..." -ForegroundColor Gray
-        Get-Process -Name "java","gradle" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 3
+        Write-Host "`n[WARN] Previous build failed, retrying attempt $($retryCount + 1)/$maxRetries..." -ForegroundColor Yellow
+        Write-Host "   Performing aggressive cleanup..." -ForegroundColor Gray
+        
+        # Kill all Java/Gradle processes again
+        Get-Process -Name "java","gradle*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 4
+        
+        # Try cleaning again
+        Write-Host "   Re-cleaning build cache..." -ForegroundColor Gray
+        flutter clean | Out-Null
+        Start-Sleep -Seconds 2
     }
     
     # Build APK - let Flutter output directly to console for real-time progress
+    Write-Host "`n   Starting build attempt $($retryCount + 1)...`n" -ForegroundColor Cyan
     flutter build apk --release --flavor dev --dart-define=FLAVOR=dev
     
     if ($LASTEXITCODE -eq 0) {
@@ -151,18 +170,20 @@ while ($retryCount -lt $maxRetries -and -not $buildSuccess) {
     } else {
         $retryCount++
         if ($retryCount -lt $maxRetries) {
-            Write-Host "`n[WARN] Build failed, will retry..." -ForegroundColor Yellow
+            Write-Host "`n[WARN] Build failed with exit code $LASTEXITCODE" -ForegroundColor Yellow
+            Write-Host "   Common causes: file locks, Gradle issues, or build config errors" -ForegroundColor Gray
         }
     }
 }
 
 if (-not $buildSuccess) {
     Write-Host "`n[ERROR] Build failed after $maxRetries attempts!" -ForegroundColor Red
-    Write-Host "   Possible causes:" -ForegroundColor Yellow
-    Write-Host "   - Files locked by another process (IDE, antivirus, etc.)" -ForegroundColor Gray
-    Write-Host "   - Insufficient disk space" -ForegroundColor Gray
-    Write-Host "   - Build configuration errors" -ForegroundColor Gray
-    Write-Host "   Try: Close IDE/editors and run again" -ForegroundColor Gray
+    Write-Host "`nTroubleshooting steps:" -ForegroundColor Yellow
+    Write-Host "   1. Close any IDEs/editors that might have files open" -ForegroundColor Gray
+    Write-Host "   2. Check if antivirus is scanning the build directory" -ForegroundColor Gray
+    Write-Host "   3. Ensure you have enough disk space" -ForegroundColor Gray
+    Write-Host "   4. Try running: flutter clean && flutter pub get" -ForegroundColor Gray
+    Write-Host "   5. Check Gradle daemon: gradlew --stop (in android folder)" -ForegroundColor Gray
     exit 1
 }
 
