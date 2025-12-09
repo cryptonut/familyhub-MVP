@@ -117,26 +117,17 @@ if ($LASTEXITCODE -ne 0) {
 # Step 9: Build dev APK
 Write-Host "`n[INFO] Building dev release APK..." -ForegroundColor Yellow
 Write-Host "   This may take a few minutes..." -ForegroundColor Gray
-Write-Host "   Showing build progress...`n" -ForegroundColor Cyan
+Write-Host "   Build progress will be shown below...`n" -ForegroundColor Cyan
 
-# Build with verbose output to show progress
-flutter build apk --release --flavor dev --dart-define=FLAVOR=dev --verbose 2>&1 | ForEach-Object {
-    # Show real-time output
-    Write-Host $_ -ForegroundColor Gray
-    
-    # Highlight important build steps
-    if ($_ -match "Running Gradle task|Building|Compiling|Assembling|Signing|BUILD SUCCESSFUL") {
-        Write-Host $_ -ForegroundColor Cyan
-    }
-    if ($_ -match "BUILD FAILED|ERROR|FAILURE") {
-        Write-Host $_ -ForegroundColor Red
-    }
-}
+# Build APK - let Flutter output directly to console for real-time progress
+flutter build apk --release --flavor dev --dart-define=FLAVOR=dev
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "`n[ERROR] Build failed!" -ForegroundColor Red
     exit 1
 }
+
+Write-Host "`n[OK] Build completed successfully!" -ForegroundColor Green
 
 # Step 10: Verify APK was created
 $apkPath = "build\app\outputs\flutter-apk\app-dev-release.apk"
