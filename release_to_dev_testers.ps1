@@ -125,12 +125,16 @@ Write-Host "   App ID: $appId" -ForegroundColor Gray
 Write-Host "   Group: dev-testers" -ForegroundColor Gray
 Write-Host ""
 
-$distributeOutput = firebase appdistribution:distribute $apkPath `
-    --app $appId `
-    --groups "dev-testers" `
-    --release-notes $releaseNotes 2>&1
+# Create temp file for release notes to avoid escaping issues
+$releaseNotesFile = [System.IO.Path]::GetTempFileName()
+$releaseNotes | Out-File -FilePath $releaseNotesFile -Encoding UTF8
 
-$distributeOutput | Out-Host
+try {
+    $distributeOutput = firebase appdistribution:distribute $apkPath --app $appId --groups "dev-testers" --release-notes-file $releaseNotesFile 2>&1
+    $distributeOutput | Out-Host
+} finally {
+    Remove-Item $releaseNotesFile -ErrorAction SilentlyContinue
+}
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
