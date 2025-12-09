@@ -1,13 +1,69 @@
 # SIMPC1 Login Recovery - "We can't sign in to your account"
 
+## Root Cause
+- **Default and Public folders were deleted** from `C:\Users\`
+- These are **critical Windows system folders** (not user profiles)
+- Windows **cannot log in users** without the `Default` folder
+- The `simon` user profile likely exists and is fine, but Windows can't initialize login
+
 ## Current Situation
 - System Restore completed but login still fails
 - Windows shows "We can't sign in to your account" error
-- This indicates user profile corruption or permission issues
+- `dir C:\Users` shows only `simon` folder (missing `Default` and `Public`)
 
 ## Recovery Options (In Order of Preference)
 
-### Option 1: Create New Admin User (Fastest Recovery)
+### Option 1: Recreate Default and Public Folders (Fix Root Cause)
+
+**From Recovery Command Prompt:**
+
+1. **Boot to Recovery Command Prompt**
+   - Force shutdown → Boot → Force shutdown (repeat until recovery)
+   - Choose "Troubleshoot" → "Advanced options" → "Command Prompt"
+
+2. **Recreate Default Folder:**
+```cmd
+REM Create Default folder structure
+mkdir "C:\Users\Default"
+mkdir "C:\Users\Default\AppData"
+mkdir "C:\Users\Default\AppData\Local"
+mkdir "C:\Users\Default\AppData\Roaming"
+mkdir "C:\Users\Default\Documents"
+mkdir "C:\Users\Default\Desktop"
+mkdir "C:\Users\Default\Downloads"
+mkdir "C:\Users\Default\Pictures"
+mkdir "C:\Users\Default\Videos"
+mkdir "C:\Users\Default\Music"
+
+REM Set permissions
+icacls "C:\Users\Default" /grant "NT AUTHORITY\SYSTEM:(OI)(CI)F" /T
+icacls "C:\Users\Default" /grant "BUILTIN\Administrators:(OI)(CI)F" /T
+icacls "C:\Users\Default" /grant "BUILTIN\Users:(OI)(CI)RX" /T
+```
+
+3. **Recreate Public Folder:**
+```cmd
+REM Create Public folder structure
+mkdir "C:\Users\Public"
+mkdir "C:\Users\Public\Documents"
+mkdir "C:\Users\Public\Desktop"
+mkdir "C:\Users\Public\Downloads"
+mkdir "C:\Users\Public\Pictures"
+mkdir "C:\Users\Public\Videos"
+mkdir "C:\Users\Public\Music"
+
+REM Set permissions
+icacls "C:\Users\Public" /grant "NT AUTHORITY\SYSTEM:(OI)(CI)F" /T
+icacls "C:\Users\Public" /grant "BUILTIN\Administrators:(OI)(CI)F" /T
+icacls "C:\Users\Public" /grant "BUILTIN\Users:(OI)(CI)RX" /T
+```
+
+4. **Restart and Try Login**
+   - Restart the PC
+   - Try logging in as `simon`
+   - Windows should now be able to initialize the login session
+
+### Option 2: Create New Admin User (If Option 1 Doesn't Work)
 
 **From Recovery Command Prompt:**
 
@@ -92,10 +148,11 @@ icacls "C:\Users\simon" /grant "simon:(OI)(CI)F" /T
 
 **Try in this order:**
 
-1. ✅ **Option 1: Create TempAdmin user** (5 minutes, safest)
-2. ⚠️ **Option 2: Reset permissions** (if TempAdmin works)
-3. ⚠️ **Option 3: Rename profile** (if permissions don't work)
-4. 🔴 **Option 4: Windows Reset** (last resort)
+1. ✅ **Option 1: Recreate Default and Public folders** (Fixes root cause - 10 minutes)
+2. ✅ **Option 2: Create TempAdmin user** (If Option 1 doesn't work - 5 minutes)
+3. ⚠️ **Option 3: Reset permissions on simon folder** (If TempAdmin works)
+4. ⚠️ **Option 4: Rename profile** (If permissions don't work)
+5. 🔴 **Option 5: Windows Reset** (Last resort)
 
 ## Why System Restore Didn't Work
 
@@ -105,10 +162,10 @@ System Restore restores:
 - Installed programs
 
 **It does NOT restore:**
+- Deleted folders (if Default/Public were deleted before the restore point)
 - User profile permissions (if they were broken before restore point)
-- User profile corruption
 
-The user profile was likely already corrupted when the restore point was created.
+If `Default` and `Public` folders were deleted before the restore point was created, System Restore won't bring them back. You need to recreate them manually.
 
 ## Quick Test from Recovery
 
