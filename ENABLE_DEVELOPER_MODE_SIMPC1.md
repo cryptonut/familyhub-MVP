@@ -64,6 +64,41 @@ If you can find it:
 
 **If you don't see "For developers" section**: Use Method 1 (PowerShell) instead.
 
+## ⚠️ ALSO CHECK: PowerShell Execution Policy
+
+**This is also critical!** The working PC has `CurrentUser: RemoteSigned` which allows scripts to run.
+
+### Check Current Policy on SIMPC1
+
+Run this command:
+```powershell
+Get-ExecutionPolicy -List
+```
+
+### Compare with Working PC
+
+**Working PC values:**
+- `MachinePolicy`: Undefined
+- `UserPolicy`: Undefined
+- `Process`: Undefined
+- `CurrentUser`: **RemoteSigned** ⚠️ (This is important!)
+- `LocalMachine`: Undefined
+
+### If SIMPC1 Has Stricter Policy, Fix It
+
+If `CurrentUser` is `Restricted` or `Undefined`, set it to `RemoteSigned`:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+**This allows:**
+- Scripts you write locally to run
+- Downloaded scripts signed by trusted publishers to run
+- Prevents unsigned remote scripts (security)
+
+**This is safe and matches the working PC configuration.**
+
 ## Verify Developer Mode is Enabled
 
 Run this command on SIMPC1 to verify:
@@ -76,11 +111,36 @@ Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModel
 
 **If it returns nothing or `0`**: Developer Mode is still OFF.
 
-## After Enabling Developer Mode
+## Complete Setup Checklist for SIMPC1
 
-1. **Restart Cursor** (completely close and reopen)
-2. **Test auto-approval** - try a simple command in Cursor agent
-3. **Test Git push** - should work without manual approval
+Do BOTH of these:
+
+1. **Enable Developer Mode** (Method 1 - PowerShell)
+   ```powershell
+   Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" -Name "AllowDevelopmentWithoutDevLicense" -Value 1 -Type DWord
+   ```
+
+2. **Set PowerShell Execution Policy** (if needed)
+   ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+
+3. **Verify Both Settings**:
+   ```powershell
+   # Check Developer Mode
+   Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" -Name "AllowDevelopmentWithoutDevLicense"
+   # Should return: AllowDevelopmentWithoutDevLicense : 1
+   
+   # Check Execution Policy
+   Get-ExecutionPolicy -List
+   # CurrentUser should be: RemoteSigned
+   ```
+
+4. **Restart Cursor** (completely close and reopen)
+
+5. **Test auto-approval** - try a simple command in Cursor agent
+
+6. **Test Git push** - should work without manual approval
 
 ## Why This Works
 
