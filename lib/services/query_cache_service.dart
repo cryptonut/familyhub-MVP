@@ -127,10 +127,21 @@ class QueryCacheService {
       
       // Handle list results
       if (json.containsKey('items') && json['items'] is List) {
-        final items = (json['items'] as List)
-            .map((item) => fromJson(item as Map<String, dynamic>))
-            .toList();
-        return items as T;
+        final itemsList = json['items'] as List;
+        // Special handling for List<Map<String, dynamic>> type
+        if (T == List<Map<String, dynamic>>) {
+          // For list of maps, fromJson should just return the map itself
+          final items = itemsList
+              .map((item) => item as Map<String, dynamic>)
+              .toList();
+          return items as T;
+        } else {
+          // For other list types, use fromJson as normal
+          final items = itemsList
+              .map((item) => fromJson(item as Map<String, dynamic>))
+              .toList();
+          return items as T;
+        }
       }
       
       // Handle single object results

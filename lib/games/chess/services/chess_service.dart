@@ -554,9 +554,9 @@ class ChessService {
         final familyDoc = await _firestore.collection('families').doc(familyId).get();
         if (familyDoc.exists) {
           final familyData = familyDoc.data();
-          final openModeEnabled = familyData?['openChessModeEnabled'] as bool? ?? false;
+          final openModeEnabled = familyData?['openMatchmakingEnabled'] as bool? ?? false;
           if (!openModeEnabled) {
-            throw ValidationException('Open chess mode is disabled for your family');
+            throw ValidationException('Open matchmaking is disabled for your family');
           }
         }
       }
@@ -580,6 +580,48 @@ class ChessService {
       return queueId;
     } catch (e, st) {
       Logger.error('Error joining matchmaking', error: e, stackTrace: st, tag: 'ChessService');
+      rethrow;
+    }
+  }
+
+  /// Create a tournament game (cross-hub tournament match)
+  /// Tournament games can use WebSocket for real-time play
+  Future<ChessGame> createTournamentGame({
+    required String whitePlayerId,
+    required String whitePlayerName,
+    required String blackPlayerId,
+    required String blackPlayerName,
+    String? tournamentId, // Optional tournament bracket ID
+    int timeLimitMs = 600000,
+  }) async {
+    try {
+      if (whitePlayerId.isEmpty || blackPlayerId.isEmpty) {
+        throw ValidationException('Both players are required');
+      }
+      if (whitePlayerId == blackPlayerId) {
+        throw ValidationException('Cannot play against yourself');
+      }
+      if (timeLimitMs <= 0) {
+        throw ValidationException('Time limit must be positive');
+      }
+
+      final gameId = _uuid.v4();
+      final game = ChessGame.newGame(
+        id: gameId,
+        whitePlayerId: whitePlayerId,
+        whitePlayerName: whitePlayerName,
+        blackPlayerId: blackPlayerId,
+        blackPlayerName: blackPlayerName,
+        mode: GameMode.tournament,
+        initialTimeMs: timeLimitMs,
+        metadata: tournamentId != null ? {'tournamentId': tournamentId} : null,
+      );
+
+      await _firestore.collection('chess_games').doc(gameId).set(game.toJson());
+      Logger.info('Created tournament game: $gameId', tag: 'ChessService');
+      return game;
+    } catch (e, st) {
+      Logger.error('Error creating tournament game', error: e, stackTrace: st, tag: 'ChessService');
       rethrow;
     }
   }

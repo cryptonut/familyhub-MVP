@@ -1189,4 +1189,93 @@ class ShoppingService {
       return false;
     }
   }
+
+  // ============== SHOPPING ANALYTICS ==============
+
+  /// Get shopping analytics for a time period
+  Future<Map<String, dynamic>> getShoppingAnalytics({
+    int days = 30,
+  }) async {
+    final familyId = await _familyId;
+    if (familyId == null) {
+      Logger.warning('getShoppingAnalytics: User not part of a family', tag: 'ShoppingService');
+      return {};
+    }
+
+    try {
+      final endDate = DateTime.now();
+      final startDate = endDate.subtract(Duration(days: days));
+
+      // Get all shopping lists
+      final lists = await getShoppingLists(forceRefresh: true);
+      
+      // Get all items from all lists
+      final allItems = <ShoppingItem>[];
+      for (final list in lists) {
+        final items = await getShoppingItems(list.id, forceRefresh: true);
+        allItems.addAll(items);
+      }
+
+      // Filter items within date range
+      final periodItems = allItems.where((item) =>
+        item.createdAt.isAfter(startDate) && item.createdAt.isBefore(endDate)
+      ).toList();
+
+      // Calculate metrics
+      final totalItems = periodItems.length;
+      final purchasedItems = periodItems.where((item) => item.isPurchased).toList();
+      final pendingItems = periodItems.where((item) => item.status == ShoppingItemStatus.pending).toList();
+      final completionRate = totalItems > 0 ? purchasedItems.length / totalItems : 0.0;
+
+      // Items by category
+      final itemsByCategory = <String, int>{};
+      for (final item in periodItems) {
+        final category = item.categoryName;
+        itemsByCategory[category] = (itemsByCategory[category] ?? 0) + 1;
+      }
+
+      // Items by member (who added them)
+      final itemsByMember = <String, int>{};
+      for (final item in periodItems) {
+        final memberId = item.addedBy;
+        itemsByMember[memberId] = (itemsByMember[memberId] ?? 0) + 1;
+      }
+
+      // Most frequently purchased items
+      final itemFrequency = <String, int>{};
+      for (final item in purchasedItems) {
+        final itemName = item.name.toLowerCase();
+        itemFrequency[itemName] = (itemFrequency[itemName] ?? 0) + item.purchaseCount!;
+      }
+      final topItems = itemFrequency.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      // Items by day (trend)
+      final itemsByDay = <String, int>{};
+      for (final item in periodItems) {
+        final dayKey = '${item.createdAt.year}-${item.createdAt.month.toString().padLeft(2, '0')}-${item.createdAt.day.toString().padLeft(2, '0')}';
+        itemsByDay[dayKey] = (itemsByDay[dayKey] ?? 0) + 1;
+      }
+
+      // Recurring items count
+      final recurringItemsCount = periodItems.where((item) => item.isRecurring == true).length;
+
+      return {
+        'totalItems': totalItems,
+        'purchasedItems': purchasedItems.length,
+        'pendingItems': pendingItems.length,
+        'completionRate': completionRate,
+        'itemsByCategory': itemsByCategory,
+        'itemsByMember': itemsByMember,
+        'topItems': topItems.take(10).map((e) => {'name': e.key, 'count': e.value}).toList(),
+        'itemsByDay': itemsByDay,
+        'recurringItemsCount': recurringItemsCount,
+        'periodStart': startDate.toIso8601String(),
+        'periodEnd': endDate.toIso8601String(),
+      };
+    } catch (e, st) {
+      Logger.error('getShoppingAnalytics error', error: e, stackTrace: st, tag: 'ShoppingService');
+      return {};
+    }
+  }
 }

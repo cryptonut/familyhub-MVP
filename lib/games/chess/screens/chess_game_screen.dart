@@ -8,6 +8,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../../../core/services/logger_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/video_call_service.dart';
+import '../../../config/config.dart';
 import '../../../widgets/ui_components.dart';
 import '../../../utils/app_theme.dart';
 import '../models/chess_game.dart';
@@ -122,8 +123,12 @@ class _ChessGameScreenState extends State<ChessGameScreen> {
     }
     
     try {
-      // WebSocket URL - adjust based on your backend
-      final socketUrl = 'wss://your-backend.com/chess'; // TODO: Replace with actual WebSocket URL
+      // Get WebSocket URL from config (for tournament games)
+      final socketUrl = Config.current.chessWebSocketUrl;
+      if (socketUrl == null || socketUrl.isEmpty) {
+        Logger.warning('WebSocket URL not configured - tournament games will use Firestore only', tag: 'ChessGameScreen');
+        return; // Tournament games can still work via Firestore, just without real-time WebSocket
+      }
       
       _socket = IO.io(socketUrl, <String, dynamic>{
         'transports': ['websocket'],

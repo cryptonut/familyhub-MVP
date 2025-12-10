@@ -290,6 +290,7 @@ enum GameMode {
   solo, // vs AI
   family, // vs family member
   open, // vs random player
+  tournament, // cross-hub tournament game
 }
 
 enum GameStatus {

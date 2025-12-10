@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/event_chat_message.dart';
 import '../../services/auth_service.dart';
 import '../../services/event_chat_service.dart';
+import '../../widgets/linkable_text.dart';
 
 /// Widget for displaying and interacting with event-specific chat
 class EventChatWidget extends StatefulWidget {
@@ -266,15 +267,15 @@ class _EventChatWidgetState extends State<EventChatWidget> {
                                           : Colors.grey[700],
                                     ),
                                   ),
-                                Text(
-                                  isDeleted
+                                LinkableText(
+                                  text: isDeleted
                                       ? message.content
                                       : message.content,
                                   style: TextStyle(
                                     color: isOwnMessage
                                         ? Colors.white
                                         : Colors.black87,
-                                    ),
+                                  ),
                                 ),
                                 if (message.editedAt != null)
                                   Text(

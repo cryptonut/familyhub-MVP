@@ -11,6 +11,7 @@ import '../../widgets/ui_components.dart';
 import '../../widgets/skeletons/skeleton_widgets.dart';
 import '../../widgets/toast_notification.dart';
 import '../../widgets/message_reaction_widget.dart';
+import '../../widgets/linkable_text.dart';
 import '../../services/message_reaction_service.dart';
 import '../../services/message_thread_service.dart';
 import '../../services/auth_service.dart';
@@ -269,7 +270,13 @@ class _ChatScreenState extends State<ChatScreen> {
           stream: _chatService.getMessagesStream(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return ListView.builder(
+                padding: const EdgeInsets.all(AppTheme.spacingMD),
+                itemCount: 6, // Show 6 skeleton message bubbles
+                itemBuilder: (context, index) => SkeletonMessageBubble(
+                  isMe: index % 3 == 0, // Alternate between sent/received for variety
+                ),
+              );
             }
 
             if (snapshot.hasError) {
@@ -397,8 +404,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (message.type == MessageType.voice && message.audioUrl != null)
                   _buildVoicePlayer(message.audioUrl!, isCurrentUser, theme)
                 else
-                  Text(
-                    message.content,
+                  LinkableText(
+                    text: message.content,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: isCurrentUser
                           ? Colors.white
@@ -548,7 +555,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(AppTheme.spacingSM),
+                      itemCount: 3, // Show fewer skeleton bubbles for thread replies
+                      itemBuilder: (context, index) => SkeletonMessageBubble(
+                        isMe: index % 2 == 1, // Alternate pattern
+                      ),
+                    );
                   }
                   
                   if (snapshot.hasError) {

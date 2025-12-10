@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../models/chat_message.dart';
 import '../../services/chat_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
+import '../../widgets/linkable_text.dart';
 import 'package:uuid/uuid.dart';
 
 class PrivateChatScreen extends StatefulWidget {
@@ -257,8 +258,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  message.content,
+                LinkableText(
+                  text: message.content,
                   style: TextStyle(
                     color: isCurrentUser ? Colors.white : Colors.black87,
                   ),

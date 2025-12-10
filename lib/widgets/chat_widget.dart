@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/chat_message.dart';
 import '../utils/date_utils.dart' as app_date_utils;
 import '../core/services/logger_service.dart';
+import 'linkable_text.dart';
 
 /// A reusable chat widget that can be embedded in pages
 /// Supports both hub chat and family chat
@@ -166,8 +167,8 @@ class _ChatWidgetState extends State<ChatWidget> {
                       ),
                     ),
                   if (!isMe) const SizedBox(height: 4),
-                  Text(
-                    message.content,
+                  LinkableText(
+                    text: message.content,
                     style: TextStyle(
                       color: isMe ? Colors.white : Colors.black87,
                     ),

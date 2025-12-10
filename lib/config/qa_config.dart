@@ -33,11 +33,14 @@ class QaConfig implements AppConfig {
   String? get apiBaseUrl => null; // Add if you have test API
 
   @override
-  String? get agoraAppId => null; // TODO: Add Agora App ID for QA environment
+  String? get agoraAppId => null; // Disabled - see VideoCallService for implementation details
   
   @override
-  String? get agoraAppCertificate => null; // TODO: Add Agora App Certificate for QA environment
+  String? get agoraAppCertificate => null; // Disabled - see VideoCallService for implementation details
   
   @override
-  String? get chessWebSocketUrl => null; // TODO: Add WebSocket URL for real-time chess if needed
+  bool get enableVideoCalls => false; // Video calls disabled - code preserved for future use
+  
+  @override
+  String? get chessWebSocketUrl => null; // WebSocket URL for real-time chess tournaments (to be configured when tournament server is set up)
 }

@@ -1,6 +1,8 @@
 import '../models/calendar_event.dart';
+import 'recurrence_engine.dart';
 
 /// Service for handling recurring event expansion
+/// Uses RecurrenceEngine for robust recurrence calculation
 class RecurrenceService {
   /// Expand a recurring event into individual instances
   /// Returns a list of CalendarEvent instances for the next N months
@@ -16,48 +18,27 @@ class RecurrenceService {
     final now = DateTime.now();
     final endDate = DateTime(now.year, now.month + monthsAhead, now.day);
     
-    DateTime currentDate = event.startTime;
-    int instanceCount = 0;
-    const maxInstances = 100; // Safety limit
+    // Use RecurrenceEngine to generate instances
+    final occurrenceDates = RecurrenceEngine.generateInstances(
+      startDate: event.startTime,
+      endDate: endDate,
+      recurrenceRule: event.recurrenceRule!,
+    );
 
-    while (currentDate.isBefore(endDate) && instanceCount < maxInstances) {
-      final duration = event.endTime.difference(event.startTime);
-      final instanceEnd = currentDate.add(duration);
+    // Create CalendarEvent instances for each occurrence
+    final duration = event.endTime.difference(event.startTime);
+    for (int i = 0; i < occurrenceDates.length; i++) {
+      final occurrenceDate = occurrenceDates[i];
+      final instanceEnd = occurrenceDate.add(duration);
       
       instances.add(event.copyWith(
-        id: '${event.id}_${instanceCount}',
-        startTime: currentDate,
+        id: '${event.id}_instance_$i',
+        startTime: occurrenceDate,
         endTime: instanceEnd,
       ));
-
-      // Calculate next occurrence based on recurrence rule
-      currentDate = _getNextOccurrence(currentDate, event.recurrenceRule!);
-      instanceCount++;
     }
 
     return instances;
-  }
-
-  /// Get the next occurrence date based on recurrence rule
-  static DateTime _getNextOccurrence(DateTime current, String rule) {
-    switch (rule.toLowerCase()) {
-      case 'daily':
-        return current.add(const Duration(days: 1));
-      case 'weekly':
-        return current.add(const Duration(days: 7));
-      case 'monthly':
-        // Add one month, handling year rollover
-        if (current.month == 12) {
-          return DateTime(current.year + 1, 1, current.day);
-        } else {
-          return DateTime(current.year, current.month + 1, current.day);
-        }
-      case 'yearly':
-        return DateTime(current.year + 1, current.month, current.day);
-      default:
-        // Default to weekly if unknown rule
-        return current.add(const Duration(days: 7));
-    }
   }
 
   /// Get all events (including expanded recurring ones) for a date range

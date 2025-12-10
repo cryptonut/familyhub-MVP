@@ -143,13 +143,26 @@ class ChessMoveValidator {
             if (_isValidMove(game, fromSquare, toSquare)) {
               // Get the piece at destination for capture info
               final destPiece = game.get(toSquare);
+              
+              // Check if this is a promotion move (pawn reaching 8th/1st rank)
+              String? promotion;
+              if (piece.type == chess_lib.PieceType.PAWN) {
+                final toRank = int.parse(toSquare[1]);
+                if ((piece.color == chess_lib.Color.WHITE && toRank == 8) ||
+                    (piece.color == chess_lib.Color.BLACK && toRank == 1)) {
+                  // This is a promotion move - we'll need to handle all 4 options
+                  // For now, include it as a valid move (promotion will be selected via dialog)
+                  promotion = 'q'; // Default to queen, but UI will show dialog
+                }
+              }
+              
               validMoves.add({
                 'from': fromSquare,
                 'to': toSquare,
                 'piece': piece.type,
                 'color': piece.color,
                 'captured': destPiece?.type,
-                'promotion': null, // TODO: handle promotion
+                'promotion': promotion,
               });
             }
           }

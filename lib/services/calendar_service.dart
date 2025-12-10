@@ -10,6 +10,7 @@ import '../models/calendar_event.dart';
 import 'auth_service.dart';
 import 'recurrence_service.dart';
 import 'notification_service.dart';
+import 'query_cache_service.dart';
 
 class CalendarService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -36,12 +37,59 @@ class CalendarService {
     return 'families/$familyId/events';
   }
 
-  Future<List<CalendarEvent>> getEvents() async {
+  /// Invalidate calendar events cache when events are modified
+  Future<void> _invalidateEventsCache(String familyId) async {
+    final queryCache = QueryCacheService();
+    // Invalidate all event caches for this family (different limits)
+    for (final limit in [50, 100, 500]) {
+      await queryCache.invalidateCache(prefix: 'calendar_events', queryId: '${familyId}_$limit');
+    }
+  }
+
+  Future<List<CalendarEvent>> getEvents({int limit = 50, bool forceRefresh = false}) async {
     final familyId = await _familyId;
-    if (familyId == null) return [];
-    
+    if (familyId == null) {
+      Logger.warning('getEvents: User not part of a family', tag: 'CalendarService');
+      return [];
+    }
+
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      final queryCache = QueryCacheService();
+      // QueryCacheService handles List<Map<String, dynamic>> specially and doesn't use fromJson
+      final cachedData = await queryCache.getCachedQueryResult<List<Map<String, dynamic>>>(
+        prefix: 'calendar_events',
+        queryId: '${familyId}_$limit',
+        fromJson: (_) => <Map<String, dynamic>>[], // Not used for List<Map> type
+      );
+
+      if (cachedData != null && cachedData.isNotEmpty) {
+        // Convert cached JSON maps back to CalendarEvent objects
+        final cachedEvents = cachedData.map((json) {
+          try {
+            return CalendarEvent.fromJson(json);
+          } catch (e) {
+            Logger.warning('Error parsing cached event', error: e, tag: 'CalendarService');
+            return null;
+          }
+        }).whereType<CalendarEvent>().toList();
+
+        if (cachedEvents.isNotEmpty) {
+          Logger.debug('getEvents: Cache hit for family $familyId (limit: $limit) - ${cachedEvents.length} events', tag: 'CalendarService');
+          return cachedEvents;
+        }
+      }
+    }
+
     try {
-      final snapshot = await _firestore.collection('families/$familyId/events').get();
+      Logger.debug('getEvents: Loading events from Firestore for family $familyId (limit: $limit)', tag: 'CalendarService');
+
+      final pageSize = limit.clamp(1, 500);
+      final snapshot = await _firestore
+          .collection('families/$familyId/events')
+          .orderBy('startTime')
+          .limit(pageSize)
+          .get();
       final events = <CalendarEvent>[];
       
       for (var doc in snapshot.docs) {
@@ -56,7 +104,27 @@ class CalendarService {
           // Skip invalid events but continue loading others
         }
       }
-      
+
+      Logger.debug('getEvents: Successfully loaded ${events.length} events', tag: 'CalendarService');
+
+      // Cache the results
+      if (!forceRefresh) {
+        final queryCache = QueryCacheService();
+        // Serialize events to JSON maps for caching
+        final eventsJson = events.map((event) {
+          final json = event.toJson();
+          json['id'] = event.id; // Ensure ID is included
+          return json;
+        }).toList();
+
+        await queryCache.cacheQueryResult<List<Map<String, dynamic>>>(
+          prefix: 'calendar_events',
+          queryId: '${familyId}_$limit',
+          data: eventsJson,
+          dataType: DataType.events,
+        );
+      }
+
       return events;
     } catch (e) {
       Logger.error('Error loading events', error: e, tag: 'CalendarService');
@@ -69,7 +137,7 @@ class CalendarService {
       if (familyId == null) {
         return Stream.value(<CalendarEvent>[]);
       }
-      
+
       return _firestore
           .collection('families/$familyId/events')
           .orderBy('startTime')
@@ -83,8 +151,45 @@ class CalendarService {
     });
   }
 
-  Future<List<CalendarEvent>> getEventsForDate(DateTime date) async {
-    final allEvents = await getEvents();
+  /// Load more events with pagination
+  Future<List<CalendarEvent>> loadMoreEvents({
+    required DocumentSnapshot lastDoc,
+    int limit = 50,
+  }) async {
+    final familyId = await _familyId;
+    if (familyId == null) return [];
+
+    try {
+      final snapshot = await _firestore
+          .collection('families/$familyId/events')
+          .orderBy('startTime')
+          .startAfterDocument(lastDoc)
+          .limit(limit)
+          .get();
+
+      final events = <CalendarEvent>[];
+      for (var doc in snapshot.docs) {
+        try {
+          final event = CalendarEvent.fromJson({
+            'id': doc.id,
+            ...doc.data(),
+          });
+          events.add(event);
+        } catch (e) {
+          Logger.warning('Error parsing event ${doc.id} in loadMore', error: e, tag: 'CalendarService');
+          // Skip invalid events but continue loading others
+        }
+      }
+
+      return events;
+    } catch (e) {
+      Logger.error('Error loading more events', error: e, tag: 'CalendarService');
+      return [];
+    }
+  }
+
+  Future<List<CalendarEvent>> getEventsForDate(DateTime date, {bool forceRefresh = false}) async {
+    final allEvents = await getEvents(forceRefresh: forceRefresh);
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
     
@@ -162,6 +267,9 @@ class CalendarService {
         Logger.warning('Error triggering calendar sync notification', error: e, tag: 'CalendarService');
         // Don't fail event creation if notification fails
       }
+
+      // Invalidate cache after successful add
+      await _invalidateEventsCache(familyId);
     } catch (e) {
       // Log the actual error for debugging
       Logger.error('addEvent error', error: e, tag: 'CalendarService');
@@ -210,6 +318,9 @@ class CalendarService {
         Logger.warning('Error triggering calendar sync notification', error: e, tag: 'CalendarService');
         // Don't fail event update if notification fails
       }
+
+      // Invalidate cache after successful update
+      await _invalidateEventsCache(familyId);
     } catch (e) {
       Logger.error('updateEvent error', error: e, tag: 'CalendarService');
       Logger.debug('Family ID: $familyId', tag: 'CalendarService');
@@ -221,8 +332,11 @@ class CalendarService {
   Future<void> deleteEvent(String eventId) async {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
-    
+
     await _firestore.collection('families/$familyId/events').doc(eventId).delete();
+
+    // Invalidate cache after successful delete
+    await _invalidateEventsCache(familyId);
   }
 
   /// Upload a photo for an event (mobile - uses File)
@@ -504,7 +618,13 @@ class CalendarService {
     try {
       final conflictKey = _getConflictKey(userId, events);
       final currentUserId = _auth.currentUser?.uid;
-      if (currentUserId == null) return;
+      if (currentUserId == null) {
+        Logger.error('Cannot ignore conflict: No current user', tag: 'CalendarService');
+        return;
+      }
+
+      final eventIds = events.map((e) => e.id).toList()..sort();
+      Logger.debug('Ignoring conflict: userId=$userId, eventIds=$eventIds, conflictKey=$conflictKey', tag: 'CalendarService');
 
       await _firestore
           .collection('users')
@@ -513,27 +633,42 @@ class CalendarService {
           .doc(conflictKey)
           .set({
         'userId': userId,
-        'eventIds': events.map((e) => e.id).toList(),
+        'eventIds': eventIds,
         'ignoredAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: false));
 
-      Logger.debug('Ignored conflict: $conflictKey', tag: 'CalendarService');
+      Logger.debug('Successfully ignored conflict: $conflictKey', tag: 'CalendarService');
+      
+      // Verify the write by reading it back (ensures write completed before returning)
+      final verifyDoc = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('ignoredConflicts')
+          .doc(conflictKey)
+          .get(GetOptions(source: Source.server));
+      
+      if (!verifyDoc.exists) {
+        Logger.error('WARNING: Ignored conflict was not found after write!', tag: 'CalendarService');
+        throw Exception('Failed to verify ignored conflict was saved');
+      }
     } catch (e, st) {
       Logger.error('Error ignoring conflict', error: e, stackTrace: st, tag: 'CalendarService');
+      rethrow; // Re-throw so caller knows it failed
     }
   }
 
   /// Get all ignored conflict keys for the current user
-  Future<Set<String>> getIgnoredConflictKeys() async {
+  Future<Set<String>> getIgnoredConflictKeys({bool forceRefresh = false}) async {
     try {
       final currentUserId = _auth.currentUser?.uid;
       if (currentUserId == null) return {};
 
+      // Force server read to ensure we get the latest ignored conflicts
       final snapshot = await _firestore
           .collection('users')
           .doc(currentUserId)
           .collection('ignoredConflicts')
-          .get();
+          .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
 
       return snapshot.docs.map((doc) => doc.id).toSet();
     } catch (e, st) {
@@ -544,9 +679,10 @@ class CalendarService {
 
   /// Filter out ignored conflicts from a conflicts map
   Future<Map<String, List<CalendarEvent>>> filterIgnoredConflicts(
-    Map<String, List<CalendarEvent>> conflicts,
-  ) async {
-    final ignoredKeys = await getIgnoredConflictKeys();
+    Map<String, List<CalendarEvent>> conflicts, {
+    bool forceRefresh = false,
+  }) async {
+    final ignoredKeys = await getIgnoredConflictKeys(forceRefresh: forceRefresh);
     final filtered = <String, List<CalendarEvent>>{};
 
     for (var entry in conflicts.entries) {
