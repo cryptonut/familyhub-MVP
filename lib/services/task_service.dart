@@ -7,6 +7,7 @@ import '../models/task.dart';
 import 'auth_service.dart';
 import 'notification_service.dart';
 import 'family_wallet_service.dart';
+import 'query_cache_service.dart';
 
 class TaskService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -44,27 +45,58 @@ class TaskService {
     return 'families/$familyId/tasks';
   }
 
-  Future<List<Task>> getTasks({bool forceRefresh = false}) async {
+  Future<List<Task>> getTasks({int limit = 50, bool forceRefresh = false}) async {
     final familyId = await _familyId;
     if (familyId == null) {
       Logger.warning('getTasks: User not part of a family', tag: 'TaskService');
       return [];
     }
     
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      final queryCache = QueryCacheService();
+      // QueryCacheService handles List<Map<String, dynamic>> specially and doesn't use fromJson
+      final cachedData = await queryCache.getCachedQueryResult<List<Map<String, dynamic>>>(
+        prefix: 'tasks',
+        queryId: '${familyId}_$limit',
+        fromJson: (_) => <Map<String, dynamic>>[], // Not used for List<Map> type
+      );
+      
+      if (cachedData != null && cachedData.isNotEmpty) {
+        // Convert cached JSON maps back to Task objects
+        final cachedTasks = cachedData.map((json) {
+          try {
+            return Task.fromJson(json);
+          } catch (e) {
+            Logger.warning('Error parsing cached task', error: e, tag: 'TaskService');
+            return null;
+          }
+        }).whereType<Task>().toList();
+        
+        if (cachedTasks.isNotEmpty) {
+          Logger.debug('getTasks: Cache hit for $familyId (limit: $limit) - ${cachedTasks.length} tasks', tag: 'TaskService');
+          return cachedTasks;
+        }
+      }
+    }
+    
     try {
       final collectionPath = 'families/$familyId/tasks';
-      Logger.debug('getTasks: Loading tasks from $collectionPath', tag: 'TaskService');
+      Logger.debug('getTasks: Loading tasks from Firestore $collectionPath (limit: $limit)', tag: 'TaskService');
       
+      final pageSize = limit.clamp(1, 500);
       QuerySnapshot snapshot;
       try {
         snapshot = await _firestore
             .collection(collectionPath)
             .orderBy('createdAt', descending: true)
+            .limit(pageSize) // Add pagination limit
             .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
       } catch (e, st) {
         Logger.warning('getTasks: orderBy failed, trying without orderBy', error: e, stackTrace: st, tag: 'TaskService');
         snapshot = await _firestore
             .collection(collectionPath)
+            .limit(pageSize)
             .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
       }
       
@@ -90,6 +122,25 @@ class TaskService {
       }
       
       Logger.debug('getTasks: Successfully loaded ${tasks.length} tasks', tag: 'TaskService');
+      
+      // Cache the results
+      if (!forceRefresh) {
+        final queryCache = QueryCacheService();
+        // Serialize tasks to JSON maps for caching
+        final tasksJson = tasks.map((task) {
+          final json = task.toJson();
+          json['id'] = task.id; // Ensure ID is included
+          return json;
+        }).toList();
+        
+        await queryCache.cacheQueryResult<List<Map<String, dynamic>>>(
+          prefix: 'tasks',
+          queryId: '${familyId}_$limit',
+          data: tasksJson,
+          dataType: DataType.tasks,
+        );
+      }
+      
       return tasks;
     } catch (e, stackTrace) {
       Logger.error('getTasks error', error: e, stackTrace: stackTrace, tag: 'TaskService');
@@ -103,9 +154,11 @@ class TaskService {
         return Stream.value(<Task>[]);
       }
       
+      final pageSize = 50; // Default page size for task stream
       return _firestore
           .collection('families/$familyId/tasks')
           .orderBy('createdAt', descending: true)
+          .limit(pageSize) // Add pagination limit
           .snapshots()
           .map((snapshot) => snapshot.docs
               .map((doc) => Task.fromJson({
@@ -137,6 +190,15 @@ class TaskService {
     } catch (e, st) {
       Logger.error('getCompletedTasks error', error: e, stackTrace: st, tag: 'TaskService');
       return [];
+    }
+  }
+
+  /// Invalidate task cache when tasks are modified
+  Future<void> _invalidateTaskCache(String familyId) async {
+    final queryCache = QueryCacheService();
+    // Invalidate all task caches for this family (different limits)
+    for (final limit in [50, 100, 500]) {
+      await queryCache.invalidateCache(prefix: 'tasks', queryId: '${familyId}_$limit');
     }
   }
 
@@ -192,6 +254,9 @@ class TaskService {
       }
       
       Logger.debug('addTask: Task ${task.id} verified in Firestore', tag: 'TaskService');
+      
+      // Invalidate cache after successful add
+      await _invalidateTaskCache(familyId);
     } catch (e, st) {
       Logger.error('addTask error', error: e, stackTrace: st, tag: 'TaskService');
       
@@ -231,6 +296,9 @@ class TaskService {
       await docRef.update(data);
       
       Logger.info('updateTask: Successfully updated task ${task.id}', tag: 'TaskService');
+      
+      // Invalidate cache after successful update
+      await _invalidateTaskCache(familyId);
     } catch (e, st) {
       Logger.error('updateTask error', error: e, stackTrace: st, tag: 'TaskService');
       rethrow;
@@ -266,6 +334,9 @@ class TaskService {
     }
     
     await docRef.delete();
+    
+    // Invalidate cache after successful delete
+    await _invalidateTaskCache(familyId);
   }
 
   Future<void> toggleTaskCompletion(String taskId) async {

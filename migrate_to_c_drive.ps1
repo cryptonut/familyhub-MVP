@@ -24,7 +24,7 @@ if (-not $currentPath.ToString().StartsWith("D:\")) {
     }
 }
 
-# Step 2: Check project size
+# Step 2: Check project size (quick estimate)
 Write-Host "`n[INFO] Checking project size..." -ForegroundColor Yellow
 $projectSize = (Get-ChildItem -Path $currentPath -Recurse -Force -ErrorAction SilentlyContinue | 
     Measure-Object -Property Length -Sum).Sum
@@ -45,35 +45,82 @@ if ($cFreeGB -lt ($projectSizeGB * 1.5)) {
 
 Write-Host "   [OK] Sufficient space available" -ForegroundColor Green
 
-# Step 4: Verify no active processes
+# Step 4: Check for active processes and handle gracefully
 Write-Host "`n[INFO] Checking for active processes..." -ForegroundColor Yellow
 $javaProcesses = Get-Process -Name "java","gradle*" -ErrorAction SilentlyContinue
 if ($javaProcesses) {
     Write-Host "[WARN] Found active Java/Gradle processes:" -ForegroundColor Yellow
     $javaProcesses | ForEach-Object { Write-Host "   - $($_.ProcessName) (PID: $($_.Id))" -ForegroundColor Gray }
-    Write-Host "   Please close these before migrating" -ForegroundColor Yellow
-    exit 1
-}
-Write-Host "   [OK] No active build processes" -ForegroundColor Green
-
-# Step 5: Verify all changes are committed
-Write-Host "`n[INFO] Checking Git status..." -ForegroundColor Yellow
-$gitStatus = git status --porcelain
-if ($gitStatus) {
-    Write-Host "[WARN] Uncommitted changes detected:" -ForegroundColor Yellow
-    $gitStatus | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
     Write-Host ""
-    $commit = Read-Host "   Commit all changes now? (Y/N)"
-    if ($commit -eq "Y" -or $commit -eq "y") {
-        git add -A
-        git commit -m "chore: Pre-migration commit before moving to C: drive"
-        Write-Host "   [OK] Changes committed" -ForegroundColor Green
+    Write-Host "   Waiting 10 seconds for processes to finish..." -ForegroundColor Cyan
+    Start-Sleep -Seconds 10
+    
+    # Check again
+    $javaProcesses = Get-Process -Name "java","gradle*" -ErrorAction SilentlyContinue
+    if ($javaProcesses) {
+        Write-Host "   Processes still running. Attempting to terminate..." -ForegroundColor Yellow
+        $javaProcesses | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 3
+        
+        # Final check
+        $javaProcesses = Get-Process -Name "java","gradle*" -ErrorAction SilentlyContinue
+        if ($javaProcesses) {
+            Write-Host "[ERROR] Could not stop all processes. Please close them manually." -ForegroundColor Red
+            exit 1
+        } else {
+            Write-Host "   [OK] Processes terminated" -ForegroundColor Green
+        }
     } else {
-        Write-Host "[ERROR] Please commit or stash changes before migrating" -ForegroundColor Red
+        Write-Host "   [OK] Processes finished" -ForegroundColor Green
+    }
+} else {
+    Write-Host "   [OK] No active build processes" -ForegroundColor Green
+}
+
+# Step 5: Check for modified tracked files (ignore untracked)
+Write-Host "`n[INFO] Checking Git status..." -ForegroundColor Yellow
+
+# Use timeout for git status (quick operation, but can hang)
+$gitStatusJob = Start-Job -ScriptBlock { git status --porcelain 2>&1 }
+$gitStatusResult = Wait-Job -Job $gitStatusJob -Timeout 10
+
+if ($gitStatusResult) {
+    $gitStatusOutput = Receive-Job -Job $gitStatusJob
+    Remove-Job -Job $gitStatusJob -Force
+    $modifiedFiles = $gitStatusOutput | Where-Object { $_ -match '^[MADRC]' }  # Only tracked files
+    $untrackedFiles = $gitStatusOutput | Where-Object { $_ -match '^\?\?' }   # Untracked files
+} else {
+    Write-Host "[WARN] Git status timed out, assuming clean repository" -ForegroundColor Yellow
+    Stop-Job -Job $gitStatusJob -Force
+    Remove-Job -Job $gitStatusJob -Force
+    $modifiedFiles = @()
+    $untrackedFiles = @()
+}
+
+if ($modifiedFiles) {
+    Write-Host "[WARN] Modified tracked files detected:" -ForegroundColor Yellow
+    $modifiedFiles | Select-Object -First 10 | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
+    if (($modifiedFiles | Measure-Object).Count -gt 10) {
+        Write-Host "   ... and $((($modifiedFiles | Measure-Object).Count) - 10) more" -ForegroundColor Gray
+    }
+    Write-Host ""
+    $commit = Read-Host "   Commit tracked changes now? (Y/N) - Untracked files will be copied as-is"
+    if ($commit -eq "Y" -or $commit -eq "y") {
+        git add -u  # Only add tracked files
+        git commit -m "chore: Pre-migration commit before moving to C: drive"
+        Write-Host "   [OK] Tracked changes committed" -ForegroundColor Green
+    } else {
+        Write-Host "[ERROR] Please commit or stash tracked file changes before migrating" -ForegroundColor Red
         exit 1
     }
 }
-Write-Host "   [OK] Git repository clean" -ForegroundColor Green
+
+if ($untrackedFiles) {
+    $untrackedCount = ($untrackedFiles | Measure-Object).Count
+    Write-Host "   [INFO] $untrackedCount untracked file(s) will be copied as-is" -ForegroundColor Gray
+}
+
+Write-Host "   [OK] Ready to migrate" -ForegroundColor Green
 
 # Step 6: Define source and destination
 $sourcePath = $currentPath.ToString()

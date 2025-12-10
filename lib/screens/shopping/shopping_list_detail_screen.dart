@@ -214,7 +214,7 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
   }
 
   Future<void> _addItemWithDialog() async {
-    final result = await showDialog<bool>(
+    final result = await showDialog<dynamic>(
       context: context,
       builder: (context) => AddShoppingItemDialog(
         listId: widget.list.id,
@@ -222,8 +222,18 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
       ),
     );
 
-    if (result == true && mounted) {
-      ToastNotification.success(context, 'Item added');
+    if (result != null && mounted) {
+      if (result is ShoppingItem) {
+        // Optimistically add the new item to the UI immediately
+        setState(() {
+          _items = [result, ..._items];
+          _groupItems();
+        });
+        ToastNotification.success(context, 'Item added');
+      } else if (result == true) {
+        // Item was updated (not added)
+        ToastNotification.success(context, 'Item updated');
+      }
     }
   }
 

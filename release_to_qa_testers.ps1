@@ -110,6 +110,12 @@ if ([string]::IsNullOrEmpty($Notes)) {
                     "RECENT UPDATES:`n" +
                     "$recentCommits`n`n" +
                     "========================================`n`n" +
+                    "TEST PLAN:`n" +
+                    "   A comprehensive test plan is available in the repository:`n" +
+                    "   - File: ANDROID_TEST_PLAN.md`n" +
+                    "   - Location: Project root`n" +
+                    "   - Coverage: 200+ test cases across 16 feature categories`n" +
+                    "   - Please follow the test plan for systematic testing`n`n" +
                     "TESTING NOTES:`n" +
                     "   - This is a QA release build for thorough testing`n" +
                     "   - Please test all features thoroughly`n" +

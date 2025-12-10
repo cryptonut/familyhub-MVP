@@ -14,6 +14,7 @@ import '../video/video_call_screen.dart';
 import '../chat/private_chat_screen.dart';
 import '../../services/video_call_service.dart';
 import '../../services/chat_service.dart';
+import '../../config/config.dart';
 import 'create_hub_event_dialog.dart';
 import 'invite_members_dialog.dart';
 import 'hub_settings_screen.dart';
@@ -163,7 +164,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
       appBar: AppBar(
         title: Text(widget.hub.name),
         actions: [
-          if (widget.hub.videoCallsEnabled)
+          if (Config.current.enableVideoCalls && widget.hub.videoCallsEnabled)
             IconButton(
               icon: const Icon(Icons.videocam),
               onPressed: _startVideoCall,

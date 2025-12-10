@@ -274,5 +274,55 @@ class GamesService {
       rethrow;
     }
   }
+
+  /// Get open matchmaking enabled setting for family
+  Future<bool> getOpenMatchmakingEnabled() async {
+    final userModel = await _authService.getCurrentUserModel();
+    if (userModel?.familyId == null) return false;
+
+    try {
+      final familyDoc = await _firestore
+          .collection('families')
+          .doc(userModel!.familyId)
+          .get();
+
+      if (familyDoc.exists) {
+        final data = familyDoc.data();
+        return data?['openMatchmakingEnabled'] as bool? ?? false;
+      }
+      return false; // Default to false for privacy
+    } catch (e) {
+      Logger.error('Error getting open matchmaking setting', error: e, tag: 'GamesService');
+      return false;
+    }
+  }
+
+  /// Set open matchmaking enabled setting for family
+  /// Only admins can change this setting
+  Future<void> setOpenMatchmakingEnabled(bool enabled) async {
+    final userModel = await _authService.getCurrentUserModel();
+    if (userModel?.familyId == null) {
+      throw AuthException('User not part of a family', code: 'no-family');
+    }
+
+    // Check if user is admin
+    if (!userModel!.isAdmin()) {
+      throw AuthException('Only admins can change this setting', code: 'permission-denied');
+    }
+
+    try {
+      await _firestore
+          .collection('families')
+          .doc(userModel.familyId!)
+          .set({
+            'openMatchmakingEnabled': enabled,
+          }, SetOptions(merge: true));
+
+      Logger.info('Updated open matchmaking setting: $enabled', tag: 'GamesService');
+    } catch (e) {
+      Logger.error('Error setting open matchmaking', error: e, tag: 'GamesService');
+      rethrow;
+    }
+  }
 }
 

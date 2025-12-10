@@ -18,6 +18,7 @@ abstract class AppConfig {
   // Agora video call configuration
   String? get agoraAppId;
   String? get agoraAppCertificate;
+  bool get enableVideoCalls; // Feature flag to enable/disable video calls UI
   
   // WebSocket endpoints
   String? get chessWebSocketUrl;

@@ -68,6 +68,11 @@ service cloud.firestore {
         isBankerOrAdmin() &&
         belongsToFamily(resource.data.familyId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['relationship']);
+      
+      // Ignored conflicts subcollection - users can manage their own ignored conflicts
+      match /ignoredConflicts/{conflictKey} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
     }
     
     // Family collections - tasks, events, messages, etc.
@@ -81,10 +86,20 @@ service cloud.firestore {
       
       // Allow updating walletBalance field for family members (for job creation/approval)
       // This handles both updates to existing documents and set() with merge on new documents
-      allow update: if belongsToFamily(familyId) && 
-        request.resource.data.walletBalance is number &&
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['walletBalance']) ||
-         !exists(/databases/$(database)/documents/families/$(familyId)));
+      // Also allow admins to update openMatchmakingEnabled setting (deployed 2025-12-10, force update)
+      allow update: if belongsToFamily(familyId) && (
+        // Update walletBalance (existing rule)
+        (request.resource.data.walletBalance is number &&
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['walletBalance']) ||
+          !exists(/databases/$(database)/documents/families/$(familyId)))) ||
+        // Update openMatchmakingEnabled (admin only)
+        (isAdmin() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['openMatchmakingEnabled']) &&
+         request.resource.data.openMatchmakingEnabled is bool) ||
+        // Allow set() with merge for both fields
+        (!exists(/databases/$(database)/documents/families/$(familyId)) &&
+         (request.resource.data.walletBalance is number || request.resource.data.openMatchmakingEnabled is bool))
+      );
       
       // Tasks subcollection
       match /tasks/{taskId} {

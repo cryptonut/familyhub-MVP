@@ -33,7 +33,7 @@ class _SchedulingConflictsScreenState extends State<SchedulingConflictsScreen> {
     _loadData();
   }
   
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     setState(() => _isLoading = true);
     try {
       // 1. Load members for names
@@ -83,7 +83,7 @@ class _SchedulingConflictsScreenState extends State<SchedulingConflictsScreen> {
       
       // 3. Find conflicts and filter ignored ones
       final allConflicts = _calendarService.findConflicts(_allEvents);
-      _conflicts = await _calendarService.filterIgnoredConflicts(allConflicts);
+      _conflicts = await _calendarService.filterIgnoredConflicts(allConflicts, forceRefresh: forceRefresh);
       
     } catch (e) {
       debugPrint('Error loading conflicts: $e');
@@ -256,13 +256,31 @@ class _SchedulingConflictsScreenState extends State<SchedulingConflictsScreen> {
                   children: [
                     TextButton(
                       onPressed: () async {
-                        await _calendarService.ignoreConflict(userId, events);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Conflict ignored')),
-                          );
-                          // Reload data to remove ignored conflict
-                          _loadData();
+                        try {
+                          await _calendarService.ignoreConflict(userId, events);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Conflict ignored')),
+                            );
+                            // Refresh to get latest ignored conflicts from server
+                            // ignoreConflict() already verifies the write completed
+                            if (mounted) {
+                              await _loadData(forceRefresh: true);
+                              // Signal to dashboard that a change occurred
+                              if (mounted) {
+                                Navigator.pop(context, true);
+                              }
+                            }
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to ignore conflict: ${e.toString()}'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
                         }
                       },
                       child: const Text('Ignore'),

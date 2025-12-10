@@ -172,7 +172,7 @@ class _AddShoppingItemDialogState extends State<AddShoppingItemDialog> {
         await _shoppingService.updateShoppingItem(updatedItem);
       } else {
         // Add new item
-        await _shoppingService.addShoppingItem(
+        final addedItem = await _shoppingService.addShoppingItem(
           listId: widget.listId,
           name: _nameController.text.trim(),
           quantity: _quantity,
@@ -183,6 +183,11 @@ class _AddShoppingItemDialogState extends State<AddShoppingItemDialog> {
           categoryId: _selectedCategory?.id,
           categoryName: _selectedCategory?.name ?? 'Other',
         );
+
+        if (mounted) {
+          Navigator.pop(context, addedItem);
+          return;
+        }
       }
 
       if (mounted) {

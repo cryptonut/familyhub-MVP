@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'dart:async';
 import '../../../core/services/logger_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/games_service.dart';
 import '../../../widgets/ui_components.dart';
 import '../../../utils/app_theme.dart';
 import '../models/chess_game.dart';
@@ -23,6 +24,7 @@ class ChessLobbyScreen extends StatefulWidget {
 class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
   final AuthService _authService = AuthService();
   final ChessService _chessService = ChessService();
+  final GamesService _gamesService = GamesService();
   bool _openModeEnabled = false;
   bool _isLoading = true;
   List<ChessGame> _waitingGames = [];
@@ -138,22 +140,15 @@ class _ChessLobbyScreenState extends State<ChessLobbyScreen> {
 
   Future<void> _checkOpenModeEnabled() async {
     try {
-      final userModel = await _authService.getCurrentUserModel();
-      if (userModel?.familyId != null) {
-        // Check family settings - this would be in a family settings collection
-        // For now, default to false
-        setState(() {
-          _openModeEnabled = false; // TODO: Load from family settings
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      final enabled = await _gamesService.getOpenMatchmakingEnabled();
+      setState(() {
+        _openModeEnabled = enabled;
+        _isLoading = false;
+      });
     } catch (e) {
       Logger.error('Error checking open mode', error: e, tag: 'ChessLobbyScreen');
       setState(() {
+        _openModeEnabled = false; // Default to false on error
         _isLoading = false;
       });
     }

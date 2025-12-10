@@ -19,6 +19,11 @@ service firebase.storage {
       allow read, write, delete: if request.auth != null;
     }
     
+    // Shopping receipts
+    match /families/{familyId}/receipts/{receiptId} {
+      allow read, write, delete: if request.auth != null;
+    }
+    
     // Event photos
     match /eventPhotos/{familyId}/{eventId}/{photoId} {
       allow read, write, delete: if request.auth != null;

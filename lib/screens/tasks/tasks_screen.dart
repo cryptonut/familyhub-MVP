@@ -40,6 +40,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
   final Set<String> _claimingTaskIds = {}; // Track tasks being claimed
   final Set<String> _approvingTaskIds = {}; // Track tasks being approved
   Map<String, String> _userNames = {}; // Cache of user ID to display name
+  bool _isLoadingTasks = false; // Track initial loading state for skeleton widgets
   
   // Search and filters
   final TextEditingController _searchController = TextEditingController();
@@ -103,6 +104,12 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
   Future<void> _loadTasks({bool forceRefresh = false}) async {
     try {
       Logger.debug('_loadTasks: Loading tasks (forceRefresh: $forceRefresh)', tag: 'TasksScreen');
+
+      // Set loading state for skeleton widgets (only for initial load, not refresh)
+      if (!forceRefresh && mounted) {
+        setState(() => _isLoadingTasks = true);
+      }
+
       final allTasks = await _taskService.getTasks(forceRefresh: forceRefresh);
       
       // Collect all unique user IDs (creators)
@@ -219,6 +226,11 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
       Logger.error('_loadTasks error', error: e, tag: 'TasksScreen');
       if (mounted) {
         ToastNotification.error(context, 'Error loading tasks: $e');
+      }
+    } finally {
+      // Clear loading state
+      if (mounted) {
+        setState(() => _isLoadingTasks = false);
       }
     }
   }
@@ -1126,7 +1138,16 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
 
   Widget _buildTasksList(List<Task> tasks, bool isCompleted) {
     Logger.debug('_buildTasksList: Building list with ${tasks.length} tasks (isCompleted: $isCompleted)', tag: 'TasksScreen');
-    
+
+    // Show skeleton widgets during initial loading
+    if (_isLoadingTasks && tasks.isEmpty) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(8),
+        itemCount: 5, // Show 5 skeleton items
+        itemBuilder: (context, index) => const SkeletonTaskCard(),
+      );
+    }
+
     if (tasks.isEmpty) {
       return EmptyState(
         icon: isCompleted ? Icons.check_circle_outline : Icons.assignment_outlined,

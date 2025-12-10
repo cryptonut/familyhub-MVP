@@ -30,6 +30,7 @@ import '../../widgets/ui_components.dart';
 import '../../widgets/skeletons/skeleton_widgets.dart';
 import '../../widgets/quick_actions_fab.dart';
 import '../../utils/app_theme.dart';
+import '../analytics/analytics_dashboard_screen.dart';
 import '../../services/payout_service.dart';
 import '../../services/recurrence_service.dart'; // Added for conflict detection
 import '../../models/payout_request.dart';
@@ -96,20 +97,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  Future<void> _loadConflicts() async {
+  Future<void> _loadConflicts({bool forceRefresh = false}) async {
     try {
       final now = DateTime.now();
       final tomorrow = now.add(const Duration(days: 1));
       
-      final todayEvents = await _calendarService.getEventsForDate(now);
-      final tomorrowEvents = await _calendarService.getEventsForDate(tomorrow);
+      // Force refresh events if needed to get latest data
+      final todayEvents = await _calendarService.getEventsForDate(now, forceRefresh: forceRefresh);
+      final tomorrowEvents = await _calendarService.getEventsForDate(tomorrow, forceRefresh: forceRefresh);
       
       final combinedEvents = [...todayEvents, ...tomorrowEvents];
       final uniqueEvents = {for (var e in combinedEvents) e.id: e}.values.toList();
       
       final allConflicts = _calendarService.findConflicts(uniqueEvents);
-      // Filter out ignored conflicts
-      final conflicts = await _calendarService.filterIgnoredConflicts(allConflicts);
+      // Filter out ignored conflicts - force refresh to get latest ignored state
+      final conflicts = await _calendarService.filterIgnoredConflicts(allConflicts, forceRefresh: forceRefresh);
       
       int count = 0;
       for (var list in conflicts.values) {
@@ -491,6 +493,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildQuickStats(),
             const SizedBox(height: 24),
             
+            // Analytics Card
+            _buildAnalyticsCard(),
+            const SizedBox(height: 24),
+            
             // Upcoming Birthdays
             if (_upcomingBirthdays.isNotEmpty) ...[
               _buildUpcomingBirthdays(),
@@ -510,6 +516,72 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAnalyticsCard() {
+    return ModernCard(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const AnalyticsDashboardScreen(),
+          ),
+        );
+      },
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      padding: const EdgeInsets.all(AppTheme.spacingLG),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.insights, 
+                  color: Colors.purple.shade700, size: 28),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Family Analytics',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.purple.shade700),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'View insights and trends',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildAnalyticsChip(Icons.task, 'Tasks'),
+              _buildAnalyticsChip(Icons.message, 'Messages'),
+              _buildAnalyticsChip(Icons.calendar_today, 'Events'),
+              _buildAnalyticsChip(Icons.photo_library, 'Photos'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsChip(IconData icon, String label) {
+    return Chip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -604,14 +676,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildConflictWarning() {
     return InkWell(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        final result = await Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const SchedulingConflictsScreen()),
-        ).then((_) {
-          _loadConflicts(); // Reload conflicts after returning
+        );
+        // Force refresh conflicts after returning (especially if a conflict was ignored)
+        if (mounted) {
+          await _loadConflicts(forceRefresh: true);
           _loadDashboardData();
-        });
+        }
       },
       child: Container(
         width: double.infinity,

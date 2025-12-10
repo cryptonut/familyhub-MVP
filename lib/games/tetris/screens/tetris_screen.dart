@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:math';
@@ -39,6 +40,12 @@ class _TetrisScreenState extends State<TetrisScreen> {
   // Next piece
   List<List<int>>? _nextPiece;
   int _nextPieceType = 0;
+  
+  // Touch control state
+  DateTime? _lastTapTime;
+  static const Duration _tapDebounce = Duration(milliseconds: 100);
+  Offset? _panStartPosition;
+  static const double _swipeThreshold = 30.0; // Minimum distance for swipe
 
   final List<List<List<int>>> _pieces = [
     // I-piece (cyan)
@@ -342,7 +349,9 @@ class _TetrisScreenState extends State<TetrisScreen> {
   }
 
   void _moveLeft() {
+    if (_gameOver || _isPaused || _currentPiece == null) return;
     if (!_checkCollision(_currentRow, _currentCol - 1, _currentPiece!)) {
+      HapticFeedback.selectionClick();
       setState(() {
         _currentCol--;
       });
@@ -350,7 +359,9 @@ class _TetrisScreenState extends State<TetrisScreen> {
   }
 
   void _moveRight() {
+    if (_gameOver || _isPaused || _currentPiece == null) return;
     if (!_checkCollision(_currentRow, _currentCol + 1, _currentPiece!)) {
+      HapticFeedback.selectionClick();
       setState(() {
         _currentCol++;
       });
@@ -358,7 +369,7 @@ class _TetrisScreenState extends State<TetrisScreen> {
   }
 
   void _rotate() {
-    if (_currentPiece == null) return;
+    if (_currentPiece == null || _gameOver || _isPaused) return;
     
     final rotated = List.generate(
       _currentPiece![0].length,
@@ -369,10 +380,117 @@ class _TetrisScreenState extends State<TetrisScreen> {
     );
     
     if (!_checkCollision(_currentRow, _currentCol, rotated)) {
+      HapticFeedback.lightImpact();
       setState(() {
         _currentPiece = rotated;
       });
     }
+  }
+  
+  void _hardDrop() {
+    if (_currentPiece == null || _gameOver || _isPaused) return;
+    
+    // Move piece down until collision
+    int dropDistance = 0;
+    while (!_checkCollision(_currentRow + dropDistance + 1, _currentCol, _currentPiece!)) {
+      dropDistance++;
+    }
+    
+    if (dropDistance > 0) {
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _currentRow += dropDistance;
+        _score += dropDistance * 2; // Bonus points for hard drop
+      });
+      _placePiece();
+    }
+  }
+  
+  void _handleTap(Offset localPosition, Size boardSize) {
+    if (_gameOver || _isPaused || _currentPiece == null) return;
+    
+    // Debounce rapid taps
+    final now = DateTime.now();
+    if (_lastTapTime != null && now.difference(_lastTapTime!) < _tapDebounce) {
+      return;
+    }
+    _lastTapTime = now;
+    
+    // Calculate cell dimensions (accounting for border)
+    final cellWidth = boardSize.width / (cols + 2);
+    final cellHeight = boardSize.height / (rows + 2);
+    
+    // Convert tap position to board coordinates (accounting for border)
+    final tapX = localPosition.dx;
+    final tapY = localPosition.dy;
+    
+    // Check if tap is in border area (ignore border taps)
+    final col = (tapX / cellWidth).floor();
+    final row = (tapY / cellHeight).floor();
+    
+    if (row == 0 || row == rows + 1 || col == 0 || col == cols + 1) {
+      return; // Ignore border taps
+    }
+    
+    // Convert to board coordinates (remove border offset)
+    final boardCol = col - 1;
+    final boardRow = row - 1;
+    
+    // Check if tap is in bottom row (hard drop)
+    if (boardRow >= rows - 1) {
+      _hardDrop();
+      return;
+    }
+    
+    // Calculate current piece width
+    final pieceWidth = _currentPiece![0].length;
+    final pieceLeftCol = _currentCol;
+    final pieceRightCol = _currentCol + pieceWidth - 1;
+    
+    // Determine tap zone relative to falling block
+    if (boardCol < pieceLeftCol) {
+      // Left zone - move left
+      _moveLeft();
+    } else if (boardCol > pieceRightCol) {
+      // Right zone - move right
+      _moveRight();
+    } else {
+      // Block zone - rotate
+      _rotate();
+    }
+  }
+  
+  void _handlePanStart(Offset position) {
+    _panStartPosition = position;
+  }
+  
+  void _handlePanUpdate(Offset position) {
+    if (_panStartPosition == null || _gameOver || _isPaused || _currentPiece == null) return;
+    
+    final delta = position - _panStartPosition!;
+    final absDeltaX = delta.dx.abs();
+    final absDeltaY = delta.dy.abs();
+    
+    // Determine if this is a horizontal or vertical swipe
+    if (absDeltaX > _swipeThreshold && absDeltaX > absDeltaY) {
+      // Horizontal swipe
+      if (delta.dx < 0) {
+        _moveLeft();
+      } else {
+        _moveRight();
+      }
+      _panStartPosition = position; // Reset to prevent multiple moves
+    } else if (absDeltaY > _swipeThreshold && absDeltaY > absDeltaX) {
+      // Vertical swipe down - soft drop
+      if (delta.dy > 0) {
+        _moveDown();
+        _panStartPosition = position; // Reset to allow continuous soft drop
+      }
+    }
+  }
+  
+  void _handlePanEnd() {
+    _panStartPosition = null;
   }
 
   List<List<int>> _getDisplayBoard() {
@@ -405,45 +523,142 @@ class _TetrisScreenState extends State<TetrisScreen> {
     return _pieceColors[value - 1];
   }
   
+  Widget _buildControlHint(String gesture, String action) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          gesture,
+          style: TextStyle(
+            color: Colors.blue.shade300,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          action,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+  
   Widget _buildBlock(int value, {bool isBorder = false}) {
     final color = isBorder ? Colors.grey[600]! : _getBlockColor(value);
     final isFilled = value > 0 || isBorder;
     
+    if (!isFilled) {
+      return Container(color: Colors.black);
+    }
+    
+    // Enhanced border blocks (like the image)
+    if (isBorder) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[600],
+          border: Border.all(
+            color: Colors.grey[800]!,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 2,
+              offset: const Offset(1, 1),
+            ),
+          ],
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.grey[500]!,
+                Colors.grey[600]!,
+                Colors.grey[700]!,
+              ],
+            ),
+            border: Border(
+              top: BorderSide(color: Colors.grey[400]!, width: 1),
+              left: BorderSide(color: Colors.grey[400]!, width: 1),
+              right: BorderSide(color: Colors.grey[800]!, width: 1),
+              bottom: BorderSide(color: Colors.grey[800]!, width: 1),
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // Enhanced game blocks with modern 3D look
     return Container(
       decoration: BoxDecoration(
-        color: isFilled ? color : Colors.black,
-        border: isBorder 
-            ? Border.all(color: Colors.grey[800]!, width: 1)
-            : null,
-        boxShadow: isFilled && !isBorder
-            ? [
-                BoxShadow(
-                  color: color.withOpacity(0.3),
-                  blurRadius: 2,
-                  offset: const Offset(1, 1),
-                ),
-              ]
-            : null,
+        borderRadius: BorderRadius.circular(2),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.4),
+            blurRadius: 3,
+            offset: const Offset(0, 2),
+            spreadRadius: 0.5,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 1,
+            offset: const Offset(1, 1),
+          ),
+        ],
       ),
-      child: isFilled && !isBorder
-          ? Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    color.withOpacity(0.9),
-                    color,
-                    color.withOpacity(0.7),
-                  ],
-                ),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-            )
-          : null,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: const [0.0, 0.3, 0.7, 1.0],
+            colors: [
+              color.withOpacity(1.0), // Bright top
+              color, // Main color
+              color.withOpacity(0.85), // Slightly darker
+              color.withOpacity(0.7), // Darker bottom
+            ],
+          ),
+          borderRadius: BorderRadius.circular(2),
+          border: Border(
+            top: BorderSide(
+              color: Colors.white.withOpacity(0.4),
+              width: 1.5,
+            ),
+            left: BorderSide(
+              color: Colors.white.withOpacity(0.3),
+              width: 1.5,
+            ),
+            right: BorderSide(
+              color: Colors.black.withOpacity(0.3),
+              width: 1.5,
+            ),
+            bottom: BorderSide(
+              color: Colors.black.withOpacity(0.4),
+              width: 1.5,
+            ),
+          ),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(1),
+            gradient: RadialGradient(
+              center: Alignment.topLeft,
+              radius: 1.5,
+              colors: [
+                Colors.white.withOpacity(0.2),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -474,41 +689,160 @@ class _TetrisScreenState extends State<TetrisScreen> {
             tooltip: 'New Game',
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(100),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[900],
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[700]!, width: 1),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                // Next Piece Preview
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'NEXT',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_nextPiece != null)
+                      SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: GridView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            crossAxisSpacing: 1,
+                            mainAxisSpacing: 1,
+                          ),
+                          itemCount: 16,
+                          itemBuilder: (context, index) {
+                            final row = index ~/ 4;
+                            final col = index % 4;
+                            final hasBlock = row < _nextPiece!.length &&
+                                col < _nextPiece![row].length &&
+                                _nextPiece![row][col] == 1;
+                            return _buildBlock(hasBlock ? _nextPieceType : 0);
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+                
+                // Score
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'SCORE',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$_score',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                // Lines
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'LINES',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$_lines',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // Game Board with Next Piece and Stats
+            // Game Board - Takes up most of the screen
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  // Calculate available width
+                  // Calculate board size to maximize screen usage
                   final availableWidth = constraints.maxWidth;
-                  final rightColumnWidth = 100.0;
-                  final spacing = 8.0;
-                  final boardMaxWidth = availableWidth - rightColumnWidth - spacing - 32; // Account for padding
+                  final availableHeight = constraints.maxHeight;
                   
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Main Game Board with Border
-                      Flexible(
-                        child: Container(
-                          constraints: BoxConstraints(maxWidth: boardMaxWidth),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[800],
-                            borderRadius: BorderRadius.circular(4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey[900]!.withOpacity(0.5),
-                                blurRadius: 4,
-                                offset: const Offset(2, 2),
-                              ),
-                            ],
+                  // Calculate cell size based on available space
+                  final cellWidth = availableWidth / (cols + 2);
+                  final cellHeight = availableHeight / (rows + 2);
+                  final cellSize = cellWidth < cellHeight ? cellWidth : cellHeight;
+                  
+                  final boardWidth = cellSize * (cols + 2);
+                  final boardHeight = cellSize * (rows + 2);
+                  
+                  return Center(
+                    child: Container(
+                      width: boardWidth,
+                      height: boardHeight,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                            spreadRadius: 2,
                           ),
-                          padding: const EdgeInsets.all(4),
-                          child: AspectRatio(
-                            aspectRatio: (cols + 2) / (rows + 2), // Account for border
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          return GestureDetector(
+                            onTapDown: (details) {
+                              _handleTap(details.localPosition, constraints.biggest);
+                            },
+                            onPanStart: (details) {
+                              _handlePanStart(details.localPosition);
+                            },
+                            onPanUpdate: (details) {
+                              _handlePanUpdate(details.localPosition);
+                            },
+                            onPanEnd: (_) {
+                              _handlePanEnd();
+                            },
                             child: GridView.builder(
                               physics: const NeverScrollableScrollPhysics(),
                               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -536,140 +870,54 @@ class _TetrisScreenState extends State<TetrisScreen> {
                                 return _buildBlock(value);
                               },
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
-                      
-                      // Right Column: Next Piece Preview + Score + Lines
-                      SizedBox(width: spacing),
-                      Container(
-                        width: rightColumnWidth,
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[900],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[700]!, width: 1),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Next Piece Preview
-                            Text(
-                              'NEXT',
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            if (_nextPiece != null)
-                              SizedBox(
-                                width: 60,
-                                height: 60,
-                                child: GridView.builder(
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 4, // Max width for preview
-                                    crossAxisSpacing: 1,
-                                    mainAxisSpacing: 1,
-                                  ),
-                                  itemCount: 16, // 4x4 grid
-                                  itemBuilder: (context, index) {
-                                    final row = index ~/ 4;
-                                    final col = index % 4;
-                                    final hasBlock = row < _nextPiece!.length &&
-                                        col < _nextPiece![row].length &&
-                                        _nextPiece![row][col] == 1;
-                                    return _buildBlock(hasBlock ? _nextPieceType : 0);
-                                  },
-                                ),
-                              ),
-                            
-                            const SizedBox(height: 16),
-                            
-                            // Score
-                            Column(
-                              children: [
-                                Text(
-                                  'SCORE',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '$_score',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            
-                            const SizedBox(height: 12),
-                            
-                            // Lines
-                            Column(
-                              children: [
-                                Text(
-                                  'LINES',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '$_lines',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   );
                 },
               ),
             ),
             
-            // Controls
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, size: 32),
-                    onPressed: _gameOver || _isPaused ? null : _moveLeft,
+            // Control Instructions (only show when game is paused or just started)
+            if (_isPaused || _score == 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade900.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade700, width: 1),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_downward, size: 32),
-                    onPressed: _gameOver || _isPaused ? null : _moveDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Touch Controls',
+                        style: TextStyle(
+                          color: Colors.blue.shade200,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _buildControlHint('Tap left of block', '← Move left'),
+                          _buildControlHint('Tap on block', '↻ Rotate'),
+                          _buildControlHint('Tap right of block', '→ Move right'),
+                          _buildControlHint('Tap bottom row', '⬇ Hard drop'),
+                          _buildControlHint('Swipe down', '⬇ Soft drop'),
+                        ],
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.rotate_right, size: 32),
-                    onPressed: _gameOver || _isPaused ? null : _rotate,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_forward, size: 32),
-                    onPressed: _gameOver || _isPaused ? null : _moveRight,
-                  ),
-                ],
+                ),
               ),
-            ),
           ],
         ),
       ),

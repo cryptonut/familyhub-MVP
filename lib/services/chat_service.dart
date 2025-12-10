@@ -4,6 +4,7 @@ import '../core/services/logger_service.dart';
 import '../core/errors/app_exceptions.dart';
 import '../models/chat_message.dart';
 import 'auth_service.dart';
+import 'query_cache_service.dart';
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -25,6 +26,12 @@ class ChatService {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     return 'families/$familyId/messages';
+  }
+
+  /// Invalidate chat messages cache when messages are modified
+  Future<void> _invalidateChatMessagesCache(String familyId) async {
+    final queryCache = QueryCacheService();
+    await queryCache.invalidateCache(prefix: 'chat_messages', queryId: familyId);
   }
 
   Stream<List<ChatMessage>> getMessagesStream() {
@@ -87,59 +94,123 @@ class ChatService {
     return _cachedMessagesStream!;
   }
 
-  Future<List<ChatMessage>> getMessages() async {
+  Future<List<ChatMessage>> getMessages({int limit = 50, bool forceRefresh = false}) async {
     final familyId = await _familyId;
-    if (familyId == null) return [];
-    
-    final snapshot = await _firestore
-        .collection('families/$familyId/messages')
-        .orderBy('timestamp', descending: false)
-        .get();
-    
-    // Process messages and ensure senderName is populated
-    final messages = <ChatMessage>[];
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      var messageData = {
-        'id': doc.id,
-        ...data,
-      };
-      
-      // If senderName is missing, try to get it from user document
-      if (messageData['senderName'] == null || 
-          (messageData['senderName'] as String).isEmpty) {
-        final senderId = messageData['senderId'] as String?;
-        if (senderId != null) {
+    if (familyId == null) {
+      Logger.warning('getMessages: User not part of a family', tag: 'ChatService');
+      return [];
+    }
+
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      final queryCache = QueryCacheService();
+      // QueryCacheService handles List<Map<String, dynamic>> specially and doesn't use fromJson
+      final cachedData = await queryCache.getCachedQueryResult<List<Map<String, dynamic>>>(
+        prefix: 'chat_messages',
+        queryId: familyId,
+        fromJson: (_) => <Map<String, dynamic>>[], // Not used for List<Map> type
+      );
+
+      if (cachedData != null && cachedData.isNotEmpty) {
+        // Convert cached JSON maps back to ChatMessage objects
+        final cachedMessages = cachedData.map((json) {
           try {
-            final userDoc = await _firestore.collection('users').doc(senderId).get();
-            if (userDoc.exists) {
-              final userData = userDoc.data();
-              messageData['senderName'] = userData?['displayName'] as String? ?? 
-                                           userData?['email'] as String? ?? 
-                                           'Unknown User';
-            } else {
-              messageData['senderName'] = 'Unknown User';
-            }
+            return ChatMessage.fromJson(json);
           } catch (e) {
-            Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
-            messageData['senderName'] = 'Unknown User';
+            Logger.warning('Error parsing cached message', error: e, tag: 'ChatService');
+            return null;
           }
-        } else {
-          messageData['senderName'] = 'Unknown User';
+        }).whereType<ChatMessage>().toList();
+
+        if (cachedMessages.isNotEmpty) {
+          Logger.debug('getMessages: Cache hit for family $familyId - ${cachedMessages.length} messages', tag: 'ChatService');
+          return cachedMessages;
         }
       }
-      
-      messages.add(ChatMessage.fromJson(messageData));
     }
-    return messages;
+
+    try {
+      Logger.debug('getMessages: Loading messages from Firestore for family $familyId', tag: 'ChatService');
+
+      final pageSize = limit.clamp(1, 500);
+      final snapshot = await _firestore
+          .collection('families/$familyId/messages')
+          .orderBy('timestamp', descending: false)
+          .limit(pageSize)
+          .get();
+
+      // Process messages and ensure senderName is populated
+      final messages = <ChatMessage>[];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        var messageData = {
+          'id': doc.id,
+          ...data,
+        };
+
+        // If senderName is missing, try to get it from user document
+        if (messageData['senderName'] == null ||
+            (messageData['senderName'] as String).isEmpty) {
+          final senderId = messageData['senderId'] as String?;
+          if (senderId != null) {
+            try {
+              final userDoc = await _firestore.collection('users').doc(senderId).get();
+              if (userDoc.exists) {
+                final userData = userDoc.data();
+                messageData['senderName'] = userData?['displayName'] as String? ??
+                                             userData?['email'] as String? ??
+                                             'Unknown User';
+              } else {
+                messageData['senderName'] = 'Unknown User';
+              }
+            } catch (e) {
+              Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
+              messageData['senderName'] = 'Unknown User';
+            }
+          } else {
+            messageData['senderName'] = 'Unknown User';
+          }
+        }
+
+        messages.add(ChatMessage.fromJson(messageData));
+      }
+
+      Logger.debug('getMessages: Successfully loaded ${messages.length} messages', tag: 'ChatService');
+
+      // Cache the results
+      if (!forceRefresh) {
+        final queryCache = QueryCacheService();
+        // Serialize messages to JSON maps for caching
+        final messagesJson = messages.map((message) {
+          final json = message.toJson();
+          json['id'] = message.id; // Ensure ID is included
+          return json;
+        }).toList();
+
+        await queryCache.cacheQueryResult<List<Map<String, dynamic>>>(
+          prefix: 'chat_messages',
+          queryId: familyId,
+          data: messagesJson,
+          dataType: DataType.messages,
+        );
+      }
+
+      return messages;
+    } catch (e, st) {
+      Logger.error('getMessages error', error: e, stackTrace: st, tag: 'ChatService');
+      return [];
+    }
   }
 
   Future<void> sendMessage(ChatMessage message) async {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
-    
+
     try {
       await _firestore.collection('families/$familyId/messages').add(message.toJson());
+
+      // Invalidate cache after successful send
+      await _invalidateChatMessagesCache(familyId);
     } catch (e) {
       Logger.error('sendMessage error', error: e, tag: 'ChatService');
       rethrow;
@@ -327,6 +398,64 @@ class ChatService {
           }
           return messages;
         }).asBroadcastStream();
+  }
+
+  /// Load more messages with pagination
+  Future<List<ChatMessage>> loadMoreMessages({
+    required DocumentSnapshot lastDoc,
+    int limit = 50,
+  }) async {
+    final familyId = await _familyId;
+    if (familyId == null) return [];
+
+    try {
+      final snapshot = await _firestore
+          .collection('families/$familyId/messages')
+          .orderBy('timestamp', descending: false)
+          .startAfterDocument(lastDoc)
+          .limit(limit)
+          .get();
+
+      final messages = <ChatMessage>[];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        var messageData = {
+          'id': doc.id,
+          ...data,
+        };
+
+        // If senderName is missing, try to get it from user document
+        if (messageData['senderName'] == null ||
+            (messageData['senderName'] as String).isEmpty) {
+          final senderId = messageData['senderId'] as String?;
+          if (senderId != null) {
+            try {
+              final userDoc = await _firestore.collection('users').doc(senderId).get();
+              if (userDoc.exists) {
+                final userData = userDoc.data();
+                messageData['senderName'] = userData?['displayName'] as String? ??
+                                             userData?['email'] as String? ??
+                                             'Unknown User';
+              } else {
+                messageData['senderName'] = 'Unknown User';
+              }
+            } catch (e) {
+              Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
+              messageData['senderName'] = 'Unknown User';
+            }
+          } else {
+            messageData['senderName'] = 'Unknown User';
+          }
+        }
+
+        messages.add(ChatMessage.fromJson(messageData));
+      }
+
+      return messages;
+    } catch (e) {
+      Logger.error('loadMoreMessages error', error: e, tag: 'ChatService');
+      return [];
+    }
   }
 
   /// Send a message to a hub

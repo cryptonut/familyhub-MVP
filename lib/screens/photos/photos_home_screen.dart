@@ -13,6 +13,7 @@ import 'album_photos_screen.dart';
 import 'upload_photo_dialog.dart';
 import 'create_album_dialog.dart';
 import '../../utils/app_theme.dart';
+import '../../widgets/toast_notification.dart';
 import '../../widgets/ui_components.dart';
 import '../../widgets/skeletons/skeleton_widgets.dart';
 
@@ -58,6 +59,9 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
       }
     } catch (e) {
       Logger.error('Error loading photos data', error: e, tag: 'PhotosHomeScreen');
+      if (mounted) {
+        ToastNotification.error(context, 'Error loading photos: $e');
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -78,6 +82,7 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
 
     if (result != null && mounted) {
       await _loadData();
+      ToastNotification.success(context, 'Photo uploaded successfully');
     }
   }
 
@@ -91,6 +96,7 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
 
     if (result != null && mounted) {
       await _loadData();
+      ToastNotification.success(context, 'Album created successfully');
     }
   }
 

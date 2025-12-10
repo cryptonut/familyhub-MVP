@@ -12,6 +12,7 @@ import '../models/photo_album.dart';
 import '../models/photo_comment.dart';
 import '../services/image_compression_service.dart';
 import 'auth_service.dart';
+import 'query_cache_service.dart';
 
 /// Service for managing family photos and albums
 class PhotoService {
@@ -206,12 +207,48 @@ class PhotoService {
   }
 
   /// Get all photos for a family
-  Future<List<FamilyPhoto>> getPhotos(String familyId, {String? albumId}) async {
+  Future<List<FamilyPhoto>> getPhotos(String familyId, {String? albumId, int limit = 50, bool forceRefresh = false}) async {
+    // Create cache key that includes album filter and limit
+    final cacheKey = albumId != null ? '${familyId}_album_${albumId}_$limit' : '${familyId}_$limit';
+
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      final queryCache = QueryCacheService();
+      // QueryCacheService handles List<Map<String, dynamic>> specially and doesn't use fromJson
+      final cachedData = await queryCache.getCachedQueryResult<List<Map<String, dynamic>>>(
+        prefix: 'family_photos',
+        queryId: cacheKey,
+        fromJson: (_) => <Map<String, dynamic>>[], // Not used for List<Map> type
+      );
+
+      if (cachedData != null && cachedData.isNotEmpty) {
+        // Convert cached JSON maps back to FamilyPhoto objects
+        final cachedPhotos = cachedData.map((json) {
+          try {
+            return FamilyPhoto.fromJson(json);
+          } catch (e) {
+            Logger.warning('Error parsing cached photo', error: e, tag: 'PhotoService');
+            return null;
+          }
+        }).whereType<FamilyPhoto>().toList();
+
+        if (cachedPhotos.isNotEmpty) {
+          Logger.debug('getPhotos: Cache hit for family $familyId${albumId != null ? ' album $albumId' : ''} - ${cachedPhotos.length} photos', tag: 'PhotoService');
+          return cachedPhotos;
+        }
+      }
+    }
+
     try {
+      Logger.debug('getPhotos: Loading photos from Firestore for family $familyId${albumId != null ? ' album $albumId' : ''}', tag: 'PhotoService');
+
+      final pageSize = limit.clamp(1, 500);
       Query query = _firestore
           .collection('families')
           .doc(familyId)
-          .collection('photos');
+          .collection('photos')
+          .orderBy('uploadedAt', descending: true)
+          .limit(pageSize);
 
       if (albumId != null) {
         query = query.where('albumId', isEqualTo: albumId);
@@ -224,10 +261,30 @@ class PhotoService {
                 ...(doc.data() as Map<String, dynamic>),
               }))
           .toList();
-          
+
       // Sort in memory to avoid Firestore composite index requirements
       photos.sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
-      
+
+      Logger.debug('getPhotos: Successfully loaded ${photos.length} photos', tag: 'PhotoService');
+
+      // Cache the results
+      if (!forceRefresh) {
+        final queryCache = QueryCacheService();
+        // Serialize photos to JSON maps for caching
+        final photosJson = photos.map((photo) {
+          final json = photo.toJson();
+          json['id'] = photo.id; // Ensure ID is included
+          return json;
+        }).toList();
+
+        await queryCache.cacheQueryResult<List<Map<String, dynamic>>>(
+          prefix: 'family_photos',
+          queryId: cacheKey,
+          data: photosJson,
+          dataType: DataType.photos,
+        );
+      }
+
       return photos;
     } catch (e) {
       Logger.error('Error getting photos', error: e, tag: 'PhotoService');
@@ -253,12 +310,47 @@ class PhotoService {
                 ...(doc.data() as Map<String, dynamic>),
               }))
           .toList();
-      
+
       // Sort in memory
       photos.sort((a, b) => b.uploadedAt.compareTo(a.uploadedAt));
-      
+
       return photos;
     });
+  }
+
+  /// Load more photos with pagination
+  Future<List<FamilyPhoto>> loadMorePhotos({
+    required String familyId,
+    required DocumentSnapshot lastDoc,
+    String? albumId,
+    int limit = 50,
+  }) async {
+    try {
+      Query query = _firestore
+          .collection('families')
+          .doc(familyId)
+          .collection('photos')
+          .orderBy('uploadedAt', descending: true)
+          .startAfterDocument(lastDoc)
+          .limit(limit);
+
+      if (albumId != null) {
+        query = query.where('albumId', isEqualTo: albumId);
+      }
+
+      final snapshot = await query.get();
+      final photos = snapshot.docs
+          .map((doc) => FamilyPhoto.fromJson({
+                'id': doc.id,
+                ...(doc.data() as Map<String, dynamic>),
+              }))
+          .toList();
+
+      return photos;
+    } catch (e) {
+      Logger.error('Error loading more photos', error: e, tag: 'PhotoService');
+      return [];
+    }
   }
 
   /// Get a single photo
@@ -518,6 +610,17 @@ class PhotoService {
       });
     } catch (e) {
       Logger.warning('Error recording photo view', error: e, tag: 'PhotoService');
+    }
+  }
+
+  /// Invalidate photo cache when photos are modified
+  Future<void> _invalidatePhotoCache(String familyId, {String? albumId}) async {
+    final queryCache = QueryCacheService();
+    // Invalidate all photo caches for this family
+    await queryCache.invalidateCache(prefix: 'family_photos', queryId: familyId);
+    // If album-specific, also invalidate album-specific cache
+    if (albumId != null) {
+      await queryCache.invalidateCache(prefix: 'family_photos', queryId: '${familyId}_album_$albumId');
     }
   }
 

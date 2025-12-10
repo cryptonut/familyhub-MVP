@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "C:\\Users\\Simon\\Documents\\familyhub-MVP",
+			"name": "Family Hub MVP"
+		}
+	],
+	"settings": {
+		"terminal.integrated.defaultProfile.windows": "PowerShell",
+		"files.exclude": {
+			"**/.dart_tool": true,
+			"**/build": true,
+			"**/.git": false
+		}
+	}
+}
+

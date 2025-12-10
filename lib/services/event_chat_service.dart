@@ -21,11 +21,6 @@ class EventChatService {
     if (userId == null) return false;
 
     try {
-      // Get event to check access - we'll check via Firestore directly
-
-      // Check if user is creator (we'll add createdBy field to events)
-      // For now, check if user is in invitedMemberIds
-      // TODO: Add createdBy field to CalendarEvent model
       final userModel = await _authService.getCurrentUserModel();
       if (userModel == null) return false;
 
@@ -125,6 +120,76 @@ class EventChatService {
             });
       });
     });
+  }
+
+  /// Load more event chat messages with pagination
+  Future<List<EventChatMessage>> loadMoreEventChatMessages({
+    required String eventId,
+    required DocumentSnapshot lastDoc,
+    int limit = 50,
+  }) async {
+    if (!await _hasEventAccess(eventId)) {
+      return [];
+    }
+
+    final userId = _currentUserId;
+    if (userId == null) return [];
+
+    try {
+      final userModel = await _authService.getCurrentUserModel();
+      if (userModel?.familyId == null) return [];
+
+      final familyId = userModel!.familyId!;
+
+      final snapshot = await _firestore
+          .collection('families/$familyId/events/$eventId/chats')
+          .orderBy('timestamp', descending: false)
+          .startAfterDocument(lastDoc)
+          .limit(limit)
+          .get();
+
+      final messages = <EventChatMessage>[];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        var messageData = {
+          'id': doc.id,
+          ...data,
+        };
+
+        // If senderName is missing, try to get it from user document
+        if (messageData['senderName'] == null ||
+            (messageData['senderName'] as String).isEmpty) {
+          final senderId = messageData['senderId'] as String?;
+          if (senderId != null) {
+            try {
+              final userDoc =
+                  await _firestore.collection('users').doc(senderId).get();
+              if (userDoc.exists) {
+                final userData = userDoc.data();
+                messageData['senderName'] =
+                    userData?['displayName'] as String? ??
+                        userData?['email'] as String? ??
+                        'Unknown User';
+              } else {
+                messageData['senderName'] = 'Unknown User';
+              }
+            } catch (e) {
+              Logger.warning('Error fetching sender name in loadMore', error: e, tag: 'EventChatService');
+              messageData['senderName'] = 'Unknown User';
+            }
+          } else {
+            messageData['senderName'] = 'Unknown User';
+          }
+        }
+
+        messages.add(EventChatMessage.fromJson(messageData));
+      }
+
+      return messages;
+    } catch (e) {
+      Logger.error('Error loading more event chat messages', error: e, tag: 'EventChatService');
+      return [];
+    }
   }
 
   /// Send a message to event chat
