@@ -391,8 +391,38 @@ class _UATScreenState extends State<UATScreen> {
                     // Test Cases List
                     Expanded(
                       child: _testCases.isEmpty
-                          ? const Center(
-                              child: Text('No test cases available for this round.'),
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24.0),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.checklist_outlined,
+                                      size: 64,
+                                      color: Colors.grey[400],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No test cases available for this round.',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey[600],
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Test cases will appear here once they are added by administrators.',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[500],
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             )
                           : ListView.builder(
                               padding: const EdgeInsets.all(16),

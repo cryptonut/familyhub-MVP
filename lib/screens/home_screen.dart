@@ -1460,18 +1460,20 @@ class _HomeScreenState extends State<HomeScreen> {
             children: _buildOrderedScreens(),
           ),
           bottomNavigationBar: ReorderableNavigationBar(
-            selectedIndex: appState.currentIndex,
+            selectedIndex: _navigationOrder.indexOf(appState.currentIndex), // Map screen index to nav position
             onDestinationSelected: (screenIndex) {
-              // screenIndex is the actual screen index (0-6)
+              // screenIndex is the actual screen index (0-6) from ReorderableNavigationBar
               // Find which navigation position this screen is at
               final navIndex = _navigationOrder.indexOf(screenIndex);
-              if (navIndex >= 0) {
+              if (navIndex >= 0 && navIndex < _navigationOrder.length) {
                 appState.setCurrentIndex(screenIndex);
-                _pageController.animateToPage(
-                  navIndex,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
+                if (_pageController.hasClients) {
+                  _pageController.animateToPage(
+                    navIndex,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
               }
             },
             onOrderChanged: (newOrder) {

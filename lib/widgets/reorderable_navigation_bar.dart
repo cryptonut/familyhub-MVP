@@ -178,9 +178,13 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
   }
 
   int get _selectedNavIndex {
-    if (_currentOrder.isEmpty) return widget.selectedIndex;
+    if (_currentOrder.isEmpty) {
+      // Fallback: if order not loaded yet, assume selectedIndex is already a nav position
+      return widget.selectedIndex.clamp(0, widget.destinations.length - 1);
+    }
     // Find which navigation position contains the selected screen index
-    return _currentOrder.indexOf(widget.selectedIndex);
+    final navIndex = _currentOrder.indexOf(widget.selectedIndex);
+    return navIndex >= 0 ? navIndex : 0; // Default to first if not found
   }
 
   @override
@@ -285,12 +289,10 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
                     onTap: _isReorderMode
                         ? null
                         : () {
-                            if (_currentOrder.isEmpty) {
-                              widget.onDestinationSelected(index);
-                            } else {
-                              final screenIndex = _currentOrder[index];
-                              widget.onDestinationSelected(screenIndex);
-                            }
+                            // Always pass the screen index (from _currentOrder)
+                            // If _currentOrder is empty, use index as fallback (shouldn't happen after init)
+                            final screenIndex = _currentOrder.isEmpty ? index : _currentOrder[index];
+                            widget.onDestinationSelected(screenIndex);
                           },
                     child: Container(
                       color: isTarget ? colorScheme.primaryContainer.withOpacity(0.3) : Colors.transparent,

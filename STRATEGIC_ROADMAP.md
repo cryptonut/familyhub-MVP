@@ -852,9 +852,138 @@ This roadmap is a **living document** and should be updated:
 
 ---
 
+### Phase 5: Social Feed Redesign (Q1-Q2 2026)
+**Status:** 🚧 Planned
+
+#### Overview
+Transform the chat system from SMS-style bubbles to a modern social feed experience similar to X (formerly Twitter), with support for threaded comments, rich media previews, polls, and cross-hub engagement.
+
+#### Key Features
+
+**5.1 Feed-Style UI**
+- [ ] **Timeline Layout**
+  - Replace bubble-based chat with vertical feed layout
+  - Post cards with author info, timestamp, engagement metrics
+  - Infinite scroll with pre-loading of content
+  - Pull-to-refresh functionality
+  - Smooth scrolling performance optimization
+
+- [ ] **Rich Media Previews**
+  - Automatic URL preview cards (like X link cards)
+  - Image/video previews in feed
+  - Expandable media galleries
+  - Embedded content support (YouTube, etc.)
+
+- [ ] **Post Interactions**
+  - Like/Unlike posts (heart icon)
+  - Comment threading (nested replies)
+  - Share/Repost functionality
+  - Bookmark/Save posts
+  - Engagement counters (likes, comments, shares)
+
+**5.2 Polling System**
+- [ ] **Poll Creation**
+  - Create polls with 2-4 options
+  - Set poll duration (1 hour to 7 days)
+  - Add poll description/context
+  - Attach poll to a post or create standalone poll
+
+- [ ] **Poll Participation**
+  - Vote on polls (single choice)
+  - View real-time results (percentage bars)
+  - See who voted (optional, privacy-controlled)
+  - Poll expiration handling
+
+- [ ] **Cross-Hub Polling**
+  - Option to open polls to other hubs in "My Hubs" list
+  - Multi-hub poll aggregation
+  - Hub-specific poll visibility controls
+  - Cross-hub engagement metrics
+
+**5.3 Comment Threading**
+- [ ] **Nested Comments**
+  - Reply to posts (top-level comments)
+  - Reply to comments (nested replies, 2-3 levels deep)
+  - Thread collapse/expand
+  - Comment count indicators
+
+- [ ] **Comment Interactions**
+  - Like comments
+  - Edit own comments
+  - Delete own comments (admins can delete any)
+  - Report inappropriate comments
+
+**5.4 Technical Requirements**
+- [ ] Redesign `ChatMessage` model to support:
+  - Post type (text, poll, media)
+  - Poll data structure (options, votes, expiration)
+  - Comment threading (parentId, threadId)
+  - Engagement metrics (likes, comments, shares)
+  - Cross-hub visibility flags
+
+- [ ] Create `FeedService` to replace/enhance `ChatService`:
+  - Feed querying with pagination
+  - Poll creation and voting
+  - Comment threading logic
+  - Engagement tracking
+  - Cross-hub feed aggregation
+
+- [ ] Build new `FeedScreen` component:
+  - Feed list view with post cards
+  - Post detail view with full thread
+  - Poll voting UI
+  - Comment composer
+  - Media preview components
+
+- [ ] Implement URL preview service:
+  - Fetch metadata from URLs (Open Graph, Twitter Cards)
+  - Generate preview cards
+  - Cache previews for performance
+  - Handle preview errors gracefully
+
+**5.5 Cross-Hub Integration**
+- [ ] **Hub Selection for Polls**
+  - UI to select which hubs can participate
+  - Hub list from "My Hubs" screen
+  - Default to current hub, allow expansion
+  - Visual indicators for multi-hub polls
+
+- [ ] **Multi-Hub Feed View**
+  - Option to view feed from all hubs
+  - Filter by specific hub
+  - Hub badges on posts
+  - Cross-hub engagement visibility
+
+**5.6 Migration Strategy**
+- [ ] **Backward Compatibility**
+  - Migrate existing chat messages to feed format
+  - Preserve message history
+  - Convert old bubbles to feed posts
+  - Maintain existing chat functionality during transition
+
+- [ ] **Feature Flags**
+  - Enable/disable feed UI per hub
+  - Gradual rollout to test groups
+  - A/B testing between old and new UI
+  - Rollback capability
+
+**Success Metrics:**
+- 80%+ user engagement with new feed UI
+- 60%+ poll participation rate
+- 50%+ cross-hub poll engagement
+- Average 3+ comments per post
+- 90%+ URL preview success rate
+- User satisfaction: 4.5+ stars
+
+**Estimated Timeline:**
+- **Q1 2026**: Feed UI redesign, basic polling
+- **Q2 2026**: Comment threading, cross-hub polls, URL previews
+
+---
+
 **Document Owner**: Product & Engineering Teams  
-**Last Reviewed**: December 2024  
-**Next Review**: January 2025  
+**Last Reviewed**: December 10, 2025  
+**Next Review**: January 2026  
 **Status**: Active Planning
 
 ---
