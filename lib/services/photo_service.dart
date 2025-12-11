@@ -63,13 +63,16 @@ class PhotoService {
       await uploadTask;
       final imageUrl = await ref.getDownloadURL();
 
-      // Create thumbnail (simplified - in production, generate actual thumbnail)
-      // For now, we'll use the same image as thumbnail (can be optimized later)
+      // Create thumbnail from full-size image
       String? thumbnailUrl;
       try {
+        // Read the image file and create a thumbnail
+        final imageBytes = await imageFile.readAsBytes();
+        final thumbnailBytes = await _compressionService.createThumbnail(imageBytes, size: 400);
+        
         final thumbnailRef = _storage.ref().child('thumbnails/$familyId/$photoId.jpg');
-        final thumbnailTask = thumbnailRef.putFile(
-          imageFile,
+        final thumbnailTask = thumbnailRef.putData(
+          thumbnailBytes,
           SettableMetadata(contentType: 'image/jpeg'),
         );
         await thumbnailTask;
@@ -155,12 +158,14 @@ class PhotoService {
       await uploadTask;
       final imageUrl = await ref.getDownloadURL();
 
-      // Create thumbnail (simplified - in production, generate actual thumbnail)
+      // Create thumbnail from full-size image
       String? thumbnailUrl;
       try {
+        final thumbnailBytes = await _compressionService.createThumbnail(imageBytes, size: 400);
+        
         final thumbnailRef = _storage.ref().child('thumbnails/$familyId/$photoId.jpg');
         final thumbnailTask = thumbnailRef.putData(
-          imageBytes,
+          thumbnailBytes,
           SettableMetadata(contentType: 'image/jpeg'),
         );
         await thumbnailTask;

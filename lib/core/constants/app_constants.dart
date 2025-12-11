@@ -30,6 +30,7 @@ abstract class AppConstants {
   static const String roleAdmin = 'admin';
   static const String roleBanker = 'banker';
   static const String roleApprover = 'approver';
+  static const String roleTester = 'tester';
 
   // ============================================
   // Task/Job Status

@@ -1,6 +1,6 @@
 # Family Hub - Strategic Roadmap
-**Version:** 1.0  
-**Last Updated:** December 2024  
+**Version:** 1.1  
+**Last Updated:** December 10, 2025  
 **Status:** Living Document - Updated Regularly  
 **Classification:** Strategic Planning
 
@@ -56,6 +56,176 @@ Transform Family Hub into a multi-hub platform where families can manage not jus
   - Implement hub-scoped data isolation
   - Create hub membership management
   - Design cross-hub analytics (if needed)
+
+- [ ] **Data Isolation & Environment Separation (Post-Release Refactor)**
+  - **Status:** 🚧 Planned for after next QA release
+  - **Priority:** High - Required for proper dev/qa/prod separation
+  - **Objective:** Implement `firestorePrefix` usage across all services to ensure complete data isolation between development, QA, and production environments
+  
+  **Current State:**
+  - `firestorePrefix` is defined in all flavor configs (`dev_`, `test_`, `''`)
+  - `Config.current.firestorePrefix` is available but **not currently used** in services
+  - All services use hardcoded collection paths (e.g., `'families/$familyId/messages'`)
+  - **Risk:** Dev, QA, and Prod environments share the same Firestore data
+  
+  **Implementation Plan:**
+  1. **Create Helper Method**
+     - Add `_getCollectionPath(String basePath)` helper to base service class or utility
+     - Method should prepend `Config.current.firestorePrefix` to collection paths
+     - Example: `_getCollectionPath('families')` → `'dev_families'` (in dev flavor)
+  
+  2. **Refactor All Services**
+     - Update all `FirebaseFirestore.instance.collection()` calls
+     - Services to update:
+       - `TaskService` - `'families/$familyId/tasks'` → `'${prefix}families/$familyId/tasks'`
+       - `ChatService` - `'families/$familyId/messages'` → `'${prefix}families/$familyId/messages'`
+       - `CalendarService` - `'families/$familyId/events'` → `'${prefix}families/$familyId/events'`
+       - `PhotoService` - `'families/$familyId/photos'` → `'${prefix}families/$familyId/photos'`
+       - `ShoppingService` - `'families/$familyId/shoppingLists'` → `'${prefix}families/$familyId/shoppingLists'`
+       - `GamesService` - `'families/$familyId/games'` → `'${prefix}families/$familyId/games'`
+       - `EventTemplateService` - `'families/$familyId/eventTemplates'` → `'${prefix}families/$familyId/eventTemplates'`
+       - `AuthService` - `'users'`, `'families'` → `'${prefix}users'`, `'${prefix}families'`
+       - `PrivacyService` - `'families/$familyId/privacySettings'` → `'${prefix}families/$familyId/privacySettings'`
+       - `NavigationOrderService` - `'users/$userId'` → `'${prefix}users/$userId'`
+       - `UATService` - `'uat_test_cases'`, `'uat_test_results'` → `'${prefix}uat_test_cases'`, `'${prefix}uat_test_results'`
+       - Any other services using Firestore collections
+  
+  3. **Storage Rules Path Updates**
+     - Update Firebase Storage rules to include prefixed paths
+     - Example: `match /${prefix}photos/{familyId}/{photoId}` (if prefix support needed)
+     - Note: Storage paths may need different handling (verify Firebase Storage prefix support)
+  
+  4. **Testing & Verification**
+     - Verify dev flavor creates data in `dev_families`, `dev_users`, etc.
+     - Verify qa flavor creates data in `test_families`, `test_users`, etc.
+     - Verify prod flavor uses unprefixed paths (`families`, `users`, etc.)
+     - Test data isolation: Create data in dev, verify it doesn't appear in qa/prod
+     - Test cross-environment queries don't leak data
+  
+  5. **Migration Considerations**
+     - Existing data in production will remain unprefixed
+     - Dev/QA environments will start fresh with prefixed collections
+     - No migration needed for existing prod data (uses empty prefix)
+     - Document the prefix system for future developers
+  
+  **Estimated Effort:** 2-3 hours
+  - Service refactoring: ~1.5 hours
+  - Testing & verification: ~1 hour
+  - Documentation: ~30 minutes
+  
+  **Dependencies:**
+  - Must complete after next QA release to avoid blocking testing
+  - Requires all services to be stable before refactoring
+  
+  **Success Criteria:**
+  - All Firestore collection paths use `firestorePrefix`
+  - Dev environment data isolated from QA/Prod
+  - QA environment data isolated from Dev/Prod
+  - Production environment uses unprefixed paths (backward compatible)
+  - No data leakage between environments verified
+
+- [ ] **Freemium Foundation (Post-Release Refactor)**
+  - **Status:** 🚧 Planned for after next QA release
+  - **Priority:** Medium - Required for premium hub monetization
+  - **Objective:** Implement foundation for freemium model with subscription management and premium feature flags
+  
+  **Current State:**
+  - No subscription or premium feature infrastructure
+  - All features currently available to all users
+  - No IAP integration
+  
+  **Implementation Plan (Option C - Recommended):**
+  1. **UserModel Extensions**
+     - Add subscription fields to `UserModel`:
+       - `subscriptionTier`: `'free' | 'premium' | 'family_plus' | 'family_premium'`
+       - `subscriptionStatus`: `'active' | 'expired' | 'cancelled' | 'trial'`
+       - `subscriptionExpiresAt`: `DateTime?`
+       - `premiumHubTypes`: `List<String>` (e.g., `['extended_family', 'homeschooling']`)
+       - `subscriptionPurchaseDate`: `DateTime?`
+       - `subscriptionPlatform`: `'google' | 'apple' | null`
+  
+  2. **AppConfig Extensions**
+     - Add premium feature flags to `AppConfig`:
+       - `bool get enablePremiumHubs;`
+       - `bool get enableExtendedFamilyHub;`
+       - `bool get enableHomeschoolingHub;`
+       - `bool get enableCoparentingHub;`
+     - These can be environment-specific (e.g., enable in prod, disable in dev for testing)
+  
+  3. **SubscriptionService Creation**
+     - Create new `lib/services/subscription_service.dart`
+     - Methods:
+       - `Future<bool> hasActiveSubscription()` - Check if user has active premium subscription
+       - `Future<bool> hasPremiumHubAccess(String hubType)` - Check access to specific hub type
+       - `Future<SubscriptionTier> getCurrentTier()` - Get user's current subscription tier
+       - `Future<void> verifyPurchase(String purchaseToken, String platform)` - Verify IAP purchase
+       - `Future<void> restorePurchases()` - Restore purchases (for account recovery)
+       - `Stream<SubscriptionStatus> subscriptionStatusStream()` - Real-time subscription status
+       - `Future<void> updateSubscriptionFromReceipt(String receipt)` - Update subscription from IAP receipt
+  
+  4. **IAP Integration (Google Play & App Store)**
+     - Add `in_app_purchase` package to `pubspec.yaml`
+     - Implement Google Play Billing:
+       - Product ID configuration
+       - Purchase flow
+       - Receipt validation
+     - Implement Apple App Store IAP:
+       - Product ID configuration
+       - Purchase flow
+       - Receipt validation
+     - Handle platform differences (Android vs iOS)
+  
+  5. **Premium Feature Gating**
+     - Create `PremiumFeatureGate` widget for conditional rendering
+     - Example usage:
+       ```dart
+       PremiumFeatureGate(
+         requiredHubType: 'extended_family',
+         fallback: UpgradePrompt(),
+         child: ExtendedFamilyHubScreen(),
+       )
+       ```
+     - Add checks in hub creation flows
+     - Add upgrade prompts where premium features are accessed
+  
+  6. **Subscription Management UI**
+     - Create `SubscriptionScreen` for viewing/managing subscriptions
+     - Display current tier, expiration date, features included
+     - Purchase/upgrade buttons
+     - Restore purchases button
+     - Subscription history
+  
+  7. **Backend Validation (Optional but Recommended)**
+     - Create Cloud Function to validate IAP receipts server-side
+     - Store subscription status in Firestore `users/{userId}/subscription`
+     - Periodic validation to catch subscription changes
+     - Handle subscription renewals, cancellations, refunds
+  
+  8. **Testing Strategy**
+     - Test with Google Play test accounts
+     - Test with App Store sandbox accounts
+     - Test subscription expiration handling
+     - Test restore purchases flow
+     - Test premium feature access gating
+  
+  **Estimated Effort:** 4-6 hours
+  - SubscriptionService: ~2 hours
+  - IAP integration: ~2 hours
+  - UI components: ~1 hour
+  - Testing: ~1 hour
+  
+  **Dependencies:**
+  - Must complete after next QA release
+  - Requires IAP product IDs configured in Google Play Console / App Store Connect
+  - Backend validation (optional) requires Cloud Functions setup
+  
+  **Success Criteria:**
+  - Users can purchase premium subscriptions
+  - Subscription status persists across app restarts
+  - Premium features are gated correctly
+  - Restore purchases works on both platforms
+  - Subscription expiration handled gracefully
+  - Free tier users see upgrade prompts
 
 **Deliverables:**
 - Widget framework MVP
@@ -641,7 +811,7 @@ This roadmap is a **living document** and should be updated:
 
 ### Update Log
 - **2024-12**: Initial roadmap created
-- **[Future dates]**: Add update entries as roadmap evolves
+- **2025-12-10**: Added detailed refactor plans for Data Isolation & Environment Separation (firestorePrefix implementation) and Freemium Foundation (subscription management and premium feature gating)
 
 ---
 
