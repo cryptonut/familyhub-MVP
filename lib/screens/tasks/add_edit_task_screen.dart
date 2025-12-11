@@ -333,9 +333,10 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
     }
     
     final availableTasks = _allTasks?.where((task) {
-      // Don't show current task or already selected dependencies
+      // Don't show current task, already selected dependencies, or closed tasks
       return task.id != widget.task?.id && 
-             !_dependencyTaskIds.contains(task.id);
+             !_dependencyTaskIds.contains(task.id) &&
+             !task.isCompleted; // Filter out closed/completed tasks
     }).toList() ?? [];
     
     if (availableTasks.isEmpty) {

@@ -34,7 +34,10 @@ import 'photos/photos_home_screen.dart';
 import 'shopping/shopping_home_screen.dart';
 import 'hubs/my_hubs_screen.dart';
 import 'hubs/my_friends_hub_screen.dart';
+import 'uat/uat_screen.dart';
 import '../services/task_service.dart';
+import '../services/navigation_order_service.dart';
+import '../widgets/reorderable_navigation_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -48,6 +51,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final BadgeService _badgeService = BadgeService();
   final HubService _hubService = HubService();
   final LocationService _locationService = LocationService(); // Added
+  final NavigationOrderService _navigationOrderService = NavigationOrderService();
+  late PageController _pageController;
+  List<int> _navigationOrder = [0, 1, 2, 3, 4, 5, 6]; // Default order
   
   int _waitingChessChallenges = 0;
   StreamSubscription<List<ChessGame>>? _waitingGamesSubscription;
@@ -64,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _currentUserId;
   bool _isDeveloper = false;
   bool _isAdmin = false;
+  bool _isTester = false;
   List<Hub> _availableHubs = [];
   String? _selectedHubId;
   String? _currentFamilyName;
@@ -72,11 +79,49 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    final appState = Provider.of<AppState>(context, listen: false);
+    _pageController = PageController(initialPage: appState.currentIndex);
+    
+    // Listen to appState changes to sync PageController
+    appState.addListener(_onAppStateChanged);
+    
+    _loadNavigationOrder();
     _loadWaitingGames();
     _checkUserPermissions();
     _loadBadgeCounts();
     _loadHubsAndFamily();
     _listenForLocationRequests(); // Added
+  }
+
+  Future<void> _loadNavigationOrder() async {
+    try {
+      final order = await _navigationOrderService.getNavigationOrder();
+      if (mounted) {
+        setState(() {
+          _navigationOrder = order;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading navigation order', error: e, tag: 'HomeScreen');
+    }
+  }
+
+  void _onAppStateChanged() {
+    final appState = Provider.of<AppState>(context, listen: false);
+    if (_pageController.hasClients && _pageController.page?.round() != appState.currentIndex) {
+      _pageController.jumpToPage(appState.currentIndex);
+    }
+  }
+
+  @override
+  void dispose() {
+    final appState = Provider.of<AppState>(context, listen: false);
+    appState.removeListener(_onAppStateChanged);
+    _pageController.dispose();
+    _waitingGamesSubscription?.cancel();
+    _badgeCountsSubscription?.cancel();
+    _locationRequestSubscription?.cancel();
+    super.dispose();
   }
 
   void _listenForLocationRequests() {
@@ -223,16 +268,9 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _isDeveloper = currentUser?.email == 'simoncase78@gmail.com';
         _isAdmin = userModel?.isAdmin() ?? false;
+        _isTester = userModel?.hasRole('tester') ?? false;
       });
     }
-  }
-
-  @override
-  void dispose() {
-    _waitingGamesSubscription?.cancel();
-    _badgeCountsSubscription?.cancel();
-    _locationRequestSubscription?.cancel(); // Added
-    super.dispose();
   }
 
   Future<void> _loadHubsAndFamily() async {
@@ -501,6 +539,68 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     return Icon(icon);
+  }
+
+  /// Build ordered screens based on navigation order
+  List<Widget> _buildOrderedScreens() {
+    // All screens in their default order (by screen index)
+    final allScreens = const [
+      DashboardScreen(),      // 0
+      CalendarScreen(),       // 1
+      TasksScreen(),          // 2
+      GamesHomeScreen(),      // 3
+      PhotosHomeScreen(),     // 4
+      ShoppingHomeScreen(),   // 5
+      LocationScreen(),       // 6
+    ];
+
+    // Reorder based on _navigationOrder
+    return _navigationOrder.map((screenIndex) => allScreens[screenIndex]).toList();
+  }
+
+  /// Build ordered navigation destinations based on navigation order
+  List<NavigationDestination> _buildOrderedDestinations() {
+    // All destinations in their default order (by screen index)
+    final allDestinations = [
+      const NavigationDestination(
+        icon: Icon(Icons.home_outlined),
+        selectedIcon: Icon(Icons.home),
+        label: 'Home',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.calendar_today_outlined),
+        selectedIcon: Icon(Icons.calendar_today),
+        label: 'Calendar',
+      ),
+      NavigationDestination(
+        icon: _buildJobsIcon(Icons.task_outlined),
+        selectedIcon: _buildJobsIcon(Icons.task),
+        label: 'Jobs',
+      ),
+      NavigationDestination(
+        icon: _buildGamesIcon(Icons.sports_esports_outlined),
+        selectedIcon: _buildGamesIcon(Icons.sports_esports),
+        label: 'Games',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.photo_library_outlined),
+        selectedIcon: Icon(Icons.photo_library),
+        label: 'Photos',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.shopping_bag_outlined),
+        selectedIcon: Icon(Icons.shopping_bag),
+        label: 'Shopping',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.location_on_outlined),
+        selectedIcon: Icon(Icons.location_on),
+        label: 'Location',
+      ),
+    ];
+
+    // Reorder based on _navigationOrder
+    return _navigationOrder.map((screenIndex) => allDestinations[screenIndex]).toList();
   }
 
   Future<void> _showDeveloperMenu(BuildContext context, AuthService authService) async {
@@ -1191,6 +1291,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   }
                   
+                  // UAT Testing Menu (for testers)
+                  if (_isTester) {
+                    items.add(
+                      const PopupMenuItem(
+                        value: 'uat_testing',
+                        child: Row(
+                          children: [
+                            Icon(Icons.checklist, size: 20, color: Colors.teal),
+                            SizedBox(width: 8),
+                            Text('User Acceptance Testing', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
+                            SizedBox(width: 8),
+                            Icon(Icons.chevron_right, size: 16),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  
                   items.add(
                     const PopupMenuItem(
                       value: 'force_signout',
@@ -1268,6 +1386,13 @@ class _HomeScreenState extends State<HomeScreen> {
           await _showAdminMenu(context, authService);
         } else if (value == 'developer_menu') {
           await _showDeveloperMenu(context, authService);
+        } else if (value == 'uat_testing') {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const UATScreen(),
+            ),
+          );
         } else if (value == 'force_signout') {
                         // Force sign out to clear persisted session and refresh
                         final confirm = await showDialog<bool>(
@@ -1323,60 +1448,42 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          body: IndexedStack(
-            index: appState.currentIndex,
-            children: const [
-              DashboardScreen(),
-              CalendarScreen(),
-              TasksScreen(),
-              GamesHomeScreen(),
-              PhotosHomeScreen(),
-              ShoppingHomeScreen(),
-              LocationScreen(),
-            ],
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: appState.currentIndex,
-            onDestinationSelected: (index) {
-              appState.setCurrentIndex(index);
+          body: PageView(
+            controller: _pageController,
+            onPageChanged: (navIndex) {
+              // navIndex is the navigation position, map to screen index
+              if (navIndex >= 0 && navIndex < _navigationOrder.length) {
+                final screenIndex = _navigationOrder[navIndex];
+                appState.setCurrentIndex(screenIndex);
+              }
             },
-            destinations: [
-              const NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.calendar_today_outlined),
-                selectedIcon: Icon(Icons.calendar_today),
-                label: 'Calendar',
-              ),
-              NavigationDestination(
-                icon: _buildJobsIcon(Icons.task_outlined),
-                selectedIcon: _buildJobsIcon(Icons.task),
-                label: 'Jobs',
-              ),
-              NavigationDestination(
-                icon: _buildGamesIcon(Icons.sports_esports_outlined),
-                selectedIcon: _buildGamesIcon(Icons.sports_esports),
-                label: 'Games',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.photo_library_outlined),
-                selectedIcon: Icon(Icons.photo_library),
-                label: 'Photos',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.shopping_bag_outlined),
-                selectedIcon: Icon(Icons.shopping_bag),
-                label: 'Shopping',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.location_on_outlined),
-                selectedIcon: Icon(Icons.location_on),
-                label: 'Location',
-              ),
-            ],
+            children: _buildOrderedScreens(),
+          ),
+          bottomNavigationBar: ReorderableNavigationBar(
+            selectedIndex: appState.currentIndex,
+            onDestinationSelected: (screenIndex) {
+              // screenIndex is the actual screen index (0-6)
+              // Find which navigation position this screen is at
+              final navIndex = _navigationOrder.indexOf(screenIndex);
+              if (navIndex >= 0) {
+                appState.setCurrentIndex(screenIndex);
+                _pageController.animateToPage(
+                  navIndex,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              }
+            },
+            onOrderChanged: (newOrder) {
+              // Only update if order actually changed to prevent infinite recursion
+              if (newOrder.toString() != _navigationOrder.toString()) {
+                setState(() {
+                  _navigationOrder = newOrder;
+                });
+                // PageView will rebuild with new order via _buildOrderedScreens()
+              }
+            },
+            destinations: _buildOrderedDestinations(),
           ),
         );
       },

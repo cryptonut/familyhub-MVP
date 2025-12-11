@@ -133,6 +133,8 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
                     _buildRoleInfo('Banker', 'Can create jobs with rewards (mints in-app currency)'),
                     const SizedBox(height: 8),
                     _buildRoleInfo('Approver', 'Can approve any job regardless of creator'),
+                    const SizedBox(height: 8),
+                    _buildRoleInfo('Tester', 'Can access User Acceptance Testing (UAT) features for testing new releases'),
                   ],
                 ),
               ),
@@ -290,6 +292,9 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
                 _buildRoleChip('Approver', member.isApprover(), (value) {
                   _toggleRole(member, 'approver', value);
                 }, false, _currentUser?.isAdmin() ?? false),
+                _buildRoleChip('Tester', member.hasRole('tester'), (value) {
+                  _toggleRole(member, 'tester', value);
+                }, false, _currentUser?.isAdmin() ?? false),
               ],
             ),
           ],
@@ -371,6 +376,8 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
         return Colors.blue;
       case 'approver':
         return Colors.green;
+      case 'tester':
+        return Colors.teal;
       default:
         return Colors.grey;
     }
