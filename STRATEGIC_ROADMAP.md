@@ -45,6 +45,66 @@ Transform Family Hub into a multi-hub platform where families can manage not jus
   - Feature flag system for premium hubs
   - Usage analytics for premium features
 
+- [ ] **Encrypted Chat (Premium Feature)**
+  - **Status:** 🚧 Planned for Premium Tier
+  - **Priority:** High - Privacy and security differentiator
+  - **Objective:** Provide end-to-end encrypted messaging with auto-destruct capabilities as a premium feature
+  
+  **Key Features:**
+  - [ ] **End-to-End Encryption (E2EE)**
+    - Implement Signal Protocol or similar E2EE standard
+    - Key exchange and management system
+    - Forward secrecy (keys rotate periodically)
+    - Message encryption/decryption on device
+    - Encrypted message storage in Firestore (server cannot read)
+  
+  - [ ] **Auto-Destruct Messages**
+    - User-configurable message expiration (1 hour, 1 day, 1 week, custom)
+    - Per-message or per-conversation settings
+    - Automatic deletion after expiration
+    - Visual indicators for expiring messages (countdown timer)
+    - Screenshot detection (optional, platform-dependent)
+    - Notification when message expires
+  
+  - [ ] **Security Features**
+    - Device key management (secure key storage)
+    - Key backup/recovery (optional, user-controlled)
+    - Verification codes for contact verification
+    - Security indicators (lock icons, encryption status)
+    - Audit log for security events (optional)
+  
+  - [ ] **User Experience**
+    - Seamless encryption (transparent to user)
+    - Clear indicators when chat is encrypted
+    - Settings to enable/disable encryption per hub
+    - Migration path for existing unencrypted chats
+    - Performance optimization (encryption shouldn't slow down messaging)
+  
+  - [ ] **Technical Requirements**
+    - Choose encryption library (e.g., `cryptography` package for Dart)
+    - Implement key exchange protocol
+    - Encrypt messages before sending to Firestore
+    - Decrypt messages on receipt
+    - Handle key rotation and re-encryption
+    - Implement message expiration service
+    - Background job to delete expired messages
+  
+  - [ ] **Monetization**
+    - Available to Premium tier subscribers
+    - Can be enabled per hub (family, extended family, etc.)
+    - Optional: One-time purchase for lifetime encryption access
+    - Value proposition: "Private, secure family communication"
+  
+  **Success Metrics:**
+  - 60%+ of premium users enable encrypted chat
+  - 40%+ of encrypted messages use auto-destruct
+  - Zero security incidents (no message leaks)
+  - User satisfaction: 4.5+ stars for security features
+  
+  **Estimated Timeline:**
+  - Q2 2026: E2EE implementation
+  - Q3 2026: Auto-destruct and advanced features
+
 - [ ] **Hub Type System**
   - Extend hub model to support hub types
   - Create hub type registry
