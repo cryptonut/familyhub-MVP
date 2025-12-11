@@ -69,6 +69,7 @@ Family Hub is a comprehensive Flutter-based family management application target
 2. **No subscription/IAP infrastructure** - Required for premium hubs
 3. **Limited test coverage** - Risk for regression bugs
 4. **Hub model lacks type system** - Cannot differentiate hub types
+5. **No message encryption** - Privacy concern for sensitive communications (solution: Encrypted Chat premium feature)
 
 ---
 
@@ -261,6 +262,7 @@ abstract class BaseFirestoreService {
 | Firestore prefix not implemented | HIGH - Data leakage between envs | 2-3 hrs | P0 |
 | No subscription infrastructure | HIGH - Blocks monetization | 4-6 hrs | P0 |
 | Hub type system missing | HIGH - Blocks premium hubs | 3-4 hrs | P0 |
+| No message encryption | HIGH - Privacy/security concern | 16-24 hrs | P1 |
 | Limited test coverage | MEDIUM - Regression risk | 20+ hrs | P1 |
 | Service layer DI | MEDIUM - Maintenance | 4-5 hrs | P1 |
 | Large file refactoring | LOW - Readability | 8-10 hrs | P2 |
@@ -349,7 +351,7 @@ enum HubType {
 ### 5.3 Data Protection
 ⚠️ **Areas for Improvement:**
 1. Sensitive data (location) should have privacy controls ✅ (PrivacyService exists)
-2. Message encryption not implemented (end-to-end)
+2. Message encryption not implemented (end-to-end) → **Solution: Encrypted Chat (Premium Feature) planned for Phase 1**
 3. Photo URLs are public Firebase Storage links
 
 ### 5.4 API Key Security
@@ -758,6 +760,914 @@ class FamilyHubWidgetProvider : HomeWidgetProvider() {
 ```
 
 **Estimated Effort:** 6-8 hours (full widget implementation)
+
+#### 7.1.5 Encrypted Chat (Premium Feature) (Priority: P1)
+
+**Overview:**
+End-to-end encrypted (E2EE) messaging as a premium feature for users who require enhanced privacy. Messages are encrypted on the sender's device and can only be decrypted by intended recipients, ensuring that even Family Hub servers cannot read message contents.
+
+**Task 5.1: Add Encryption Dependencies**
+```yaml
+# pubspec.yaml additions
+dependencies:
+  cryptography: ^2.7.0          # Cross-platform cryptography
+  pointycastle: ^3.7.4          # Dart crypto implementations
+  flutter_secure_storage: ^9.0.0 # Secure key storage
+  # Alternative: Use libsodium bindings for better performance
+  # sodium_libs: ^2.2.0
+```
+
+**Task 5.2: Create Encryption Key Models**
+```dart
+// lib/models/encryption/encryption_key.dart
+import 'dart:typed_data';
+
+/// Represents a user's encryption key pair
+class EncryptionKeyPair {
+  final String odId;
+  final String oderId;
+  final Uint8List publicKey;
+  final Uint8List privateKey;  // Stored only locally, never sent to server
+  final DateTime createdAt;
+  final int keyVersion;
+  
+  EncryptionKeyPair({
+    required this.userId,
+    required this.publicKey,
+    required this.privateKey,
+    required this.createdAt,
+    this.keyVersion = 1,
+  });
+  
+  /// Export public key for sharing (Base64 encoded)
+  String get publicKeyBase64 => base64Encode(publicKey);
+  
+  /// Create from stored data
+  factory EncryptionKeyPair.fromSecureStorage(Map<String, dynamic> data) { ... }
+  
+  /// Serialize for secure storage (private key encrypted with device key)
+  Map<String, dynamic> toSecureStorage() { ... }
+}
+
+/// Public key stored in Firestore for other users to encrypt messages
+class PublicKeyRecord {
+  final String odId;
+  final String oderId;
+  final String publicKeyBase64;
+  final int keyVersion;
+  final DateTime uploadedAt;
+  final String? deviceId;  // Optional: support multiple devices
+  
+  PublicKeyRecord({...});
+  
+  Map<String, dynamic> toJson() => { ... };
+  factory PublicKeyRecord.fromJson(Map<String, dynamic> json) => ...;
+}
+```
+
+**Task 5.3: Create Encrypted Message Model**
+```dart
+// lib/models/encryption/encrypted_message.dart
+class EncryptedChatMessage {
+  final String id;
+  final String senderId;
+  final String senderName;
+  final String recipientId;  // For private chats
+  final String? hubId;       // For hub/group chats
+  
+  // Encrypted content fields
+  final String encryptedContent;     // Base64-encoded encrypted message
+  final String encryptedContentIv;   // Initialization vector for AES
+  final String encryptedSymmetricKey; // Symmetric key encrypted with recipient's public key
+  
+  // Metadata (not encrypted - needed for routing/display)
+  final DateTime timestamp;
+  final String messageType;  // 'text', 'image', 'voice', etc.
+  final bool isEncrypted;    // Flag to distinguish from legacy messages
+  final int encryptionVersion;
+  
+  // For group chats: map of recipientId -> encrypted symmetric key
+  final Map<String, String>? groupEncryptedKeys;
+  
+  EncryptedChatMessage({...});
+  
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'senderId': senderId,
+    'senderName': senderName,
+    'recipientId': recipientId,
+    'hubId': hubId,
+    'encryptedContent': encryptedContent,
+    'encryptedContentIv': encryptedContentIv,
+    'encryptedSymmetricKey': encryptedSymmetricKey,
+    'timestamp': timestamp.toIso8601String(),
+    'messageType': messageType,
+    'isEncrypted': true,
+    'encryptionVersion': encryptionVersion,
+    'groupEncryptedKeys': groupEncryptedKeys,
+  };
+  
+  factory EncryptedChatMessage.fromJson(Map<String, dynamic> json) => ...;
+}
+```
+
+**Task 5.4: Create Encryption Service**
+```dart
+// lib/services/encryption_service.dart
+import 'package:cryptography/cryptography.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+class EncryptionService {
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
+  // Algorithms
+  final _keyExchangeAlgorithm = X25519();  // For key exchange
+  final _encryptionAlgorithm = AesGcm.with256bits();  // For message encryption
+  
+  EncryptionKeyPair? _cachedKeyPair;
+  final Map<String, SimplePublicKey> _publicKeyCache = {};
+  
+  /// Initialize encryption for current user
+  /// Generates key pair if not exists, loads from secure storage if exists
+  Future<void> initialize() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+    
+    // Try to load existing key pair from secure storage
+    final storedKeyPair = await _loadKeyPairFromStorage(userId);
+    
+    if (storedKeyPair != null) {
+      _cachedKeyPair = storedKeyPair;
+      Logger.info('Loaded existing encryption key pair', tag: 'EncryptionService');
+    } else {
+      // Generate new key pair
+      await generateAndStoreKeyPair(userId);
+    }
+    
+    // Upload public key to Firestore (if not already there or if key version changed)
+    await _syncPublicKeyToFirestore(userId);
+  }
+  
+  /// Generate new key pair and store securely
+  Future<EncryptionKeyPair> generateAndStoreKeyPair(String userId) async {
+    Logger.info('Generating new encryption key pair', tag: 'EncryptionService');
+    
+    // Generate X25519 key pair
+    final keyPair = await _keyExchangeAlgorithm.newKeyPair();
+    final publicKey = await keyPair.extractPublicKey();
+    final privateKeyBytes = await keyPair.extractPrivateKeyBytes();
+    
+    final encryptionKeyPair = EncryptionKeyPair(
+      userId: userId,
+      publicKey: Uint8List.fromList(publicKey.bytes),
+      privateKey: Uint8List.fromList(privateKeyBytes),
+      createdAt: DateTime.now(),
+      keyVersion: 1,
+    );
+    
+    // Store in secure storage
+    await _secureStorage.write(
+      key: 'encryption_key_$userId',
+      value: jsonEncode(encryptionKeyPair.toSecureStorage()),
+    );
+    
+    _cachedKeyPair = encryptionKeyPair;
+    return encryptionKeyPair;
+  }
+  
+  /// Encrypt a message for a single recipient (private chat)
+  Future<EncryptedChatMessage> encryptMessage({
+    required String plaintext,
+    required String recipientId,
+    required String senderId,
+    required String senderName,
+    String messageType = 'text',
+  }) async {
+    // Get recipient's public key
+    final recipientPublicKey = await _getPublicKey(recipientId);
+    if (recipientPublicKey == null) {
+      throw EncryptionException('Recipient public key not found');
+    }
+    
+    // Generate random symmetric key for this message
+    final symmetricKey = await _encryptionAlgorithm.newSecretKey();
+    final symmetricKeyBytes = await symmetricKey.extractBytes();
+    
+    // Encrypt message content with symmetric key
+    final secretBox = await _encryptionAlgorithm.encrypt(
+      utf8.encode(plaintext),
+      secretKey: symmetricKey,
+    );
+    
+    // Encrypt symmetric key with recipient's public key (ECDH + HKDF)
+    final sharedSecret = await _deriveSharedSecret(recipientPublicKey);
+    final encryptedSymmetricKey = await _encryptWithSharedSecret(
+      symmetricKeyBytes,
+      sharedSecret,
+    );
+    
+    return EncryptedChatMessage(
+      id: const Uuid().v4(),
+      senderId: senderId,
+      senderName: senderName,
+      recipientId: recipientId,
+      encryptedContent: base64Encode(secretBox.cipherText),
+      encryptedContentIv: base64Encode(secretBox.nonce),
+      encryptedSymmetricKey: base64Encode(encryptedSymmetricKey),
+      timestamp: DateTime.now(),
+      messageType: messageType,
+      isEncrypted: true,
+      encryptionVersion: 1,
+    );
+  }
+  
+  /// Encrypt a message for multiple recipients (group/hub chat)
+  Future<EncryptedChatMessage> encryptGroupMessage({
+    required String plaintext,
+    required List<String> recipientIds,
+    required String hubId,
+    required String senderId,
+    required String senderName,
+    String messageType = 'text',
+  }) async {
+    // Generate random symmetric key for this message
+    final symmetricKey = await _encryptionAlgorithm.newSecretKey();
+    final symmetricKeyBytes = await symmetricKey.extractBytes();
+    
+    // Encrypt message content with symmetric key
+    final secretBox = await _encryptionAlgorithm.encrypt(
+      utf8.encode(plaintext),
+      secretKey: symmetricKey,
+    );
+    
+    // Encrypt symmetric key for each recipient
+    final groupEncryptedKeys = <String, String>{};
+    for (final recipientId in recipientIds) {
+      final recipientPublicKey = await _getPublicKey(recipientId);
+      if (recipientPublicKey != null) {
+        final sharedSecret = await _deriveSharedSecret(recipientPublicKey);
+        final encryptedSymmetricKey = await _encryptWithSharedSecret(
+          symmetricKeyBytes,
+          sharedSecret,
+        );
+        groupEncryptedKeys[recipientId] = base64Encode(encryptedSymmetricKey);
+      }
+    }
+    
+    return EncryptedChatMessage(
+      id: const Uuid().v4(),
+      senderId: senderId,
+      senderName: senderName,
+      recipientId: '',
+      hubId: hubId,
+      encryptedContent: base64Encode(secretBox.cipherText),
+      encryptedContentIv: base64Encode(secretBox.nonce),
+      encryptedSymmetricKey: '',  // Not used for group messages
+      groupEncryptedKeys: groupEncryptedKeys,
+      timestamp: DateTime.now(),
+      messageType: messageType,
+      isEncrypted: true,
+      encryptionVersion: 1,
+    );
+  }
+  
+  /// Decrypt a message received from another user
+  Future<String> decryptMessage(EncryptedChatMessage message) async {
+    if (_cachedKeyPair == null) {
+      throw EncryptionException('Encryption not initialized');
+    }
+    
+    // Get the encrypted symmetric key for current user
+    String encryptedSymmetricKeyBase64;
+    if (message.groupEncryptedKeys != null) {
+      // Group message
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      encryptedSymmetricKeyBase64 = message.groupEncryptedKeys![userId] ?? '';
+      if (encryptedSymmetricKeyBase64.isEmpty) {
+        throw EncryptionException('Message not encrypted for current user');
+      }
+    } else {
+      // Private message
+      encryptedSymmetricKeyBase64 = message.encryptedSymmetricKey;
+    }
+    
+    // Get sender's public key to derive shared secret
+    final senderPublicKey = await _getPublicKey(message.senderId);
+    if (senderPublicKey == null) {
+      throw EncryptionException('Sender public key not found');
+    }
+    
+    // Derive shared secret and decrypt symmetric key
+    final sharedSecret = await _deriveSharedSecret(senderPublicKey);
+    final symmetricKeyBytes = await _decryptWithSharedSecret(
+      base64Decode(encryptedSymmetricKeyBase64),
+      sharedSecret,
+    );
+    
+    // Decrypt message content with symmetric key
+    final symmetricKey = SecretKey(symmetricKeyBytes);
+    final secretBox = SecretBox(
+      base64Decode(message.encryptedContent),
+      nonce: base64Decode(message.encryptedContentIv),
+      mac: Mac.empty,  // GCM includes MAC in ciphertext
+    );
+    
+    final plaintextBytes = await _encryptionAlgorithm.decrypt(
+      secretBox,
+      secretKey: symmetricKey,
+    );
+    
+    return utf8.decode(plaintextBytes);
+  }
+  
+  /// Get public key for a user (from cache or Firestore)
+  Future<SimplePublicKey?> _getPublicKey(String odId) async {
+    // Check cache first
+    if (_publicKeyCache.containsKey(userId)) {
+      return _publicKeyCache[userId];
+    }
+    
+    // Fetch from Firestore
+    try {
+      final doc = await _firestore
+          .collection('${Config.current.firestorePrefix}publicKeys')
+          .doc(userId)
+          .get();
+      
+      if (!doc.exists) return null;
+      
+      final record = PublicKeyRecord.fromJson(doc.data()!);
+      final publicKey = SimplePublicKey(
+        base64Decode(record.publicKeyBase64),
+        type: KeyPairType.x25519,
+      );
+      
+      _publicKeyCache[userId] = publicKey;
+      return publicKey;
+    } catch (e) {
+      Logger.error('Error fetching public key', error: e, tag: 'EncryptionService');
+      return null;
+    }
+  }
+  
+  /// Derive shared secret using ECDH
+  Future<SecretKey> _deriveSharedSecret(SimplePublicKey otherPublicKey) async {
+    if (_cachedKeyPair == null) {
+      throw EncryptionException('Encryption not initialized');
+    }
+    
+    final privateKey = SimpleKeyPairData(
+      _cachedKeyPair!.privateKey,
+      publicKey: SimplePublicKey(
+        _cachedKeyPair!.publicKey,
+        type: KeyPairType.x25519,
+      ),
+      type: KeyPairType.x25519,
+    );
+    
+    return await _keyExchangeAlgorithm.sharedSecretKey(
+      keyPair: privateKey,
+      remotePublicKey: otherPublicKey,
+    );
+  }
+  
+  /// Sync public key to Firestore
+  Future<void> _syncPublicKeyToFirestore(String userId) async {
+    if (_cachedKeyPair == null) return;
+    
+    final record = PublicKeyRecord(
+      userId: userId,
+      publicKeyBase64: _cachedKeyPair!.publicKeyBase64,
+      keyVersion: _cachedKeyPair!.keyVersion,
+      uploadedAt: DateTime.now(),
+    );
+    
+    await _firestore
+        .collection('${Config.current.firestorePrefix}publicKeys')
+        .doc(userId)
+        .set(record.toJson());
+    
+    Logger.info('Public key synced to Firestore', tag: 'EncryptionService');
+  }
+  
+  /// Export recovery key (for backup)
+  Future<String> exportRecoveryKey() async {
+    if (_cachedKeyPair == null) {
+      throw EncryptionException('Encryption not initialized');
+    }
+    
+    // Create encrypted backup of private key
+    // User should store this securely (e.g., write down, password manager)
+    final recoveryData = {
+      'privateKey': base64Encode(_cachedKeyPair!.privateKey),
+      'publicKey': base64Encode(_cachedKeyPair!.publicKey),
+      'keyVersion': _cachedKeyPair!.keyVersion,
+      'exportedAt': DateTime.now().toIso8601String(),
+    };
+    
+    // Encode as base64 for easy copying
+    return base64Encode(utf8.encode(jsonEncode(recoveryData)));
+  }
+  
+  /// Import recovery key (for account recovery)
+  Future<void> importRecoveryKey(String recoveryKeyBase64, String userId) async {
+    try {
+      final recoveryData = jsonDecode(
+        utf8.decode(base64Decode(recoveryKeyBase64)),
+      ) as Map<String, dynamic>;
+      
+      final keyPair = EncryptionKeyPair(
+        userId: userId,
+        privateKey: base64Decode(recoveryData['privateKey']),
+        publicKey: base64Decode(recoveryData['publicKey']),
+        createdAt: DateTime.now(),
+        keyVersion: recoveryData['keyVersion'] ?? 1,
+      );
+      
+      // Store in secure storage
+      await _secureStorage.write(
+        key: 'encryption_key_$userId',
+        value: jsonEncode(keyPair.toSecureStorage()),
+      );
+      
+      _cachedKeyPair = keyPair;
+      
+      // Sync public key to Firestore
+      await _syncPublicKeyToFirestore(userId);
+      
+      Logger.info('Recovery key imported successfully', tag: 'EncryptionService');
+    } catch (e) {
+      Logger.error('Error importing recovery key', error: e, tag: 'EncryptionService');
+      throw EncryptionException('Invalid recovery key format');
+    }
+  }
+  
+  /// Check if user has encryption enabled
+  Future<bool> isEncryptionEnabled() async {
+    return _cachedKeyPair != null;
+  }
+  
+  /// Clear encryption keys (for logout/account deletion)
+  Future<void> clearKeys() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId != null) {
+      await _secureStorage.delete(key: 'encryption_key_$userId');
+    }
+    _cachedKeyPair = null;
+    _publicKeyCache.clear();
+  }
+}
+
+/// Custom exception for encryption errors
+class EncryptionException implements Exception {
+  final String message;
+  EncryptionException(this.message);
+  
+  @override
+  String toString() => 'EncryptionException: $message';
+}
+```
+
+**Task 5.5: Create Encrypted Chat Service**
+```dart
+// lib/services/encrypted_chat_service.dart
+class EncryptedChatService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final EncryptionService _encryptionService = EncryptionService();
+  final AuthService _authService = AuthService();
+  
+  /// Send an encrypted private message
+  Future<void> sendEncryptedPrivateMessage({
+    required String recipientId,
+    required String content,
+    String messageType = 'text',
+  }) async {
+    final currentUser = await _authService.getCurrentUserModel();
+    if (currentUser == null) throw AuthException('Not authenticated');
+    
+    // Encrypt message
+    final encryptedMessage = await _encryptionService.encryptMessage(
+      plaintext: content,
+      recipientId: recipientId,
+      senderId: currentUser.uid,
+      senderName: currentUser.displayName,
+      messageType: messageType,
+    );
+    
+    // Store in Firestore
+    final chatId = _getChatId(currentUser.uid, recipientId);
+    final familyId = currentUser.familyId;
+    
+    await _firestore
+        .collection('${Config.current.firestorePrefix}families/$familyId/encryptedMessages')
+        .doc(chatId)
+        .collection('messages')
+        .add(encryptedMessage.toJson());
+  }
+  
+  /// Send an encrypted hub/group message
+  Future<void> sendEncryptedHubMessage({
+    required String hubId,
+    required String content,
+    String messageType = 'text',
+  }) async {
+    final currentUser = await _authService.getCurrentUserModel();
+    if (currentUser == null) throw AuthException('Not authenticated');
+    
+    // Get hub members
+    final hubDoc = await _firestore
+        .collection('${Config.current.firestorePrefix}hubs')
+        .doc(hubId)
+        .get();
+    
+    if (!hubDoc.exists) throw FirestoreException('Hub not found');
+    
+    final memberIds = List<String>.from(hubDoc.data()?['memberIds'] ?? []);
+    
+    // Encrypt message for all members
+    final encryptedMessage = await _encryptionService.encryptGroupMessage(
+      plaintext: content,
+      recipientIds: memberIds,
+      hubId: hubId,
+      senderId: currentUser.uid,
+      senderName: currentUser.displayName,
+      messageType: messageType,
+    );
+    
+    // Store in Firestore
+    await _firestore
+        .collection('${Config.current.firestorePrefix}hubs/$hubId/encryptedMessages')
+        .add(encryptedMessage.toJson());
+  }
+  
+  /// Stream decrypted private messages
+  Stream<List<ChatMessage>> getDecryptedPrivateMessagesStream(String otherUserId) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return Stream.value([]);
+    
+    return Stream.fromFuture(_authService.getCurrentUserModel()).asyncExpand((userModel) {
+      if (userModel?.familyId == null) return Stream.value([]);
+      
+      final chatId = _getChatId(currentUserId, otherUserId);
+      final familyId = userModel!.familyId!;
+      
+      return _firestore
+          .collection('${Config.current.firestorePrefix}families/$familyId/encryptedMessages')
+          .doc(chatId)
+          .collection('messages')
+          .orderBy('timestamp', descending: false)
+          .snapshots()
+          .asyncMap((snapshot) async {
+            final messages = <ChatMessage>[];
+            
+            for (var doc in snapshot.docs) {
+              try {
+                final encryptedMessage = EncryptedChatMessage.fromJson({
+                  'id': doc.id,
+                  ...doc.data(),
+                });
+                
+                // Decrypt message
+                final plaintext = await _encryptionService.decryptMessage(encryptedMessage);
+                
+                // Convert to regular ChatMessage for UI
+                messages.add(ChatMessage(
+                  id: encryptedMessage.id,
+                  senderId: encryptedMessage.senderId,
+                  senderName: encryptedMessage.senderName,
+                  content: plaintext,
+                  timestamp: encryptedMessage.timestamp,
+                  type: encryptedMessage.messageType,
+                  isEncrypted: true,
+                ));
+              } catch (e) {
+                Logger.warning('Failed to decrypt message', error: e, tag: 'EncryptedChatService');
+                // Add placeholder for failed decryption
+                messages.add(ChatMessage(
+                  id: doc.id,
+                  senderId: doc.data()['senderId'] ?? '',
+                  senderName: doc.data()['senderName'] ?? 'Unknown',
+                  content: '[Unable to decrypt message]',
+                  timestamp: DateTime.tryParse(doc.data()['timestamp'] ?? '') ?? DateTime.now(),
+                  type: 'text',
+                  isEncrypted: true,
+                ));
+              }
+            }
+            
+            return messages;
+          });
+    });
+  }
+  
+  String _getChatId(String odId1, String odId2) {
+    final sorted = [userId1, userId2]..sort();
+    return '${sorted[0]}_${sorted[1]}';
+  }
+}
+```
+
+**Task 5.6: Create Encrypted Chat UI Components**
+```dart
+// lib/widgets/encrypted_chat_indicator.dart
+class EncryptedChatIndicator extends StatelessWidget {
+  final bool isEncrypted;
+  
+  const EncryptedChatIndicator({required this.isEncrypted, super.key});
+  
+  @override
+  Widget build(BuildContext context) {
+    if (!isEncrypted) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock, size: 14, color: Colors.green[700]),
+          const SizedBox(width: 4),
+          Text(
+            'End-to-end encrypted',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.green[700],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// lib/widgets/encryption_setup_dialog.dart
+class EncryptionSetupDialog extends StatefulWidget {
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.enhanced_encryption, color: Colors.green),
+          const SizedBox(width: 8),
+          const Text('Enable Encrypted Chat'),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'End-to-end encryption ensures only you and your recipients can read your messages.',
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            '⚠️ Important:',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text('• Save your recovery key securely'),
+          const Text('• Lost keys cannot be recovered'),
+          const Text('• Encrypted messages cannot be read on new devices without recovery key'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Later'),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => _enableEncryption(context),
+          icon: const Icon(Icons.lock),
+          label: const Text('Enable Encryption'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+**Task 5.7: Premium Feature Gating for Encrypted Chat**
+```dart
+// Integration with SubscriptionService
+class EncryptedChatFeatureGate extends StatelessWidget {
+  final Widget child;
+  final Widget? fallback;
+  
+  const EncryptedChatFeatureGate({
+    required this.child,
+    this.fallback,
+    super.key,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: _checkEncryptedChatAccess(),
+      builder: (context, snapshot) {
+        if (snapshot.data == true) {
+          return child;
+        }
+        return fallback ?? const EncryptedChatUpgradePrompt();
+      },
+    );
+  }
+  
+  Future<bool> _checkEncryptedChatAccess() async {
+    final subscriptionService = SubscriptionService();
+    final userModel = await AuthService().getCurrentUserModel();
+    
+    // Encrypted chat available for:
+    // 1. Premium subscribers
+    // 2. Family Plus/Premium tier
+    // 3. Users with 'encrypted_chat' feature flag
+    return subscriptionService.hasActiveSubscription() ||
+           (userModel?.premiumHubTypes.contains('encrypted_chat') ?? false);
+  }
+}
+
+class EncryptedChatUpgradePrompt extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.enhanced_encryption, size: 48, color: Colors.amber),
+            const SizedBox(height: 16),
+            const Text(
+              'Encrypted Chat',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Upgrade to Premium to enable end-to-end encrypted messaging for maximum privacy.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => Navigator.pushNamed(context, '/subscription'),
+              child: const Text('Upgrade to Premium'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+**Task 5.8: Update ChatMessage Model for Encryption Support**
+```dart
+// lib/models/chat_message.dart - Add encryption fields
+class ChatMessage {
+  // ... existing fields ...
+  
+  // NEW: Encryption indicator
+  final bool isEncrypted;
+  
+  ChatMessage({
+    // ... existing parameters ...
+    this.isEncrypted = false,
+  });
+  
+  Map<String, dynamic> toJson() => {
+    // ... existing fields ...
+    'isEncrypted': isEncrypted,
+  };
+  
+  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
+    // ... existing parsing ...
+    isEncrypted: json['isEncrypted'] as bool? ?? false,
+  );
+}
+```
+
+**Task 5.9: Firestore Security Rules for Encrypted Messages**
+```javascript
+// firestore.rules additions
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public keys - readable by authenticated users, writable only by owner
+    match /{prefix}publicKeys/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Encrypted messages - same rules as regular messages
+    match /{prefix}families/{familyId}/encryptedMessages/{chatId}/messages/{messageId} {
+      allow read: if request.auth != null && 
+                    exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.familyId == familyId;
+      allow create: if request.auth != null && 
+                      request.auth.uid == request.resource.data.senderId;
+      allow update, delete: if false;  // Messages are immutable
+    }
+    
+    // Hub encrypted messages
+    match /{prefix}hubs/{hubId}/encryptedMessages/{messageId} {
+      allow read: if request.auth != null &&
+                    request.auth.uid in get(/databases/$(database)/documents/hubs/$(hubId)).data.memberIds;
+      allow create: if request.auth != null &&
+                      request.auth.uid in get(/databases/$(database)/documents/hubs/$(hubId)).data.memberIds &&
+                      request.auth.uid == request.resource.data.senderId;
+      allow update, delete: if false;  // Messages are immutable
+    }
+  }
+}
+```
+
+**Task 5.10: Key Recovery UI**
+```dart
+// lib/screens/settings/encryption_settings_screen.dart
+class EncryptionSettingsScreen extends StatefulWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Encryption Settings')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Encryption status
+          _buildEncryptionStatusCard(),
+          const SizedBox(height: 16),
+          
+          // Export recovery key
+          ListTile(
+            leading: const Icon(Icons.key),
+            title: const Text('Export Recovery Key'),
+            subtitle: const Text('Save your key to recover messages on new devices'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _exportRecoveryKey,
+          ),
+          
+          // Import recovery key
+          ListTile(
+            leading: const Icon(Icons.restore),
+            title: const Text('Import Recovery Key'),
+            subtitle: const Text('Restore your encryption keys'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _importRecoveryKey,
+          ),
+          
+          const Divider(),
+          
+          // Regenerate keys (danger)
+          ListTile(
+            leading: Icon(Icons.warning, color: Colors.red),
+            title: Text('Regenerate Keys', style: TextStyle(color: Colors.red)),
+            subtitle: const Text('Warning: You will lose access to old messages'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _regenerateKeys,
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+**Estimated Effort:** 16-24 hours
+- Encryption service implementation: ~8 hours
+- Encrypted chat service: ~4 hours
+- UI components: ~4 hours
+- Key management & recovery: ~4 hours
+- Testing & security review: ~4 hours
+
+**Security Considerations:**
+1. Private keys NEVER leave the device
+2. Use secure storage for key persistence
+3. Implement proper key rotation mechanism
+4. Add device verification for multi-device support
+5. Consider Signal Protocol for advanced forward secrecy
+6. Regular security audits recommended
+
+**Dependencies:**
+- Requires Subscription Infrastructure (7.1.2) for premium gating
+- Requires Firestore Prefix (7.1.1) for proper collection paths
+- Flutter Secure Storage for key persistence
+- Cryptography package for encryption primitives
+
+**Success Criteria:**
+- Messages encrypted before leaving device
+- Only intended recipients can decrypt
+- Key recovery works across devices
+- No plaintext messages stored in Firestore
+- Premium feature gating works correctly
+- Backward compatible with unencrypted messages
 
 ### 7.2 Phase 2: Extended Family Hubs (Q2 2025)
 
@@ -1173,7 +2083,8 @@ class UrlPreviewService {
 │                  │ ├─ Week 3-4: Subscription Service & IAP                 │
 │                  │ ├─ Week 5-6: Hub Type System                            │
 │                  │ ├─ Week 7-8: Widget Framework Setup                     │
-│                  │ └─ Week 9-12: Testing & Refinement                      │
+│                  │ ├─ Week 9-11: Encrypted Chat (Premium Feature)          │
+│                  │ └─ Week 12: Testing & Refinement                        │
 ├──────────────────┼──────────────────────────────────────────────────────────┤
 │ Q2 2025 (Apr-Jun)│ Phase 2: Extended Family Hubs                           │
 │                  │ ├─ Week 1-3: Family Tree Implementation                 │
@@ -1213,13 +2124,14 @@ class UrlPreviewService {
 | 1 | Subscription System | 6 | 1 dev | 1 day |
 | 1 | Hub Type System | 4 | 1 dev | 0.5 days |
 | 1 | Widget Framework | 8 | 1 dev | 1 day |
+| 1 | **Encrypted Chat** | **20** | **1 dev** | **2.5 days** |
 | 1 | Testing | 20 | 1 dev | 2.5 days |
 | 2 | Extended Family | 60 | 2 devs | 3 weeks |
 | 3 | Homeschooling | 80 | 2 devs | 4 weeks |
 | 4 | Co-Parenting | 80 | 2 devs | 4 weeks |
 | 5 | Social Feed | 100 | 2 devs | 5 weeks |
 
-**Total Estimated Effort:** ~360 developer hours
+**Total Estimated Effort:** ~380 developer hours
 
 ---
 
@@ -1234,6 +2146,8 @@ class UrlPreviewService {
 | Firestore query limits | Medium | Medium | Implement proper pagination |
 | Data migration issues | Low | High | Thorough testing, rollback plan |
 | Performance degradation | Medium | Medium | Load testing, caching |
+| **Encryption key loss** | **Medium** | **High** | **Recovery key export, multi-device sync** |
+| **Crypto library vulnerabilities** | **Low** | **Critical** | **Use audited libraries, regular updates** |
 
 ### 9.2 Business Risks
 
@@ -1250,7 +2164,7 @@ class UrlPreviewService {
 |------|-------------|--------|------------|
 | Server costs increase | Medium | Medium | Monitor usage, optimize queries |
 | Support volume increase | High | Medium | FAQ, in-app help, chatbot |
-| Security breach | Low | Critical | Regular audits, encryption |
+| Security breach | Low | Critical | Regular audits, E2E encryption (Encrypted Chat feature) |
 
 ---
 
@@ -1269,6 +2183,7 @@ class UrlPreviewService {
 2. **Add comprehensive unit tests** (target 60% coverage)
 3. **Implement IAP integration**
 4. **Create widget framework prototype**
+5. **Implement Encrypted Chat** - Premium feature for privacy-conscious users
 
 ### 10.3 Medium-Term (Q2-Q3 2025)
 
@@ -1335,6 +2250,16 @@ lib/services/hub_type_registry.dart
 lib/widgets/premium_feature_gate.dart
 lib/widgets/upgrade_prompt_widget.dart
 lib/services/widget_service.dart
+
+# Encrypted Chat (Premium Feature)
+lib/models/encryption/encryption_key.dart
+lib/models/encryption/encrypted_message.dart
+lib/services/encryption_service.dart
+lib/services/encrypted_chat_service.dart
+lib/widgets/encrypted_chat_indicator.dart
+lib/widgets/encryption_setup_dialog.dart
+lib/widgets/encrypted_chat_feature_gate.dart
+lib/screens/settings/encryption_settings_screen.dart
 ```
 
 ---
