@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/services/logger_service.dart';
 import '../core/errors/app_exceptions.dart';
-import '../models/chat_message.dart';
+import '../utils/firestore_path.dart';
 import 'auth_service.dart';
 import 'query_cache_service.dart';
 
@@ -25,7 +25,7 @@ class ChatService {
   Future<String> get _collectionPath async {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
-    return 'families/$familyId/messages';
+    return FirestorePath.getFamilyCollection(familyId, 'messages');
   }
 
   /// Invalidate chat messages cache when messages are modified
@@ -48,7 +48,7 @@ class ChatService {
       
       // Stream from Firestore - this emits immediately when connected
       return _firestore
-          .collection('families/$familyId/messages')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'messages'))
           .orderBy('timestamp', descending: false)
           .snapshots()
           .asyncMap((snapshot) async {
@@ -67,7 +67,7 @@ class ChatService {
                 final senderId = messageData['senderId'] as String?;
                 if (senderId != null) {
                   try {
-                    final userDoc = await _firestore.collection('users').doc(senderId).get();
+                    final userDoc = await _firestore.collection(FirestorePath.getCollection('users')).doc(senderId).get();
                     if (userDoc.exists) {
                       final userData = userDoc.data();
                       messageData['senderName'] = userData?['displayName'] as String? ?? 
@@ -134,7 +134,7 @@ class ChatService {
 
       final pageSize = limit.clamp(1, 500);
       final snapshot = await _firestore
-          .collection('families/$familyId/messages')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'messages'))
           .orderBy('timestamp', descending: false)
           .limit(pageSize)
           .get();
@@ -154,7 +154,7 @@ class ChatService {
           final senderId = messageData['senderId'] as String?;
           if (senderId != null) {
             try {
-              final userDoc = await _firestore.collection('users').doc(senderId).get();
+              final userDoc = await _firestore.collection(FirestorePath.getCollection('users')).doc(senderId).get();
               if (userDoc.exists) {
                 final userData = userDoc.data();
                 messageData['senderName'] = userData?['displayName'] as String? ??
@@ -241,7 +241,7 @@ class ChatService {
       final chatId = _getChatId(currentUserId, otherUserId);
       
       return _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('messages')
           .orderBy('timestamp', descending: false)
@@ -261,7 +261,7 @@ class ChatService {
                 final senderId = messageData['senderId'] as String?;
                 if (senderId != null) {
                   try {
-                    final userDoc = await _firestore.collection('users').doc(senderId).get();
+                    final userDoc = await _firestore.collection(FirestorePath.getCollection('users')).doc(senderId).get();
                     if (userDoc.exists) {
                       final userData = userDoc.data();
                       messageData['senderName'] = userData?['displayName'] as String? ?? 
@@ -312,7 +312,7 @@ class ChatService {
       );
       
       await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('messages')
           .add(privateMessage.toJson());
@@ -335,7 +335,7 @@ class ChatService {
     
     try {
       final snapshot = await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('messages')
           .orderBy('timestamp', descending: true)
@@ -358,7 +358,7 @@ class ChatService {
   /// Get hub messages stream
   Stream<List<ChatMessage>> getHubMessagesStream(String hubId) {
     return _firestore
-        .collection('hubs/$hubId/messages')
+        .collection('${FirestorePath.getCollection('hubs')}/$hubId/messages')
         .orderBy('timestamp', descending: false)
         .snapshots()
         .asyncMap((snapshot) async {
@@ -376,7 +376,7 @@ class ChatService {
               final senderId = messageData['senderId'] as String?;
               if (senderId != null) {
                 try {
-                  final userDoc = await _firestore.collection('users').doc(senderId).get();
+                  final userDoc = await _firestore.collection(FirestorePath.getCollection('users')).doc(senderId).get();
                   if (userDoc.exists) {
                     final userData = userDoc.data();
                     messageData['senderName'] = userData?['displayName'] as String? ?? 
@@ -410,7 +410,7 @@ class ChatService {
 
     try {
       final snapshot = await _firestore
-          .collection('families/$familyId/messages')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'messages'))
           .orderBy('timestamp', descending: false)
           .startAfterDocument(lastDoc)
           .limit(limit)
@@ -430,7 +430,7 @@ class ChatService {
           final senderId = messageData['senderId'] as String?;
           if (senderId != null) {
             try {
-              final userDoc = await _firestore.collection('users').doc(senderId).get();
+              final userDoc = await _firestore.collection(FirestorePath.getCollection('users')).doc(senderId).get();
               if (userDoc.exists) {
                 final userData = userDoc.data();
                 messageData['senderName'] = userData?['displayName'] as String? ??
@@ -483,7 +483,7 @@ class ChatService {
     try {
       // Get the latest message
       final snapshot = await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('messages')
           .orderBy('timestamp', descending: true)
@@ -537,7 +537,7 @@ class ChatService {
     try {
       // Store the last read timestamp for this user in this chat
       await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('readStatus')
           .doc(currentUserId)
@@ -564,7 +564,7 @@ class ChatService {
     
     try {
       final doc = await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('readStatus')
           .doc(currentUserId)

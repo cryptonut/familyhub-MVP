@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import '../models/user_model.dart';
+import '../utils/firestore_path.dart';
 import '../utils/relationship_utils.dart';
 import 'package:uuid/uuid.dart';
 import '../core/services/logger_service.dart';
@@ -106,7 +106,7 @@ class AuthService {
       }
     }
 
-    final userRef = _firestore.collection('users').doc(user.uid);
+    final userRef = _firestore.collection(FirestorePath.getCollection('users')).doc(user.uid);
     
     // CRITICAL FIX from code review: Ensure user doc exists before queries
     // This prevents Firestore rules circular dependency issues on Android cold-start
@@ -390,7 +390,7 @@ class AuthService {
           try {
             Logger.debug('Method 1: Querying users collection by familyId...', tag: 'AuthService');
             final familyCheck = await _firestore
-                .collection('users')
+                .collection(FirestorePath.getCollection('users'))
                 .where('familyId', isEqualTo: cleanFamilyId)
                 .limit(1)
                 .get(GetOptions(source: Source.server));
@@ -414,7 +414,7 @@ class AuthService {
             try {
               Logger.debug('Method 2: Reading all users and checking manually...', tag: 'AuthService');
               final allUsers = await _firestore
-                  .collection('users')
+                  .collection(FirestorePath.getCollection('users'))
                   .limit(AppConstants.usersQueryLimit)
                   .get(GetOptions(source: Source.server));
               
@@ -470,7 +470,7 @@ class AuthService {
             
             try {
               final retryCheck = await _firestore
-                  .collection('users')
+                  .collection(FirestorePath.getCollection('users'))
                   .where('familyId', isEqualTo: cleanFamilyId)
                   .limit(1)
                   .get(GetOptions(source: Source.server));
@@ -542,7 +542,7 @@ class AuthService {
           bool isFamilyCreator = true;
           try {
             final existingFamilyMembers = await _firestore
-                .collection('users')
+                .collection(FirestorePath.getCollection('users'))
                 .where('familyId', isEqualTo: finalFamilyId)
                 .limit(1)
                 .get(GetOptions(source: Source.server));
@@ -710,7 +710,7 @@ class AuthService {
             // Verify the fix worked
             await Future.delayed(const Duration(milliseconds: 200));
             final verifyFix = await _firestore
-                .collection('users')
+                .collection(FirestorePath.getCollection('users'))
                 .doc(userCredential.user!.uid)
                 .get(GetOptions(source: Source.server));
             final verifyFamilyId = verifyFix.data()?['familyId'] as String?;
@@ -1650,7 +1650,7 @@ class AuthService {
   /// Delete all data for a family
   Future<void> deleteFamilyData(String familyId) async {
     try {
-      final familyPath = 'families/$familyId';
+      final familyPath = FirestorePath.getFamilyCollection(familyId, '');
       await deleteCollectionRecursive(familyPath);
       Logger.info('deleteFamilyData: Deleted family data for $familyId', tag: 'AuthService');
     } catch (e, st) {
@@ -1660,7 +1660,7 @@ class AuthService {
 
     // Delete family wallet document if it exists
     try {
-      await _firestore.collection('families').doc(familyId).delete();
+      await _firestore.collection(FirestorePath.getCollection('families')).doc(familyId).delete();
       Logger.info('deleteFamilyData: Deleted family wallet document', tag: 'AuthService');
     } catch (e, st) {
       Logger.warning('deleteFamilyData: Could not delete family wallet document', error: e, stackTrace: st, tag: 'AuthService');
@@ -1673,7 +1673,7 @@ class AuthService {
   Future<void> deleteCollectionRecursive(String collectionPath) async {
     try {
       // Handle families/{familyId} structure - delete subcollections directly
-      if (collectionPath.startsWith('families/')) {
+      if (collectionPath.startsWith(FirestorePath.getCollection('families') + '/')) {
         final parts = collectionPath.split('/');
         if (parts.length == 2) {
           // families/{familyId} - delete all subcollections
@@ -1744,7 +1744,7 @@ class AuthService {
 
     try {
       final notificationsSnapshot = await _firestore
-          .collection('notifications')
+          .collection(FirestorePath.getCollection('notifications'))
           .where('userId', isEqualTo: user.uid)
           .get();
 

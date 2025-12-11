@@ -1,3 +1,10 @@
+enum HubType {
+  family,
+  extendedFamily,
+  homeschooling,
+  coparenting,
+}
+
 class Hub {
   final String id;
   final String name;
@@ -7,6 +14,8 @@ class Hub {
   final DateTime createdAt;
   final String? icon; // Optional icon identifier
   final bool videoCallsEnabled; // Whether video calls are enabled in this hub
+  final HubType type;
+  final Map<String, dynamic> typeSpecificData;
 
   Hub({
     required this.id,
@@ -17,6 +26,8 @@ class Hub {
     required this.createdAt,
     this.icon,
     bool? videoCallsEnabled,
+    this.type = HubType.family,
+    this.typeSpecificData = const {},
   }) : videoCallsEnabled = videoCallsEnabled ?? true; // Default true for family hubs
 
   Map<String, dynamic> toJson() => {
@@ -28,6 +39,8 @@ class Hub {
         'createdAt': createdAt.toIso8601String(),
         'icon': icon,
         'videoCallsEnabled': videoCallsEnabled,
+        'type': type.toString().split('.').last,
+        'typeSpecificData': typeSpecificData,
       };
 
   factory Hub.fromJson(Map<String, dynamic> json) => Hub(
@@ -39,6 +52,11 @@ class Hub {
         createdAt: DateTime.parse(json['createdAt'] as String),
         icon: json['icon'] as String?,
         videoCallsEnabled: json['videoCallsEnabled'] as bool? ?? true,
+        type: HubType.values.firstWhere(
+          (e) => e.toString().split('.').last == json['type'],
+          orElse: () => HubType.family,
+        ),
+        typeSpecificData: json['typeSpecificData'] as Map<String, dynamic>? ?? {},
       );
 
   Hub copyWith({
@@ -50,6 +68,8 @@ class Hub {
     DateTime? createdAt,
     String? icon,
     bool? videoCallsEnabled,
+    HubType? type,
+    Map<String, dynamic>? typeSpecificData,
   }) =>
       Hub(
         id: id ?? this.id,
@@ -60,6 +80,7 @@ class Hub {
         createdAt: createdAt ?? this.createdAt,
         icon: icon ?? this.icon,
         videoCallsEnabled: videoCallsEnabled ?? this.videoCallsEnabled,
+        type: type ?? this.type,
+        typeSpecificData: typeSpecificData ?? this.typeSpecificData,
       );
 }
-

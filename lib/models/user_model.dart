@@ -1,6 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+enum SubscriptionTier {
+  free,
+  premium, // Individual premium
+  familyPlus, // Family plan (some premium hubs)
+  familyPremium // All access
+}
+
+enum SubscriptionStatus {
+  active,
+  expired,
+  cancelled,
+  trial,
+  none
+}
+
 class UserModel {
   final String uid;
   final String email;
@@ -18,6 +33,14 @@ class UserModel {
   final String? googleCalendarId; // Optional if using Google API directly
   final DateTime? lastSyncedAt; // Last successful sync timestamp
   final bool locationPermissionGranted; // Whether location sharing is enabled
+  
+  // Freemium / Subscription Fields
+  final SubscriptionTier subscriptionTier;
+  final SubscriptionStatus subscriptionStatus;
+  final DateTime? subscriptionExpiresAt;
+  final List<String> premiumHubTypes; // List of hub types the user has unlocked (e.g., 'extended_family')
+  final DateTime? subscriptionPurchaseDate;
+  final String? subscriptionPlatform; // 'google', 'apple', etc.
 
   UserModel({
     required this.uid,
@@ -35,6 +58,12 @@ class UserModel {
     this.googleCalendarId,
     this.lastSyncedAt,
     bool? locationPermissionGranted,
+    this.subscriptionTier = SubscriptionTier.free,
+    this.subscriptionStatus = SubscriptionStatus.none,
+    this.subscriptionExpiresAt,
+    this.premiumHubTypes = const [],
+    this.subscriptionPurchaseDate,
+    this.subscriptionPlatform,
   }) : roles = roles ?? [],
        birthdayNotificationsEnabled = birthdayNotificationsEnabled ?? true,
        calendarSyncEnabled = calendarSyncEnabled ?? false,
@@ -56,6 +85,12 @@ class UserModel {
         if (googleCalendarId != null) 'googleCalendarId': googleCalendarId,
         if (lastSyncedAt != null) 'lastSyncedAt': lastSyncedAt!.toIso8601String(),
         'locationPermissionGranted': locationPermissionGranted,
+        'subscriptionTier': subscriptionTier.toString().split('.').last,
+        'subscriptionStatus': subscriptionStatus.toString().split('.').last,
+        if (subscriptionExpiresAt != null) 'subscriptionExpiresAt': subscriptionExpiresAt!.toIso8601String(),
+        'premiumHubTypes': premiumHubTypes,
+        if (subscriptionPurchaseDate != null) 'subscriptionPurchaseDate': subscriptionPurchaseDate!.toIso8601String(),
+        if (subscriptionPlatform != null) 'subscriptionPlatform': subscriptionPlatform,
       };
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -68,7 +103,6 @@ class UserModel {
     }
     
     // Handle createdAt - can be Timestamp, String, or DateTime
-    // This fixes the Android login issue where FieldValue.serverTimestamp() creates Timestamp objects
     DateTime parseCreatedAt(dynamic value) {
       if (value == null) return DateTime.now();
       if (value is Timestamp) return value.toDate();
@@ -81,12 +115,11 @@ class UserModel {
           return DateTime.now();
         }
       }
-      debugPrint('UserModel.fromJson: Unexpected createdAt type: ${value.runtimeType}, value: $value');
       return DateTime.now();
     }
     
-    // Handle birthday - can be Timestamp, String, or DateTime
-    DateTime? parseBirthday(dynamic value) {
+    // Handle optional DateTimes
+    DateTime? parseDateTime(dynamic value) {
       if (value == null) return null;
       if (value is Timestamp) return value.toDate();
       if (value is DateTime) return value;
@@ -94,28 +127,10 @@ class UserModel {
         try {
           return DateTime.parse(value);
         } catch (e) {
-          debugPrint('UserModel.fromJson: Error parsing birthday string "$value": $e');
+          debugPrint('UserModel.fromJson: Error parsing DateTime string "$value": $e');
           return null;
         }
       }
-      debugPrint('UserModel.fromJson: Unexpected birthday type: ${value.runtimeType}, value: $value');
-      return null;
-    }
-    
-    // Handle lastSyncedAt - can be Timestamp, String, or DateTime
-    DateTime? parseLastSyncedAt(dynamic value) {
-      if (value == null) return null;
-      if (value is Timestamp) return value.toDate();
-      if (value is DateTime) return value;
-      if (value is String) {
-        try {
-          return DateTime.parse(value);
-        } catch (e) {
-          debugPrint('UserModel.fromJson: Error parsing lastSyncedAt string "$value": $e');
-          return null;
-        }
-      }
-      debugPrint('UserModel.fromJson: Unexpected lastSyncedAt type: ${value.runtimeType}, value: $value');
       return null;
     }
     
@@ -128,13 +143,25 @@ class UserModel {
       familyId: json['familyId'] as String?,
       roles: roles,
       relationship: json['relationship'] as String?,
-      birthday: parseBirthday(json['birthday']),
+      birthday: parseDateTime(json['birthday']),
       birthdayNotificationsEnabled: json['birthdayNotificationsEnabled'] as bool? ?? true,
       calendarSyncEnabled: json['calendarSyncEnabled'] as bool? ?? false,
       localCalendarId: json['localCalendarId'] as String?,
       googleCalendarId: json['googleCalendarId'] as String?,
-      lastSyncedAt: parseLastSyncedAt(json['lastSyncedAt']),
+      lastSyncedAt: parseDateTime(json['lastSyncedAt']),
       locationPermissionGranted: json['locationPermissionGranted'] as bool? ?? false,
+      subscriptionTier: SubscriptionTier.values.firstWhere(
+        (e) => e.toString().split('.').last == json['subscriptionTier'],
+        orElse: () => SubscriptionTier.free,
+      ),
+      subscriptionStatus: SubscriptionStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == json['subscriptionStatus'],
+        orElse: () => SubscriptionStatus.none,
+      ),
+      subscriptionExpiresAt: parseDateTime(json['subscriptionExpiresAt']),
+      premiumHubTypes: List<String>.from(json['premiumHubTypes'] as List? ?? []),
+      subscriptionPurchaseDate: parseDateTime(json['subscriptionPurchaseDate']),
+      subscriptionPlatform: json['subscriptionPlatform'] as String?,
     );
   }
 
@@ -154,6 +181,12 @@ class UserModel {
     String? googleCalendarId,
     DateTime? lastSyncedAt,
     bool? locationPermissionGranted,
+    SubscriptionTier? subscriptionTier,
+    SubscriptionStatus? subscriptionStatus,
+    DateTime? subscriptionExpiresAt,
+    List<String>? premiumHubTypes,
+    DateTime? subscriptionPurchaseDate,
+    String? subscriptionPlatform,
   }) =>
       UserModel(
         uid: uid ?? this.uid,
@@ -171,6 +204,12 @@ class UserModel {
         googleCalendarId: googleCalendarId ?? this.googleCalendarId,
         lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
         locationPermissionGranted: locationPermissionGranted ?? this.locationPermissionGranted,
+        subscriptionTier: subscriptionTier ?? this.subscriptionTier,
+        subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
+        subscriptionExpiresAt: subscriptionExpiresAt ?? this.subscriptionExpiresAt,
+        premiumHubTypes: premiumHubTypes ?? this.premiumHubTypes,
+        subscriptionPurchaseDate: subscriptionPurchaseDate ?? this.subscriptionPurchaseDate,
+        subscriptionPlatform: subscriptionPlatform ?? this.subscriptionPlatform,
       );
   
   // Helper methods for role checking
@@ -178,5 +217,8 @@ class UserModel {
   bool isAdmin() => hasRole('admin');
   bool isBanker() => hasRole('banker');
   bool isApprover() => hasRole('approver');
+  
+  // Helper methods for subscription checking
+  bool get isPremium => subscriptionTier != SubscriptionTier.free && subscriptionStatus == SubscriptionStatus.active;
+  bool hasHubAccess(String hubType) => premiumHubTypes.contains(hubType) || subscriptionTier == SubscriptionTier.familyPremium;
 }
-

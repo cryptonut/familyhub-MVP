@@ -6,7 +6,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import '../core/services/logger_service.dart';
 import '../core/errors/app_exceptions.dart';
-import '../models/calendar_event.dart';
+import '../utils/firestore_path.dart';
 import 'auth_service.dart';
 import 'recurrence_service.dart';
 import 'notification_service.dart';
@@ -34,7 +34,7 @@ class CalendarService {
   Future<String> get _collectionPath async {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
-    return 'families/$familyId/events';
+    return FirestorePath.getFamilyCollection(familyId, 'events');
   }
 
   /// Invalidate calendar events cache when events are modified
@@ -86,7 +86,7 @@ class CalendarService {
 
       final pageSize = limit.clamp(1, 500);
       final snapshot = await _firestore
-          .collection('families/$familyId/events')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'events'))
           .orderBy('startTime')
           .limit(pageSize)
           .get();
@@ -139,7 +139,7 @@ class CalendarService {
       }
 
       return _firestore
-          .collection('families/$familyId/events')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'events'))
           .orderBy('startTime')
           .snapshots()
           .map((snapshot) => snapshot.docs
@@ -161,7 +161,7 @@ class CalendarService {
 
     try {
       final snapshot = await _firestore
-          .collection('families/$familyId/events')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'events'))
           .orderBy('startTime')
           .startAfterDocument(lastDoc)
           .limit(limit)
@@ -255,7 +255,7 @@ class CalendarService {
       
       // Use set() with the event.id as document ID to ensure consistent IDs
       await _firestore
-          .collection('families/$familyId/events')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'events'))
           .doc(event.id)
           .set(data);
       
@@ -286,7 +286,7 @@ class CalendarService {
     
     try {
       await _firestore
-          .collection('families/$familyId/events')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'events'))
           .doc(eventId)
           .update({'eventOwnerId': newOwnerId});
     } catch (e) {
@@ -306,7 +306,7 @@ class CalendarService {
       
       // Use set with merge instead of update to handle cases where document might not exist
       await _firestore
-          .collection('families/$familyId/events')
+          .collection(FirestorePath.getFamilyCollection(familyId, 'events'))
           .doc(event.id)
           .set(data, SetOptions(merge: true));
       
@@ -627,7 +627,7 @@ class CalendarService {
       Logger.debug('Ignoring conflict: userId=$userId, eventIds=$eventIds, conflictKey=$conflictKey', tag: 'CalendarService');
 
       await _firestore
-          .collection('users')
+          .collection(FirestorePath.getCollection('users'))
           .doc(currentUserId)
           .collection('ignoredConflicts')
           .doc(conflictKey)
@@ -641,7 +641,7 @@ class CalendarService {
       
       // Verify the write by reading it back (ensures write completed before returning)
       final verifyDoc = await _firestore
-          .collection('users')
+          .collection(FirestorePath.getCollection('users'))
           .doc(currentUserId)
           .collection('ignoredConflicts')
           .doc(conflictKey)
@@ -665,7 +665,7 @@ class CalendarService {
 
       // Force server read to ensure we get the latest ignored conflicts
       final snapshot = await _firestore
-          .collection('users')
+          .collection(FirestorePath.getCollection('users'))
           .doc(currentUserId)
           .collection('ignoredConflicts')
           .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
@@ -846,7 +846,7 @@ class CalendarService {
 
         // Update the kept event with merged data
         final keepEventRef = _firestore
-            .collection('families/$familyId/events')
+            .collection(FirestorePath.getFamilyCollection(familyId, 'events'))
             .doc(keepEventId);
         final keepEventData = mergedEvent.toJson();
         keepEventData.remove('id');
@@ -855,7 +855,7 @@ class CalendarService {
         // Delete duplicate events
         for (var eventToDelete in eventsToDelete) {
           final deleteRef = _firestore
-              .collection('families/$familyId/events')
+              .collection(FirestorePath.getFamilyCollection(familyId, 'events'))
               .doc(eventToDelete.id);
           batch.delete(deleteRef);
           mergedCount++;
