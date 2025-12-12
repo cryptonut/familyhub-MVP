@@ -76,14 +76,49 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "[OK] Merge completed successfully" -ForegroundColor Green
 
-# Step 6: Push merged branch
+# Step 6: Increment build number for new release
+Write-Host "`n[INFO] Incrementing build number..." -ForegroundColor Yellow
+$pubspecPath = "pubspec.yaml"
+$appVersion = $null
+if (Test-Path $pubspecPath) {
+    $pubspecContent = Get-Content $pubspecPath -Raw
+    if ($pubspecContent -match "version:\s*(\d+\.\d+\.\d+)\+(\d+)") {
+        $versionName = $matches[1]
+        $buildNumber = [int]$matches[2]
+        $newBuildNumber = $buildNumber + 1
+        $newVersion = "$versionName+$newBuildNumber"
+        $appVersion = $newVersion
+        
+        Write-Host "   Current version: $versionName+$buildNumber" -ForegroundColor Gray
+        Write-Host "   New version: $newVersion" -ForegroundColor Gray
+        
+        # Replace version line
+        $pubspecContent = $pubspecContent -replace "version:\s*$versionName\+$buildNumber", "version: $newVersion"
+        Set-Content -Path $pubspecPath -Value $pubspecContent -NoNewline
+        
+        Write-Host "[OK] Build number incremented to $newBuildNumber" -ForegroundColor Green
+        
+        # Commit version change
+        git add $pubspecPath
+        git commit -m "chore: Bump build number to $newBuildNumber for QA release" --no-verify
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[OK] Version change committed" -ForegroundColor Green
+        }
+    } else {
+        Write-Host "[WARN] Could not parse version from pubspec.yaml, continuing..." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "[WARN] pubspec.yaml not found, skipping version increment..." -ForegroundColor Yellow
+}
+
+# Step 7: Push merged branch (including version bump)
 Write-Host "`n[INFO] Pushing merged release/qa branch..." -ForegroundColor Yellow
 git push origin release/qa
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[WARN] Push had issues, continuing with build anyway..." -ForegroundColor Yellow
 }
 
-# Step 7: Get commit info for release notes
+# Step 8: Get commit info for release notes
 Write-Host "`n[INFO] Generating release notes..." -ForegroundColor Yellow
 $commitHash = git rev-parse --short HEAD
 $commitMessage = git log -1 --pretty=format:"%s"
@@ -96,9 +131,11 @@ $branchName = git branch --show-current
 $recentCommits = git log -5 --pretty=format:"- %s (%an)" --abbrev-commit
 
 if ([string]::IsNullOrEmpty($Notes)) {
+    $versionInfo = if ($appVersion) { "   Version: $appVersion`n" } else { "" }
     $releaseNotes = "QA Release Build - Ready for Testing!`n`n" +
                     "========================================`n`n" +
                     "BUILD INFO:`n" +
+                    $versionInfo +
                     "   Branch: $branchName`n" +
                     "   Commit: $commitHash`n" +
                     "   Build #: $commitCount`n" +
@@ -129,7 +166,7 @@ if ([string]::IsNullOrEmpty($Notes)) {
 Write-Host "   Release notes:" -ForegroundColor Gray
 $releaseNotes -split "`n" | Select-Object -First 5 | ForEach-Object { Write-Host "   $_" -ForegroundColor Gray }
 
-# Step 8: Verify qa google-services.json exists
+# Step 9: Verify qa google-services.json exists
 Write-Host "`n[INFO] Verifying QA configuration..." -ForegroundColor Yellow
 $googleServicesPath = "android/app/src/qa/google-services.json"
 if (-not (Test-Path $googleServicesPath)) {
@@ -138,7 +175,7 @@ if (-not (Test-Path $googleServicesPath)) {
     exit 1
 }
 
-# Step 9: Get QA App ID from google-services.json
+# Step 10: Get QA App ID from google-services.json
 $json = Get-Content $googleServicesPath | ConvertFrom-Json
 
 # Find the client entry with qa package name (com.example.familyhub_mvp.test)
@@ -165,7 +202,7 @@ if ($packageName -ne "com.example.familyhub_mvp.test") {
     exit 1
 }
 
-# Step 10: Aggressive cleanup to prevent file locking issues
+# Step 11: Aggressive cleanup to prevent file locking issues
 Write-Host "`n[INFO] Preparing build environment..." -ForegroundColor Yellow
 
 # Kill any lingering Gradle/Java processes
@@ -189,7 +226,7 @@ flutter clean 2>&1 | Out-Null
 Start-Sleep -Seconds 2
 Write-Host "[OK] Build environment ready" -ForegroundColor Green
 
-# Step 11: Get dependencies
+# Step 12: Get dependencies
 Write-Host "`n[INFO] Getting dependencies..." -ForegroundColor Yellow
 flutter pub get
 if ($LASTEXITCODE -ne 0) {
@@ -197,7 +234,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 12: Build QA APK with retry logic
+# Step 13: Build QA APK with retry logic
 Write-Host "`n[INFO] Building QA release APK..." -ForegroundColor Yellow
 Write-Host "   This may take a few minutes..." -ForegroundColor Gray
 Write-Host "   Build progress will be shown below...`n" -ForegroundColor Cyan
@@ -241,7 +278,7 @@ if (-not $buildSuccess) {
     exit 1
 }
 
-# Step 13: Verify APK was created
+# Step 14: Verify APK was created
 $apkPath = "build\app\outputs\flutter-apk\app-qa-release.apk"
 if (-not (Test-Path $apkPath)) {
     Write-Host "[ERROR] APK not found at: $apkPath" -ForegroundColor Red
@@ -253,7 +290,7 @@ Write-Host "[OK] APK built successfully!" -ForegroundColor Green
 Write-Host "   Size: $([math]::Round($apkSize, 2)) MB" -ForegroundColor Gray
 Write-Host "   Location: $apkPath" -ForegroundColor Gray
 
-# Step 14: Distribute to Firebase App Distribution
+# Step 15: Distribute to Firebase App Distribution
 Write-Host "`n[INFO] Distributing to qa-testers group..." -ForegroundColor Yellow
 Write-Host "   App ID: $appId" -ForegroundColor Gray
 Write-Host "   Group: qa-testers" -ForegroundColor Gray
