@@ -1,8 +1,11 @@
 # Family Hub - Strategic Roadmap
-**Version:** 1.1  
-**Last Updated:** December 10, 2025  
+**Version:** 1.2  
+**Last Updated:** December 12, 2025  
 **Status:** Living Document - Updated Regularly  
 **Classification:** Strategic Planning
+
+**Related Documents:**
+- `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` - Comprehensive budgeting implementation plan
 
 ---
 
@@ -1144,8 +1147,436 @@ Transform the chat system from SMS-style bubbles to a modern social feed experie
 
 ---
 
+### Phase 6: Family Budgeting System (Q2-Q3 2026)
+**Status:** 🚧 Planned
+**Priority:** High - Core family financial management feature
+
+#### Overview
+Comprehensive family budgeting system that helps families track income, expenses, and savings goals. Integrates seamlessly with existing Wallet, Shopping, and Task systems to provide automatic expense tracking and financial visibility. Designed with a freemium model: basic budgeting for free users, advanced features (individual budgets, project budgets, analytics) for premium subscribers.
+
+#### Market Research & Competitive Analysis
+
+**Key Market Gaps Identified:**
+1. **True Family Collaboration** - Most apps are individual or couples-focused; few include children meaningfully
+2. **Kid-Friendly Financial Education** - Limited apps make budgeting accessible/educational for children
+3. **Integrated Ecosystem** - Standalone budget apps don't connect to family calendars, tasks, or communication
+4. **Project-Based Budgeting** - Family projects (vacations, renovations) need separate tracking
+
+**Competitive Advantages for FamilyHub:**
+- Existing family infrastructure (roles, permissions, real-time sync)
+- Task/Chore integration (automatic income tracking from completed jobs)
+- Shopping list integration (automatic expense categorization)
+- Calendar integration (budget-aware event planning)
+- Established premium subscription model
+
+#### Key Features
+
+**6.1 Core Budget Features (Free Tier)**
+
+- [ ] **Family Budget Creation & Management**
+  - Create single family budget with monthly/weekly/custom periods
+  - Pre-defined budget categories (8 default: Food, Transport, Entertainment, Shopping, Bills, Health, Education, Other)
+  - Set spending limits per category
+  - Budget templates (Basic, Detailed, Zero-Based)
+  - Budget overview dashboard with visual progress indicators
+  - Category progress bars with color-coded warnings (green → yellow → red)
+  - Budget alerts at 50%, 75%, 90%, and 100% thresholds
+  - Real-time overspending warnings
+  
+  **Technical Requirements:**
+  - Create `lib/models/budget/budget.dart` model
+  - Create `lib/models/budget/budget_category.dart` model
+  - Create `lib/services/budget/budget_service.dart` for CRUD operations
+  - Firestore collection: `families/{familyId}/budgets/{budgetId}`
+  - Firestore subcollections: `categories`, `transactions`, `recurringTransactions`
+  - Reference: `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 5.1)
+
+- [ ] **Expense Tracking**
+  - Manual expense entry (amount, category, date, description, notes)
+  - Quick-add common expenses (one-tap entry)
+  - Receipt photo capture (10/month free, unlimited premium)
+  - Expense categorization by budget category
+  - Recurring expense setup (5 max free, unlimited premium)
+  - Shopping list integration (auto-import from completed shopping lists)
+  - Wallet/chore integration (auto-track job rewards as income)
+  
+  **Technical Requirements:**
+  - Create `lib/models/budget/budget_transaction.dart` model
+  - Create `lib/services/budget/transaction_service.dart`
+  - Integrate with `lib/services/shopping_service.dart` for auto-import
+  - Integrate with `lib/services/wallet_service.dart` and `lib/services/family_wallet_service.dart` for income tracking
+  - Integrate with `lib/services/task_service.dart` for job reward tracking
+  - Firebase Storage path: `families/{familyId}/budget_receipts/{transactionId}.jpg`
+  - Reference: `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 3.1.2, 6.5)
+
+- [ ] **Income Tracking**
+  - Track multiple income sources (3 max free, unlimited premium)
+  - Recurring income setup (salaries, allowances, regular transfers)
+  - One-time income entry (bonuses, gifts, refunds)
+  - Automatic income from completed chores/jobs (via WalletService integration)
+  
+  **Technical Requirements:**
+  - Extend `TransactionService` to handle income transactions
+  - Integrate with `lib/services/recurring_payment_service.dart` for recurring income
+  - Reference: `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 3.1.3)
+
+- [ ] **Budget Monitoring & Alerts**
+  - Budget overview dashboard with visual summary
+  - Category progress bars showing spent vs. limit
+  - Budget alerts via push notifications (50%, 75%, 90%, 100%)
+  - Overspending warnings with real-time updates
+  - Transaction history (3 months free, full history premium)
+  
+  **Technical Requirements:**
+  - Create `lib/services/budget/budget_notification_service.dart`
+  - Use existing `lib/services/notification_service.dart` for alerts
+  - Real-time updates via Firestore streams
+  - Reference: `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 3.1.4, 6.4)
+
+**6.2 Premium Budget Features**
+
+- [ ] **Individual Budgets**
+  - Personal budget for each family member
+  - Kid-friendly budget view with simplified UI
+  - Allowance integration (auto-populate from recurring payments)
+  - Parent-set spending limits for children
+  - Parent approval system for large purchases (configurable threshold)
+  - Kid transaction approval workflow
+  
+  **Technical Requirements:**
+  - Extend `Budget` model with `type: 'personal'` and `ownerId`
+  - Create `lib/screens/budget/individual/kid_budget_screen.dart` with simplified UI
+  - Create `lib/screens/budget/individual/personal_budget_screen.dart`
+  - Approval workflow in `TransactionService`
+  - Reference: `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 3.2.1, 7.5)
+
+- [ ] **Project Budgets**
+  - Create budgets for specific goals/projects (vacations, renovations, parties)
+  - Project timeline with start/end dates and milestones
+  - Track contributors and their contributions
+  - Visual progress toward project goal
+  - Project templates (Vacation, Home Renovation, Party, Wedding)
+  
+  **Technical Requirements:**
+  - Extend `Budget` model with `type: 'project'`, `endDate`, `milestones`
+  - Create `lib/screens/budget/project/project_budgets_screen.dart`
+  - Create `lib/screens/budget/project/project_budget_detail_screen.dart`
+  - Reference: `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 3.2.2)
+
+- [ ] **Advanced Analytics & Insights**
+  - Spending trends (month-over-month comparison)
+  - Category breakdown with detailed pie/bar charts
+  - Family member spending comparison
+  - Predictive spending (ML-based month-end predictions)
+  - Budget health score (0-100 overall performance metric)
+  - Savings rate tracking (% of income saved)
+  - Custom reports (monthly/annual summaries)
+  - Export to PDF/CSV
+  
+  **Technical Requirements:**
+  - Create `lib/services/budget/budget_analytics_service.dart`
+  - Create `lib/services/budget/budget_export_service.dart` for PDF/CSV export
+  - Create `lib/screens/budget/analytics/budget_analytics_screen.dart`
+  - Use `pdf` package for report generation
+  - Reference: `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 3.2.3, 6.4, 7.4)
+
+- [ ] **Advanced Tools**
+  - Savings goals with progress tracking (unlimited goals)
+  - Goal sharing (family members contribute to goals)
+  - Budget rollover (carry unused budget to next period)
+  - Split transactions (transactions across multiple categories)
+  - Debt tracking and payoff plans
+  - Financial calendar (bills, paydays, due dates)
+  - Scenario planning ("what if" budget simulations)
+  
+  **Technical Requirements:**
+  - Create `lib/models/budget/savings_goal.dart` model
+  - Create `lib/screens/budget/goals/savings_goals_screen.dart`
+  - Extend `TransactionService` for split transactions
+  - Reference: `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 3.2.4)
+
+**6.3 Free vs Premium Feature Matrix**
+
+| Category | Feature | Free | Premium |
+|----------|---------|------|---------|
+| **Budgets** | Single Family Budget | ✅ | ✅ |
+| | Multiple Budgets | ❌ | ✅ |
+| | Individual Budgets | ❌ | ✅ |
+| | Project Budgets | ❌ | ✅ |
+| | Budget Rollover | ❌ | ✅ |
+| **Categories** | Default Categories (8) | ✅ | ✅ |
+| | Custom Categories | 3 max | Unlimited |
+| **Expenses** | Manual Entry | ✅ | ✅ |
+| | Receipt Photos | 10/month | Unlimited |
+| | Split Expenses | ❌ | ✅ |
+| | Recurring Expenses | 5 max | Unlimited |
+| **Income** | Income Tracking | ✅ | ✅ |
+| | Multiple Income Sources | 3 max | Unlimited |
+| **Monitoring** | Budget Overview | ✅ | ✅ |
+| | Basic Alerts | ✅ | ✅ |
+| | Smart Alerts | ❌ | ✅ |
+| **Analytics** | Basic Summary | ✅ | ✅ |
+| | Spending Charts | Last 30 days | Full History |
+| | Trend Analysis | ❌ | ✅ |
+| | Family Comparison | ❌ | ✅ |
+| | Export Reports | ❌ | ✅ |
+| **Goals** | Savings Goals | 1 goal | Unlimited |
+| | Goal Sharing | ❌ | ✅ |
+| **History** | Transaction History | 3 months | Full History |
+
+**6.4 Data Architecture**
+
+**Firestore Collection Structure:**
+```
+families/{familyId}/
+├── budgets/{budgetId}
+│   ├── id, name, type, ownerId, period, startDate, endDate
+│   ├── currency, totalLimit, totalSpent, totalIncome
+│   ├── rolloverEnabled, rolloverAmount, isActive, isArchived
+│   ├── settings: {alertThresholds, allowOverspend, requireApproval, visibility}
+│   └── sharedWith: [userId, ...]
+│
+├── budgets/{budgetId}/categories/{categoryId}
+│   ├── id, name, icon, color, limit, spent, order, isDefault
+│
+├── budgets/{budgetId}/transactions/{transactionId}
+│   ├── id, type, amount, categoryId, description, date
+│   ├── receiptUrl, isRecurring, splitDetails, source
+│   ├── isApproved, approvedBy (for kid budgets)
+│
+├── budgets/{budgetId}/recurringTransactions/{recurringId}
+│   ├── id, type, amount, frequency, nextOccurrence, isActive
+│
+└── budgets/{budgetId}/goals/{goalId}  (Premium)
+    ├── id, name, targetAmount, currentAmount, contributors
+```
+
+**Required Firestore Indexes:**
+- Transactions by budget, sorted by date
+- Transactions by category and date
+- Transactions by type and date
+- Transactions by creator
+- Active budgets
+- Recurring transactions by next occurrence
+
+**Reference:** `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 5.1, 5.2)
+
+**6.5 Service Layer Architecture**
+
+```
+lib/services/budget/
+├── budget_service.dart              # Core budget CRUD operations
+├── transaction_service.dart         # Transaction management
+├── category_service.dart            # Category management
+├── recurring_transaction_service.dart  # Recurring transaction processing
+├── budget_analytics_service.dart    # Analytics and reports (Premium)
+├── budget_sync_service.dart         # Integration sync (Shopping, Wallet)
+├── budget_notification_service.dart # Alerts and notifications
+└── budget_export_service.dart       # PDF/CSV export (Premium)
+```
+
+**Integration Points:**
+- `lib/services/shopping_service.dart` - Auto-import completed shopping lists
+- `lib/services/wallet_service.dart` - Auto-track job rewards as income
+- `lib/services/family_wallet_service.dart` - Family wallet balance integration
+- `lib/services/task_service.dart` - Job completion tracking
+- `lib/services/recurring_payment_service.dart` - Recurring income/expenses
+- `lib/services/subscription_service.dart` - Premium feature gating
+- `lib/widgets/premium_feature_gate.dart` - Feature access control
+
+**Reference:** `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 6)
+
+**6.6 User Interface Design**
+
+**Screen Architecture:**
+```
+lib/screens/budget/
+├── budget_home_screen.dart           # Main budget dashboard
+├── budget_detail_screen.dart         # Single budget view
+├── create_budget_screen.dart         # Create new budget
+├── transaction_list_screen.dart      # Transaction history
+├── add_transaction_screen.dart       # Add new transaction
+├── category_management_screen.dart   # Manage categories
+├── goals/                            # Savings goals (Premium)
+│   ├── savings_goals_screen.dart
+│   └── goal_detail_screen.dart
+├── analytics/                        # Analytics dashboard (Premium)
+│   ├── budget_analytics_screen.dart
+│   └── spending_breakdown_screen.dart
+├── individual/                       # Personal budgets (Premium)
+│   ├── personal_budget_screen.dart
+│   └── kid_budget_screen.dart
+└── project/                          # Project budgets (Premium)
+    └── project_budgets_screen.dart
+```
+
+**Key UI Components:**
+- Budget summary card with progress visualization
+- Category progress bars with color gradients
+- Transaction list items with category icons
+- Quick-add FAB for common expenses
+- Spending charts (pie, bar, line)
+- Budget period selector
+- Category picker with icons
+
+**Reference:** `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 7)
+
+**6.7 Security & Privacy**
+
+**Firestore Security Rules:**
+- Budget read access: Family members only
+- Budget create: Adults only
+- Budget update: Budget owner or admin
+- Budget delete: Admin only
+- Transaction read: Based on budget visibility settings
+- Kid budget transactions: Require parent approval
+- Receipt photos: Family-private Firebase Storage path
+
+**Data Privacy:**
+- Budget visibility settings: 'all', 'adults', 'private'
+- Transaction history only viewable by budget participants
+- Child data protection with simplified views and parent-controlled permissions
+- Export data only downloadable by budget owner/admin
+
+**Reference:** `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 10)
+
+**6.8 Implementation Phases**
+
+**Phase 6.1: Foundation (Weeks 1-3)**
+- Data models (`Budget`, `BudgetCategory`, `BudgetTransaction`)
+- Core `BudgetService` CRUD operations
+- `TransactionService` with add/edit/delete
+- Basic UI screens (dashboard, transaction list, add transaction)
+- Premium gating setup
+- **Deliverables:** Users can create one family budget, add/edit/delete transactions, see basic category progress
+
+**Phase 6.2: Enhanced Tracking (Weeks 4-5)**
+- Recurring transactions with auto-processing
+- Receipt photo capture and storage
+- Shopping list integration (auto-import)
+- Wallet/chore integration (auto-income from job rewards)
+- Budget alerts and notifications
+- **Deliverables:** Recurring bills auto-tracked, receipt photos attached, shopping lists sync, job rewards appear as income, users receive alerts
+
+**Phase 6.3: Individual & Project Budgets (Weeks 6-8) [Premium]**
+- Personal budget infrastructure
+- Kid-friendly budget view
+- Parent approval system for kid purchases
+- Allowance integration
+- Project budgets with timeline and contributors
+- Project templates
+- **Deliverables:** Each family member has personal budget, children have simplified view, parents can approve/reject transactions, project budgets track goals
+
+**Phase 6.4: Analytics & Insights (Weeks 9-11) [Premium]**
+- Spending analytics (category breakdown, member comparison)
+- Trend analysis (month-over-month, seasonal patterns)
+- Budget health score algorithm
+- Predictive insights (ML-based spending predictions)
+- Report generation (monthly/annual)
+- PDF/CSV export functionality
+- **Deliverables:** Users can view spending by category/member, trend charts show historical data, budget health score calculated, reports exportable
+
+**Phase 6.5: Savings Goals & Advanced Features (Weeks 12-14) [Premium]**
+- Savings goals with progress tracking
+- Goal contributions from family members
+- Budget rollover functionality
+- Split transactions across categories
+- Financial calendar (bills, paydays)
+- Scenario planning ("what if" simulations)
+- **Deliverables:** Users can create and track savings goals, family members contribute, rollover works, transactions can be split, calendar shows financial events
+
+**Phase 6.6: Polish & Optimization (Weeks 15-16)**
+- Performance optimization (query optimization, caching)
+- Offline support (local storage, sync queue)
+- UX refinement (animations, accessibility)
+- Comprehensive testing and bug fixes
+- **Deliverables:** App performs smoothly with large datasets, basic offline functionality, accessibility requirements met, all critical bugs fixed
+
+**Reference:** `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 8)
+
+**6.9 Testing Strategy**
+
+**Unit Tests:**
+- `test/services/budget/budget_service_test.dart` - Budget CRUD, premium checks, rollover
+- `test/services/budget/transaction_service_test.dart` - Transaction operations, split transactions, approval workflow
+- `test/services/budget/budget_analytics_service_test.dart` - Analytics calculations, health score
+
+**Widget Tests:**
+- `test/screens/budget/budget_home_screen_test.dart` - Dashboard display, navigation, premium gates
+
+**Integration Tests:**
+- `integration_test/budget_flow_test.dart` - Complete budget creation → transaction → analytics flow
+- Shopping list → budget sync integration
+- Wallet job reward → budget income sync
+
+**UAT Test Cases:**
+- BUD-001: Create family budget
+- BUD-002: Add manual expense
+- BUD-003: Add income
+- BUD-004: Exceed category limit (alert triggered)
+- BUD-005: Create personal budget (Premium)
+- BUD-006: Kid adds transaction (pending approval)
+- BUD-007: Parent approves transaction
+- BUD-008: View spending analytics
+- BUD-009: Export report to PDF
+- BUD-010: Create savings goal
+
+**Reference:** `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 9)
+
+**6.10 Monetization Strategy**
+
+**Premium Value Proposition:**
+- "Track individual spending to eliminate surprise expenses"
+- "Plan for major purchases with project budgets"
+- "Teach kids financial responsibility with kid budgets"
+- "Get insights that help families save an average of $200/month"
+
+**Upgrade Triggers:**
+1. Category limit reached (3 custom categories)
+2. History limit (3 months)
+3. Analytics teaser (blurred advanced analytics with upgrade prompt)
+4. Goal limit (1 savings goal)
+5. Individual budget request
+6. Project budget creation
+7. Export request
+
+**Pricing:** Aligned with existing premium subscription ($4.99/month or $49.99/year)
+
+**6.11 Success Metrics**
+
+- 70%+ of active families create a budget within first month
+- 60%+ of premium users create individual budgets
+- 50%+ reduction in overspending alerts after 3 months of use
+- 80%+ family member participation rate in budgeting
+- 25%+ conversion rate from budget feature usage to premium
+- 4.5+ star rating for budget feature
+- Average 15+ transactions per budget per month
+
+**6.12 Future Enhancements (Post-Launch)**
+
+- **Q2 2026**: Bank sync (connect to bank accounts for auto-import)
+- **Q3 2026**: Bill detection (OCR for receipt scanning)
+- **Q3 2026**: AI insights (GPT-powered financial advice)
+- **Q4 2026**: Debt payoff plans (snowball/avalanche calculators)
+- **Q1 2027**: Multi-currency support
+
+**Reference:** `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` (Section 11)
+
+**Estimated Timeline:**
+- **Q2 2026**: Foundation and enhanced tracking (Phases 6.1-6.2)
+- **Q3 2026**: Premium features and analytics (Phases 6.3-6.5)
+- **Q4 2026**: Polish and optimization (Phase 6.6)
+
+**Dependencies:**
+- Requires subscription service infrastructure (Phase 1)
+- Integrates with existing Wallet, Shopping, and Task services
+- Requires Firebase Storage for receipt photos
+- Premium features require IAP integration
+
+---
+
 **Document Owner**: Product & Engineering Teams  
-**Last Reviewed**: December 10, 2025  
+**Last Reviewed**: December 12, 2025  
 **Next Review**: January 2026  
 **Status**: Active Planning
 
