@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/services/logger_service.dart';
 import '../core/errors/app_exceptions.dart';
 import '../models/event_chat_message.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 import 'calendar_service.dart';
 
@@ -29,7 +30,7 @@ class EventChatService {
       if (familyId == null) return false;
 
       final eventDoc = await _firestore
-          .collection('families/$familyId/events')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'events'))
           .doc(eventId)
           .get();
 
@@ -75,7 +76,7 @@ class EventChatService {
         final familyId = userModel!.familyId!;
 
         return _firestore
-            .collection('families/$familyId/events/$eventId/chats')
+            .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'events/$eventId/chats'))
             .orderBy('timestamp', descending: false)
             .snapshots()
             .asyncMap((snapshot) async {
@@ -94,7 +95,7 @@ class EventChatService {
                   if (senderId != null) {
                     try {
                       final userDoc =
-                          await _firestore.collection('users').doc(senderId).get();
+                          await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(senderId).get();
                       if (userDoc.exists) {
                         final userData = userDoc.data();
                         messageData['senderName'] =
@@ -142,7 +143,7 @@ class EventChatService {
       final familyId = userModel!.familyId!;
 
       final snapshot = await _firestore
-          .collection('families/$familyId/events/$eventId/chats')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'events/$eventId/chats'))
           .orderBy('timestamp', descending: false)
           .startAfterDocument(lastDoc)
           .limit(limit)
@@ -241,7 +242,7 @@ class EventChatService {
       // Try to find user by displayName or email
       try {
         final usersSnapshot = await _firestore
-            .collection('users')
+            .collection(FirestorePathUtils.getUsersCollection())
             .where('familyId', isEqualTo: familyId)
             .get();
 
@@ -285,7 +286,7 @@ class EventChatService {
 
     try {
       final messageRef = _firestore
-          .collection('families/$familyId/events/$eventId/chats')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'events/$eventId/chats'))
           .doc(messageId);
 
       final messageDoc = await messageRef.get();
@@ -333,7 +334,7 @@ class EventChatService {
 
     try {
       final messageRef = _firestore
-          .collection('families/$familyId/events/$eventId/chats')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'events/$eventId/chats'))
           .doc(messageId);
 
       final messageDoc = await messageRef.get();
@@ -388,7 +389,7 @@ class EventChatService {
       final familyId = userModel!.familyId!;
 
       return _firestore
-          .collection('families/$familyId/events/$eventId/chats')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'events/$eventId/chats'))
           .where('parentMessageId', isEqualTo: parentMessageId)
           .orderBy('timestamp', descending: false)
           .snapshots()

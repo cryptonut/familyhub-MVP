@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:gravity="center">
+
+    <!-- Hub Name -->
+    <TextView
+        android:id="@+id/widget_hub_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Family Hub"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/black"
+        android:gravity="center" />
+
+    <!-- Message Badge -->
+    <TextView
+        android:id="@+id/widget_message_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:textSize="18sp"
+        android:textColor="@android:color/white"
+        android:background="@android:color/holo_blue_dark"
+        android:padding="8dp"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"
+        android:layout_gravity="center" />
+
+</LinearLayout>
+

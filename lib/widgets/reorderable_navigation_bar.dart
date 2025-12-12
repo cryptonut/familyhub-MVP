@@ -5,11 +5,15 @@ import '../core/services/logger_service.dart';
 
 /// A reorderable NavigationBar that allows long-press and drag-to-reorder
 /// Home is locked to the first position
+/// 
+/// IMPORTANT: destinations must be ordered by the parent's _navigationOrder
+/// The parent should pass destinations in the order they want them displayed
 class ReorderableNavigationBar extends StatefulWidget {
-  final int selectedIndex;
-  final ValueChanged<int> onDestinationSelected;
-  final List<NavigationDestination> destinations;
-  final ValueChanged<List<int>>? onOrderChanged;
+  final int selectedIndex; // Navigation position (0-6), not screen index
+  final ValueChanged<int> onDestinationSelected; // Called with screen index (0-6)
+  final List<NavigationDestination> destinations; // Already ordered by parent
+  final ValueChanged<List<int>>? onOrderChanged; // Called with new order (list of screen indices)
+  final List<int>? initialOrder; // Optional: parent's navigation order to sync with
 
   const ReorderableNavigationBar({
     super.key,
@@ -17,6 +21,7 @@ class ReorderableNavigationBar extends StatefulWidget {
     required this.onDestinationSelected,
     required this.destinations,
     this.onOrderChanged,
+    this.initialOrder,
   });
 
   @override
@@ -38,7 +43,33 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
     _loadOrder();
   }
 
+  @override
+  void didUpdateWidget(ReorderableNavigationBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If initialOrder changed, sync _currentOrder
+    if (widget.initialOrder != null && 
+        widget.initialOrder != oldWidget.initialOrder &&
+        widget.initialOrder!.length == widget.destinations.length) {
+      if (mounted) {
+        setState(() {
+          _currentOrder = List.from(widget.initialOrder!);
+        });
+      }
+    }
+  }
+
   Future<void> _loadOrder() async {
+    // If parent provided initialOrder, use it to sync
+    if (widget.initialOrder != null && widget.initialOrder!.length == widget.destinations.length) {
+      if (mounted) {
+        setState(() {
+          _currentOrder = List.from(widget.initialOrder!);
+        });
+      }
+      return;
+    }
+    
+    // Otherwise, load from service
     try {
       final order = await _orderService.getNavigationOrder();
       if (mounted) {
@@ -173,18 +204,34 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
   }
 
   List<NavigationDestination> get _orderedDestinations {
-    if (_currentOrder.isEmpty) return widget.destinations;
-    return _currentOrder.map((screenIndex) => widget.destinations[screenIndex]).toList();
+    // If we have a custom order, use it to reorder destinations
+    // Otherwise, destinations are already in correct order from parent
+    if (_currentOrder.isEmpty || _currentOrder.length != widget.destinations.length) {
+      return widget.destinations;
+    }
+    // Reorder destinations based on _currentOrder
+    // _currentOrder[i] = screen index at position i
+    // We need to find which destination corresponds to each screen index
+    // Since destinations are passed in order of _navigationOrder, we can map them
+    final reordered = <NavigationDestination>[];
+    for (final screenIndex in _currentOrder) {
+      if (screenIndex >= 0 && screenIndex < widget.destinations.length) {
+        reordered.add(widget.destinations[screenIndex]);
+      }
+    }
+    return reordered.isNotEmpty ? reordered : widget.destinations;
   }
 
   int get _selectedNavIndex {
+    // selectedIndex from parent is the navigation position (where the selected screen is in the bar)
+    // We need to find which position in _currentOrder (or default order) contains the selected screen
     if (_currentOrder.isEmpty) {
-      // Fallback: if order not loaded yet, assume selectedIndex is already a nav position
       return widget.selectedIndex.clamp(0, widget.destinations.length - 1);
     }
-    // Find which navigation position contains the selected screen index
-    final navIndex = _currentOrder.indexOf(widget.selectedIndex);
-    return navIndex >= 0 ? navIndex : 0; // Default to first if not found
+    // Find which position in _currentOrder has the selected screen index
+    // But wait - selectedIndex from parent is already the nav position, not screen index
+    // So we can use it directly
+    return widget.selectedIndex.clamp(0, _currentOrder.length - 1);
   }
 
   @override
@@ -289,9 +336,13 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
                     onTap: _isReorderMode
                         ? null
                         : () {
-                            // Always pass the screen index (from _currentOrder)
-                            // If _currentOrder is empty, use index as fallback (shouldn't happen after init)
-                            final screenIndex = _currentOrder.isEmpty ? index : _currentOrder[index];
+                            // index is the position in the navigation bar (0-6)
+                            // We need to find which screen index is at this position
+                            // _currentOrder[i] = screen index at position i
+                            // So screenIndex = _currentOrder[index]
+                            final screenIndex = _currentOrder.isNotEmpty && index < _currentOrder.length
+                                ? _currentOrder[index]
+                                : index; // Fallback: if order not loaded, assume index = screen index
                             widget.onDestinationSelected(screenIndex);
                           },
                     child: Container(

@@ -7,6 +7,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../core/services/logger_service.dart';
 import '../core/errors/app_exceptions.dart';
 import '../models/calendar_event.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 import 'calendar_service.dart';
 import 'recurrence_service.dart';
@@ -200,7 +201,7 @@ class CalendarSyncService {
       if (!enabled) 'googleCalendarId': FieldValue.delete(),
     };
 
-    await _firestore.collection('users').doc(user.uid).update(updateData);
+    await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).update(updateData);
   }
 
   /// Update last synced timestamp
@@ -208,7 +209,7 @@ class CalendarSyncService {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    await _firestore.collection('users').doc(user.uid).update({
+    await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).update({
       'lastSyncedAt': DateTime.now().toIso8601String(),
     });
     
@@ -676,7 +677,7 @@ class CalendarSyncService {
 
       // Get existing imported events to check for duplicates by deviceEventId
       final existingEventsQuery = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('events')
           .where('deviceEventId', isEqualTo: null) // This won't work, we need a different approach
@@ -685,7 +686,7 @@ class CalendarSyncService {
       // Better approach: Query all events and filter in memory (deviceEventId might not be indexed)
       // Or check each event individually - more efficient for small datasets
       final eventsCollection = _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('events');
       
@@ -895,7 +896,7 @@ class CalendarSyncService {
 
       // Get all events with importedFromDevice = true
       final eventsRef = _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('events');
 
@@ -934,7 +935,7 @@ class CalendarSyncService {
       if (resetLastSyncedAt) {
         final user = _auth.currentUser;
         if (user != null) {
-          await _firestore.collection('users').doc(user.uid).update({
+          await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).update({
             'lastSyncedAt': FieldValue.delete(),
           });
           Logger.info('Reset lastSyncedAt timestamp', tag: 'CalendarSyncService');

@@ -5,6 +5,7 @@ import '../models/task.dart';
 import '../models/family_photo.dart';
 import '../models/calendar_event.dart';
 import '../models/user_model.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 import 'task_service.dart';
 import 'photo_service.dart';
@@ -248,7 +249,7 @@ class AchievementService {
   Future<UserAchievements> getUserAchievements(String userId) async {
     try {
       // Get user model from Firestore directly
-      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).get();
       if (!userDoc.exists) throw Exception('User not found');
       
       final userModel = UserModel.fromJson({
@@ -258,7 +259,7 @@ class AchievementService {
 
       // Get achievement progress from Firestore
       final progressDoc = await _firestore
-          .collection('users')
+          .collection(FirestorePathUtils.getUsersCollection())
           .doc(userId)
           .collection('achievements')
           .doc('progress')
@@ -343,7 +344,7 @@ class AchievementService {
   Future<void> updateProgress(String userId, AchievementType type, String metric, int value) async {
     try {
       await _firestore
-          .collection('users')
+          .collection(FirestorePathUtils.getUsersCollection())
           .doc(userId)
           .collection('achievements')
           .doc('progress')
@@ -363,7 +364,7 @@ class AchievementService {
   Future<Map<String, dynamic>> _getCurrentUserStats(String userId) async {
     try {
       // Get user model from Firestore directly
-      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).get();
       if (!userDoc.exists) return {};
       
       final userModel = UserModel.fromJson({
@@ -432,7 +433,7 @@ class AchievementService {
 
       // Update progress document
       final progressRef = _firestore
-          .collection('users')
+          .collection(FirestorePathUtils.getUsersCollection())
           .doc(userId)
           .collection('achievements')
           .doc('progress');
@@ -444,7 +445,7 @@ class AchievementService {
 
       // Add to unlocked achievements collection
       final unlockedRef = _firestore
-          .collection('users')
+          .collection(FirestorePathUtils.getUsersCollection())
           .doc(userId)
           .collection('achievements')
           .doc(achievement.id);

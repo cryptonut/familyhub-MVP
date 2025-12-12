@@ -97,7 +97,7 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
                     crossAxisCount: 2,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: 1.1,
+                    childAspectRatio: 1.15,
                   ),
                   itemCount: _hubs.length,
                   itemBuilder: (context, index) {
@@ -135,23 +135,27 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
       },
       padding: const EdgeInsets.all(AppTheme.spacingMD),
       child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Icon(
               _getHubIcon(hub.icon),
               size: 48,
               color: Theme.of(context).primaryColor,
             ),
-            const SizedBox(height: 12),
-            Text(
-              hub.name,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+            const SizedBox(height: 8),
+            Expanded(
+              child: Text(
+                hub.name,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
             Text(
@@ -160,6 +164,7 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
                 fontSize: 12,
                 color: Colors.grey[600],
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

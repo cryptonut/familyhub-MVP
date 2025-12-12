@@ -43,5 +43,20 @@ class DevConfig implements AppConfig {
   
   @override
   String? get chessWebSocketUrl => null; // WebSocket URL for real-time chess tournaments (to be configured when tournament server is set up)
+  
+  @override
+  bool get enablePremiumHubs => true; // Enable premium features in dev for testing
+  
+  @override
+  bool get enableExtendedFamilyHub => true;
+  
+  @override
+  bool get enableHomeschoolingHub => true;
+  
+  @override
+  bool get enableCoparentingHub => true;
+  
+  @override
+  bool get enableEncryptedChat => true; // Enable encrypted chat in dev for testing
 }
 

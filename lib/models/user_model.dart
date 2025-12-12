@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'subscription_tier.dart';
 
 class UserModel {
   final String uid;
@@ -18,6 +19,15 @@ class UserModel {
   final String? googleCalendarId; // Optional if using Google API directly
   final DateTime? lastSyncedAt; // Last successful sync timestamp
   final bool locationPermissionGranted; // Whether location sharing is enabled
+  
+  // Subscription & Premium Features
+  final SubscriptionTier? subscriptionTier; // Current subscription tier (null = free)
+  final SubscriptionStatus? subscriptionStatus; // Current subscription status
+  final DateTime? subscriptionExpiresAt; // When subscription expires (null = no expiration or lifetime)
+  final DateTime? subscriptionPurchaseDate; // When subscription was purchased
+  final SubscriptionPlatform? subscriptionPlatform; // Platform where subscription was purchased ('google' | 'apple' | null)
+  final List<String> premiumHubTypes; // List of premium hub types user has access to (e.g., ['extended_family', 'homeschooling'])
+  final String? subscriptionPurchaseToken; // Purchase token/receipt for verification (platform-specific)
 
   UserModel({
     required this.uid,
@@ -35,10 +45,18 @@ class UserModel {
     this.googleCalendarId,
     this.lastSyncedAt,
     bool? locationPermissionGranted,
+    this.subscriptionTier,
+    this.subscriptionStatus,
+    this.subscriptionExpiresAt,
+    this.subscriptionPurchaseDate,
+    this.subscriptionPlatform,
+    List<String>? premiumHubTypes,
+    this.subscriptionPurchaseToken,
   }) : roles = roles ?? [],
        birthdayNotificationsEnabled = birthdayNotificationsEnabled ?? true,
        calendarSyncEnabled = calendarSyncEnabled ?? false,
-       locationPermissionGranted = locationPermissionGranted ?? false;
+       locationPermissionGranted = locationPermissionGranted ?? false,
+       premiumHubTypes = premiumHubTypes ?? [];
 
   Map<String, dynamic> toJson() => {
         'uid': uid,
@@ -56,6 +74,13 @@ class UserModel {
         if (googleCalendarId != null) 'googleCalendarId': googleCalendarId,
         if (lastSyncedAt != null) 'lastSyncedAt': lastSyncedAt!.toIso8601String(),
         'locationPermissionGranted': locationPermissionGranted,
+        if (subscriptionTier != null) 'subscriptionTier': subscriptionTier!.name,
+        if (subscriptionStatus != null) 'subscriptionStatus': subscriptionStatus!.name,
+        if (subscriptionExpiresAt != null) 'subscriptionExpiresAt': subscriptionExpiresAt!.toIso8601String(),
+        if (subscriptionPurchaseDate != null) 'subscriptionPurchaseDate': subscriptionPurchaseDate!.toIso8601String(),
+        if (subscriptionPlatform != null) 'subscriptionPlatform': subscriptionPlatform!.name,
+        if (premiumHubTypes.isNotEmpty) 'premiumHubTypes': premiumHubTypes,
+        if (subscriptionPurchaseToken != null) 'subscriptionPurchaseToken': subscriptionPurchaseToken,
       };
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -119,6 +144,67 @@ class UserModel {
       return null;
     }
     
+    // Helper to parse DateTime fields (subscription dates)
+    DateTime? parseDateTime(dynamic value) {
+      if (value == null) return null;
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      if (value is String) {
+        try {
+          return DateTime.parse(value);
+        } catch (e) {
+          debugPrint('UserModel.fromJson: Error parsing DateTime string "$value": $e');
+          return null;
+        }
+      }
+      return null;
+    }
+    
+    // Parse subscription tier
+    SubscriptionTier? parseSubscriptionTier(dynamic value) {
+      if (value == null) return null;
+      if (value is String) {
+        return SubscriptionTier.values.firstWhere(
+          (tier) => tier.name == value,
+          orElse: () => SubscriptionTier.free,
+        );
+      }
+      return null;
+    }
+    
+    // Parse subscription status
+    SubscriptionStatus? parseSubscriptionStatus(dynamic value) {
+      if (value == null) return null;
+      if (value is String) {
+        return SubscriptionStatus.values.firstWhere(
+          (status) => status.name == value,
+          orElse: () => SubscriptionStatus.expired,
+        );
+      }
+      return null;
+    }
+    
+    // Parse subscription platform
+    SubscriptionPlatform? parseSubscriptionPlatform(dynamic value) {
+      if (value == null) return null;
+      if (value is String) {
+        return SubscriptionPlatform.values.firstWhere(
+          (platform) => platform.name == value,
+          orElse: () => SubscriptionPlatform.google,
+        );
+      }
+      return null;
+    }
+    
+    // Parse premium hub types
+    List<String> parsePremiumHubTypes(dynamic value) {
+      if (value == null) return [];
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      return [];
+    }
+    
     return UserModel(
       uid: json['uid'] as String,
       email: json['email'] as String,
@@ -135,6 +221,13 @@ class UserModel {
       googleCalendarId: json['googleCalendarId'] as String?,
       lastSyncedAt: parseLastSyncedAt(json['lastSyncedAt']),
       locationPermissionGranted: json['locationPermissionGranted'] as bool? ?? false,
+      subscriptionTier: parseSubscriptionTier(json['subscriptionTier']),
+      subscriptionStatus: parseSubscriptionStatus(json['subscriptionStatus']),
+      subscriptionExpiresAt: parseDateTime(json['subscriptionExpiresAt']),
+      subscriptionPurchaseDate: parseDateTime(json['subscriptionPurchaseDate']),
+      subscriptionPlatform: parseSubscriptionPlatform(json['subscriptionPlatform']),
+      premiumHubTypes: parsePremiumHubTypes(json['premiumHubTypes']),
+      subscriptionPurchaseToken: json['subscriptionPurchaseToken'] as String?,
     );
   }
 
@@ -154,6 +247,13 @@ class UserModel {
     String? googleCalendarId,
     DateTime? lastSyncedAt,
     bool? locationPermissionGranted,
+    SubscriptionTier? subscriptionTier,
+    SubscriptionStatus? subscriptionStatus,
+    DateTime? subscriptionExpiresAt,
+    DateTime? subscriptionPurchaseDate,
+    SubscriptionPlatform? subscriptionPlatform,
+    List<String>? premiumHubTypes,
+    String? subscriptionPurchaseToken,
   }) =>
       UserModel(
         uid: uid ?? this.uid,
@@ -168,9 +268,16 @@ class UserModel {
         birthdayNotificationsEnabled: birthdayNotificationsEnabled ?? this.birthdayNotificationsEnabled,
         calendarSyncEnabled: calendarSyncEnabled ?? this.calendarSyncEnabled,
         localCalendarId: localCalendarId ?? this.localCalendarId,
-        googleCalendarId: googleCalendarId ?? this.googleCalendarId,
-        lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
-        locationPermissionGranted: locationPermissionGranted ?? this.locationPermissionGranted,
+      googleCalendarId: googleCalendarId ?? this.googleCalendarId,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      locationPermissionGranted: locationPermissionGranted ?? this.locationPermissionGranted,
+      subscriptionTier: subscriptionTier ?? this.subscriptionTier,
+      subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
+      subscriptionExpiresAt: subscriptionExpiresAt ?? this.subscriptionExpiresAt,
+      subscriptionPurchaseDate: subscriptionPurchaseDate ?? this.subscriptionPurchaseDate,
+      subscriptionPlatform: subscriptionPlatform ?? this.subscriptionPlatform,
+      premiumHubTypes: premiumHubTypes ?? this.premiumHubTypes,
+      subscriptionPurchaseToken: subscriptionPurchaseToken ?? this.subscriptionPurchaseToken,
       );
   
   // Helper methods for role checking
@@ -178,5 +285,40 @@ class UserModel {
   bool isAdmin() => hasRole('admin');
   bool isBanker() => hasRole('banker');
   bool isApprover() => hasRole('approver');
+  
+  // Helper methods for subscription checking
+  /// Check if user has an active premium subscription
+  bool hasActivePremiumSubscription() {
+    if (subscriptionTier != SubscriptionTier.premium) return false;
+    if (subscriptionStatus == null) return false;
+    if (!subscriptionStatus!.isActive) return false;
+    
+    // Check if subscription has expired
+    if (subscriptionExpiresAt != null && subscriptionExpiresAt!.isBefore(DateTime.now())) {
+      return false;
+    }
+    
+    return true;
+  }
+  
+  /// Check if user has access to a specific premium hub type
+  bool hasPremiumHubAccess(String hubType) {
+    if (!hasActivePremiumSubscription()) return false;
+    return premiumHubTypes.contains(hubType);
+  }
+  
+  /// Check if user has access to encrypted chat
+  bool hasEncryptedChatAccess() {
+    return hasActivePremiumSubscription() && 
+           (subscriptionTier?.hasEncryptedChatAccess ?? false);
+  }
+  
+  /// Get days until subscription expires (null if no expiration or already expired)
+  int? getDaysUntilExpiration() {
+    if (subscriptionExpiresAt == null) return null;
+    final now = DateTime.now();
+    if (subscriptionExpiresAt!.isBefore(now)) return null;
+    return subscriptionExpiresAt!.difference(now).inDays;
+  }
 }
 

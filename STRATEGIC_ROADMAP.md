@@ -44,6 +44,7 @@ Transform Family Hub into a multi-hub platform where families can manage not jus
   - Subscription management system
   - Feature flag system for premium hubs
   - Usage analytics for premium features
+  - Subscription gifting system (see Phase 2)
 
 - [ ] **Encrypted Chat (Premium Feature)**
   - **Status:** 🚧 Planned for Premium Tier
@@ -286,6 +287,108 @@ Transform Family Hub into a multi-hub platform where families can manage not jus
   - Restore purchases works on both platforms
   - Subscription expiration handled gracefully
   - Free tier users see upgrade prompts
+
+- [ ] **Subscription Gifting System**
+  - **Status:** 🚧 Planned for Phase 2 (Q2 2025)
+  - **Priority:** Medium - Monetization enhancement
+  - **Objective:** Allow users to purchase premium subscriptions as gifts when inviting family members, creating a seamless onboarding experience and additional revenue stream
+  
+  **Key Features:**
+  - [ ] **Gift Subscription IAP Products**
+    - Create IAP product IDs for gift subscriptions:
+      - `premium_gift_monthly` - 1 month premium gift
+      - `premium_gift_yearly` - 1 year premium gift
+      - `premium_gift_3months` - 3 months premium gift (optional)
+    - Products should be consumable/non-consumable based on platform requirements
+    - Pricing should match or slightly discount regular subscription prices
+  
+  - [ ] **Invitation Flow Integration**
+    - Add "Gift Premium Subscription" option to invitation screens:
+      - `FamilyInvitationScreen` - When inviting to family
+      - `InviteMembersDialog` - When inviting to hub
+    - Show gift subscription options before sending invitation
+    - Allow invitor to select gift duration (1 month, 3 months, 1 year)
+    - Display gift pricing and benefits clearly
+  
+  - [ ] **Gift Purchase Flow**
+    - User selects gift subscription option during invitation
+    - Initiate IAP purchase flow for gift product
+    - Store gift purchase details in Firestore:
+      - `gift_subscriptions/{giftId}` collection
+      - Fields: `purchaserId`, `recipientEmail`, `recipientUserId` (null until redeemed), `subscriptionTier`, `duration`, `purchaseDate`, `expiresAt`, `status` ('pending' | 'redeemed' | 'expired'), `purchaseToken`
+    - Link gift to invitation code/email
+  
+  - [ ] **Gift Redemption**
+    - When invitee accepts invitation and creates account:
+      - Check if invitation has associated gift subscription
+      - If gift exists and status is 'pending':
+        - Automatically apply premium subscription to new user
+        - Update gift status to 'redeemed'
+        - Set subscription expiration based on gift duration
+        - Send notification to both invitor and invitee
+    - Handle case where invitee already has account (apply gift on acceptance)
+    - Handle case where gift expires before redemption (show expired message)
+  
+  - [ ] **Gift Management UI**
+    - Add "Gift Subscriptions" section to subscription screen
+    - Show pending gifts (not yet redeemed)
+    - Show redeemed gifts (with recipient info)
+    - Show expired gifts
+    - Allow invitor to resend gift notification
+    - Display gift status and expiration dates
+  
+  - [ ] **Notifications & Communication**
+    - Send email/SMS to invitee when gift is purchased:
+      - "You've been gifted a Premium subscription!"
+      - Include invitation link and gift details
+      - Explain benefits of premium subscription
+    - Send confirmation to invitor when gift is purchased
+    - Send notification to invitor when gift is redeemed
+    - Send reminder if gift is about to expire (7 days before)
+  
+  - [ ] **Technical Requirements**
+    - Extend `SubscriptionService` with gift methods:
+      - `Future<String> purchaseGiftSubscription(String recipientEmail, SubscriptionDuration duration)`
+      - `Future<void> redeemGiftSubscription(String giftId, String userId)`
+      - `Future<List<GiftSubscription>> getGiftSubscriptions({String? recipientEmail})`
+      - `Future<GiftSubscription?> getGiftByInvitationCode(String invitationCode)`
+    - Create `GiftSubscription` model:
+      - `id`, `purchaserId`, `recipientEmail`, `recipientUserId`, `subscriptionTier`, `duration`, `purchaseDate`, `expiresAt`, `status`, `purchaseToken`, `invitationCode`
+    - Update invitation models to include optional `giftSubscriptionId`
+    - Add gift subscription collection to Firestore security rules
+    - Handle IAP purchase verification for gifts (same as regular subscriptions)
+  
+  - [ ] **User Experience**
+    - Clear value proposition: "Give the gift of premium features"
+    - Show gift options prominently in invitation flow
+    - Make it easy to add gift during invitation (one-tap option)
+    - Show gift status in invitation confirmation
+    - Celebrate gift redemption with both parties
+  
+  - [ ] **Monetization Strategy**
+    - Gift subscriptions priced same as regular subscriptions (or slight discount for yearly)
+    - Consider "gift bundles" (e.g., buy 3 months, get 1 month free)
+    - Track gift purchase conversion rate
+    - Track gift redemption rate
+    - Monitor average gift duration purchased
+  
+  **Success Metrics:**
+  - 15%+ of invitations include gift subscriptions
+  - 80%+ gift redemption rate (gifts are actually used)
+  - Average gift duration: 6+ months
+  - Gift subscriptions drive 20%+ of new premium subscriptions
+  - User satisfaction: 4.5+ stars for gift feature
+  
+  **Estimated Timeline:**
+  - Q2 2025: IAP products and purchase flow
+  - Q2 2025: Invitation integration and redemption
+  - Q3 2025: Gift management UI and notifications
+  
+  **Dependencies:**
+  - Requires IAP infrastructure to be complete
+  - Requires invitation system to support gift linking
+  - Requires subscription service to support gift redemption
+  - Backend validation recommended for gift purchases
 
 **Deliverables:**
 - Widget framework MVP

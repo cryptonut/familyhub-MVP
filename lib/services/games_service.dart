@@ -4,6 +4,7 @@ import '../core/errors/app_exceptions.dart';
 import '../core/services/logger_service.dart';
 import '../models/game_stats.dart';
 import '../models/user_model.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 
 /// Service for managing family games and leaderboards
@@ -19,7 +20,7 @@ class GamesService {
 
     try {
       final doc = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(userModel!.familyId)
           .collection('game_stats')
           .doc(userId)
@@ -56,7 +57,7 @@ class GamesService {
       data['lastUpdated'] = DateTime.now().toIso8601String();
 
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(stats.familyId)
           .collection('game_stats')
           .doc(stats.userId)
@@ -116,7 +117,7 @@ class GamesService {
 
     try {
       final snapshot = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(userModel!.familyId)
           .collection('game_stats')
           .get();
@@ -169,7 +170,7 @@ class GamesService {
 
     try {
       await for (final snapshot in _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(userModel!.familyId)
           .collection('game_stats')
           .snapshots()) {
@@ -282,7 +283,7 @@ class GamesService {
 
     try {
       final familyDoc = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(userModel!.familyId)
           .get();
 
@@ -312,7 +313,7 @@ class GamesService {
 
     try {
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(userModel.familyId!)
           .set({
             'openMatchmakingEnabled': enabled,

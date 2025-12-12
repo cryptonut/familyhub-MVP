@@ -169,3 +169,8 @@ class UnknownException extends AppException {
   const UnknownException(super.message, {super.code, super.originalError});
 }
 
+/// Subscription-related exceptions
+class SubscriptionException extends AppException {
+  const SubscriptionException(super.message, {super.code, super.originalError});
+}
+

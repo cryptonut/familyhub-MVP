@@ -62,3 +62,7 @@ logs/
 # Android secrets (API keys, etc.)
 android/secrets.properties
 android/local.properties
+
+# Firebase service account keys (never commit these!)
+*service-account*.json
+scripts/firebase-service-account.json
