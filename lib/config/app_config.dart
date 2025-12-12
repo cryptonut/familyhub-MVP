@@ -22,5 +22,21 @@ abstract class AppConfig {
   
   // WebSocket endpoints
   String? get chessWebSocketUrl;
+  
+  // Premium Feature Flags
+  /// Enable premium hub features (Extended Family, Home Schooling, Co-Parenting)
+  bool get enablePremiumHubs;
+  
+  /// Enable Extended Family Hub feature
+  bool get enableExtendedFamilyHub;
+  
+  /// Enable Home Schooling Hub feature
+  bool get enableHomeschoolingHub;
+  
+  /// Enable Co-Parenting Hub feature
+  bool get enableCoparentingHub;
+  
+  /// Enable encrypted chat feature (premium)
+  bool get enableEncryptedChat;
 }
 

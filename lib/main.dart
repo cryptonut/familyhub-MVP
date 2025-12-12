@@ -22,6 +22,8 @@ import 'widgets/auth_wrapper.dart';
 import 'widgets/error_handler.dart';
 import 'utils/app_theme.dart';
 import 'services/cache_service.dart';
+import 'services/subscription_service.dart';
+import 'services/deep_link_service.dart';
 import 'core/di/service_locator.dart';
 import 'games/chess/services/chess_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -280,6 +282,9 @@ void main() async {
   // Initialize background sync service (non-blocking)
   _initializeBackgroundSync();
   
+  // Initialize subscription service (non-blocking)
+  _initializeSubscriptionService();
+  
   runApp(const FamilyHubApp());
 }
 
@@ -347,6 +352,28 @@ void _initializeBackgroundSync() {
     } catch (e, st) {
       Logger.warning('⚠ Background sync service initialization error', error: e, stackTrace: st, tag: 'main');
       // Don't fail app startup if background sync fails
+    }
+  });
+}
+
+/// Initialize subscription service asynchronously without blocking startup
+void _initializeSubscriptionService() {
+  Future.microtask(() async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 1500));
+      
+      final subscriptionService = SubscriptionService();
+      await subscriptionService.initialize().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          Logger.warning('⚠ Subscription service initialization timed out - continuing without IAP', tag: 'main');
+          return;
+        },
+      );
+      Logger.info('✓ SubscriptionService initialized', tag: 'main');
+    } catch (e, st) {
+      Logger.warning('⚠ SubscriptionService initialization error', error: e, stackTrace: st, tag: 'main');
+      // Continue - IAP may not be available on all devices/environments
     }
   });
 }

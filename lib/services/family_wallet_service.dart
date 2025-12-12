@@ -4,6 +4,7 @@ import '../core/services/logger_service.dart';
 import '../core/errors/app_exceptions.dart';
 import '../models/user_model.dart';
 import '../models/task.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 
 class FamilyWalletService {
@@ -18,7 +19,7 @@ class FamilyWalletService {
 
     try {
       final familyDoc = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(userModel.familyId)
           .get();
 
@@ -28,7 +29,7 @@ class FamilyWalletService {
       } else {
         // Family document doesn't exist yet, create it
         await _firestore
-            .collection('families')
+            .collection(FirestorePathUtils.getFamiliesCollection())
             .doc(userModel.familyId)
             .set({'walletBalance': 0.0});
         return 0.0;
@@ -47,7 +48,7 @@ class FamilyWalletService {
     }
 
     try {
-      final familyRef = _firestore.collection('families').doc(userModel.familyId);
+      final familyRef = _firestore.collection(FirestorePathUtils.getFamiliesCollection()).doc(userModel.familyId);
       
       Logger.debug('creditFamilyWallet: Starting transaction for amount $amount', tag: 'FamilyWalletService');
       Logger.debug('creditFamilyWallet: Family ID: ${userModel.familyId}', tag: 'FamilyWalletService');
@@ -89,7 +90,7 @@ class FamilyWalletService {
     }
 
     try {
-      final familyRef = _firestore.collection('families').doc(userModel.familyId);
+      final familyRef = _firestore.collection(FirestorePathUtils.getFamiliesCollection()).doc(userModel.familyId);
       
       // Use transaction to ensure atomic update
       await _firestore.runTransaction((transaction) async {

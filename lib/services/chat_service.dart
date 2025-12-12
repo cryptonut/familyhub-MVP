@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/services/logger_service.dart';
 import '../core/errors/app_exceptions.dart';
 import '../models/chat_message.dart';
+import '../utils/firestore_path_utils.dart';
+import '../config/config.dart';
 import 'auth_service.dart';
 import 'query_cache_service.dart';
 
@@ -25,7 +28,7 @@ class ChatService {
   Future<String> get _collectionPath async {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
-    return 'families/$familyId/messages';
+    return FirestorePathUtils.getFamilySubcollectionPath(familyId, 'messages');
   }
 
   /// Invalidate chat messages cache when messages are modified
@@ -46,52 +49,220 @@ class ChatService {
         return Stream.value(<ChatMessage>[]);
       }
       
-      // Stream from Firestore - this emits immediately when connected
-      return _firestore
-          .collection('families/$familyId/messages')
+      // Query both prefixed and unprefixed collections for backward compatibility
+      final prefixedPath = FirestorePathUtils.getFamilySubcollectionPath(familyId, 'messages');
+      final unprefixedPath = 'families/$familyId/messages';
+      final prefix = Config.current.firestorePrefix;
+      
+      // Create streams for both collections
+      final prefixedStream = _firestore
+          .collection(prefixedPath)
           .orderBy('timestamp', descending: false)
-          .snapshots()
-          .asyncMap((snapshot) async {
-            // Process messages and ensure senderName is populated
-            final messages = <ChatMessage>[];
-            for (var doc in snapshot.docs) {
-              final data = doc.data();
-              var messageData = {
-                'id': doc.id,
-                ...data,
-              };
-              
-              // If senderName is missing, try to get it from user document
-              if (messageData['senderName'] == null || 
-                  (messageData['senderName'] as String).isEmpty) {
-                final senderId = messageData['senderId'] as String?;
-                if (senderId != null) {
-                  try {
-                    final userDoc = await _firestore.collection('users').doc(senderId).get();
-                    if (userDoc.exists) {
-                      final userData = userDoc.data();
-                      messageData['senderName'] = userData?['displayName'] as String? ?? 
-                                                   userData?['email'] as String? ?? 
-                                                   'Unknown User';
-                    } else {
-                      messageData['senderName'] = 'Unknown User';
-                    }
-                  } catch (e) {
-                    Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
-                    messageData['senderName'] = 'Unknown User';
-                  }
-                } else {
-                  messageData['senderName'] = 'Unknown User';
-                }
-              }
-              
-              messages.add(ChatMessage.fromJson(messageData));
+          .snapshots();
+      
+      // Only query unprefixed if we're using a prefix (for migration)
+      Stream<QuerySnapshot>? unprefixedStream;
+      if (prefix.isNotEmpty) {
+        unprefixedStream = _firestore
+            .collection(unprefixedPath)
+            .orderBy('timestamp', descending: false)
+            .snapshots();
+      }
+      
+      // Combine streams: if unprefixed exists, merge both; otherwise just use prefixed
+      if (unprefixedStream != null) {
+        // Use StreamController to merge both streams
+        final controller = StreamController<List<ChatMessage>>();
+        final prefixedMessages = <String, ChatMessage>{};
+        final unprefixedMessages = <String, ChatMessage>{};
+        var prefixedReady = false;
+        var unprefixedReady = false;
+        
+        void emitCombined() {
+          // Only emit if we have data from at least one stream
+          if (!prefixedReady && !unprefixedReady) return;
+          
+          final allMessages = <ChatMessage>[];
+          final seenIds = <String>{};
+          
+          // Add unprefixed messages first (older data)
+          for (var message in unprefixedMessages.values) {
+            if (!seenIds.contains(message.id)) {
+              seenIds.add(message.id);
+              allMessages.add(message);
             }
-            return messages;
-          });
+          }
+          
+          // Add prefixed messages (newer data)
+          for (var message in prefixedMessages.values) {
+            if (!seenIds.contains(message.id)) {
+              seenIds.add(message.id);
+              allMessages.add(message);
+            }
+          }
+          
+          // Sort by timestamp
+          allMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          if (!controller.isClosed) {
+            controller.add(allMessages);
+          }
+        }
+        
+        // Listen to prefixed stream
+        final prefixedSubscription = prefixedStream.listen((snapshot) async {
+          try {
+            final messages = await _processMessageSnapshot(snapshot, familyId);
+            prefixedMessages.clear();
+            for (var msg in messages) {
+              prefixedMessages[msg.id] = msg;
+            }
+            prefixedReady = true;
+            emitCombined();
+          } catch (e) {
+            Logger.error('Error processing prefixed messages', error: e, tag: 'ChatService');
+          }
+        }, onError: (error) {
+          Logger.error('Error in prefixed messages stream', error: error, tag: 'ChatService');
+          prefixedReady = true; // Mark as ready even on error to allow emission
+          emitCombined();
+        }, onDone: () {
+          if (unprefixedReady && !controller.isClosed) {
+            controller.close();
+          }
+        });
+        
+        // Listen to unprefixed stream
+        final unprefixedSubscription = unprefixedStream.listen((snapshot) async {
+          try {
+            final messages = await _processMessageSnapshot(snapshot, familyId);
+            unprefixedMessages.clear();
+            for (var msg in messages) {
+              unprefixedMessages[msg.id] = msg;
+            }
+            unprefixedReady = true;
+            emitCombined();
+          } catch (e) {
+            Logger.error('Error processing unprefixed messages', error: e, tag: 'ChatService');
+          }
+        }, onError: (error) {
+          Logger.error('Error in unprefixed messages stream', error: error, tag: 'ChatService');
+          unprefixedReady = true; // Mark as ready even on error to allow emission
+          emitCombined();
+        }, onDone: () {
+          if (prefixedReady && !controller.isClosed) {
+            controller.close();
+          }
+        });
+        
+        // Clean up when stream is cancelled
+        controller.onCancel = () {
+          prefixedSubscription.cancel();
+          unprefixedSubscription.cancel();
+          if (!controller.isClosed) {
+            controller.close();
+          }
+        };
+        
+        return controller.stream;
+      } else {
+        return prefixedStream.asyncMap((snapshot) => _processMessageSnapshot(snapshot, familyId));
+      }
     }).asBroadcastStream();
     
     return _cachedMessagesStream!;
+  }
+  
+  Future<List<ChatMessage>> _combineMessageSnapshots(List<QuerySnapshot> snapshots, String familyId) async {
+    final allMessages = <ChatMessage>[];
+    final seenIds = <String>{};
+    
+    // Process all snapshots
+    for (var snapshot in snapshots) {
+      for (var doc in snapshot.docs) {
+        // Skip duplicates
+        if (seenIds.contains(doc.id)) continue;
+        seenIds.add(doc.id);
+        
+      final data = doc.data() as Map<String, dynamic>? ?? {};
+      var messageData = {
+        'id': doc.id,
+        ...data,
+      } as Map<String, dynamic>;
+        
+        // If senderName is missing, try to get it from user document
+        if (messageData['senderName'] == null || 
+            (messageData['senderName'] as String).isEmpty) {
+          final senderId = messageData['senderId'] as String?;
+          if (senderId != null) {
+            try {
+              // Try prefixed collection first, then unprefixed
+              var userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(senderId).get();
+              if (!userDoc.exists) {
+                userDoc = await _firestore.collection('users').doc(senderId).get();
+              }
+              
+              if (userDoc.exists) {
+                final userData = userDoc.data();
+                messageData['senderName'] = userData?['displayName'] as String? ?? 
+                                             userData?['email'] as String? ?? 
+                                             'Unknown User';
+              } else {
+                messageData['senderName'] = 'Unknown User';
+              }
+            } catch (e) {
+              Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
+              messageData['senderName'] = 'Unknown User';
+            }
+          } else {
+            messageData['senderName'] = 'Unknown User';
+          }
+        }
+        
+        allMessages.add(ChatMessage.fromJson(messageData));
+      }
+    }
+    
+    // Sort by timestamp
+    allMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return allMessages;
+  }
+  
+  Future<List<ChatMessage>> _processMessageSnapshot(QuerySnapshot snapshot, String familyId) async {
+    final messages = <ChatMessage>[];
+    for (var doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>? ?? {};
+      var messageData = {
+        'id': doc.id,
+        ...data,
+      } as Map<String, dynamic>;
+      
+      // If senderName is missing, try to get it from user document
+      if (messageData['senderName'] == null || 
+          (messageData['senderName'] as String).isEmpty) {
+        final senderId = messageData['senderId'] as String?;
+        if (senderId != null) {
+          try {
+            final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(senderId).get();
+            if (userDoc.exists) {
+              final userData = userDoc.data();
+              messageData['senderName'] = userData?['displayName'] as String? ?? 
+                                           userData?['email'] as String? ?? 
+                                           'Unknown User';
+            } else {
+              messageData['senderName'] = 'Unknown User';
+            }
+          } catch (e) {
+            Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
+            messageData['senderName'] = 'Unknown User';
+          }
+        } else {
+          messageData['senderName'] = 'Unknown User';
+        }
+      }
+      
+      messages.add(ChatMessage.fromJson(messageData));
+    }
+    return messages;
   }
 
   Future<List<ChatMessage>> getMessages({int limit = 50, bool forceRefresh = false}) async {
@@ -133,55 +304,68 @@ class ChatService {
       Logger.debug('getMessages: Loading messages from Firestore for family $familyId', tag: 'ChatService');
 
       final pageSize = limit.clamp(1, 500);
-      final snapshot = await _firestore
-          .collection('families/$familyId/messages')
-          .orderBy('timestamp', descending: false)
-          .limit(pageSize)
-          .get();
-
-      // Process messages and ensure senderName is populated
-      final messages = <ChatMessage>[];
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        var messageData = {
-          'id': doc.id,
-          ...data,
-        };
-
-        // If senderName is missing, try to get it from user document
-        if (messageData['senderName'] == null ||
-            (messageData['senderName'] as String).isEmpty) {
-          final senderId = messageData['senderId'] as String?;
-          if (senderId != null) {
-            try {
-              final userDoc = await _firestore.collection('users').doc(senderId).get();
-              if (userDoc.exists) {
-                final userData = userDoc.data();
-                messageData['senderName'] = userData?['displayName'] as String? ??
-                                             userData?['email'] as String? ??
-                                             'Unknown User';
-              } else {
-                messageData['senderName'] = 'Unknown User';
-              }
-            } catch (e) {
-              Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
-              messageData['senderName'] = 'Unknown User';
-            }
-          } else {
-            messageData['senderName'] = 'Unknown User';
+      final prefix = Config.current.firestorePrefix;
+      final prefixedPath = FirestorePathUtils.getFamilySubcollectionPath(familyId, 'messages');
+      final unprefixedPath = 'families/$familyId/messages';
+      
+      // Query both collections if using prefix
+      final allMessages = <ChatMessage>[];
+      final seenIds = <String>{};
+      
+      // Query prefixed collection
+      try {
+        final prefixedSnapshot = await _firestore
+            .collection(prefixedPath)
+            .orderBy('timestamp', descending: false)
+            .limit(pageSize)
+            .get();
+        
+        final prefixedMessages = await _processMessageSnapshot(prefixedSnapshot, familyId);
+        for (var msg in prefixedMessages) {
+          if (!seenIds.contains(msg.id)) {
+            seenIds.add(msg.id);
+            allMessages.add(msg);
           }
         }
-
-        messages.add(ChatMessage.fromJson(messageData));
+      } catch (e) {
+        Logger.warning('getMessages: Error querying prefixed collection', error: e, tag: 'ChatService');
       }
+      
+      // Query unprefixed collection if using prefix (for backward compatibility)
+      if (prefix.isNotEmpty) {
+        try {
+          final unprefixedSnapshot = await _firestore
+              .collection(unprefixedPath)
+              .orderBy('timestamp', descending: false)
+              .limit(pageSize)
+              .get();
+          
+          final unprefixedMessages = await _processMessageSnapshot(unprefixedSnapshot, familyId);
+          for (var msg in unprefixedMessages) {
+            if (!seenIds.contains(msg.id)) {
+              seenIds.add(msg.id);
+              allMessages.add(msg);
+            }
+          }
+        } catch (e) {
+          // Unprefixed collection might not exist or have index, that's OK
+          Logger.debug('getMessages: Could not query unprefixed collection (may not exist)', tag: 'ChatService');
+        }
+      }
+      
+      // Sort by timestamp
+      allMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      
+      // Limit to requested page size
+      final limitedMessages = allMessages.take(pageSize).toList();
 
-      Logger.debug('getMessages: Successfully loaded ${messages.length} messages', tag: 'ChatService');
+      Logger.debug('getMessages: Successfully loaded ${limitedMessages.length} messages', tag: 'ChatService');
 
       // Cache the results
       if (!forceRefresh) {
         final queryCache = QueryCacheService();
         // Serialize messages to JSON maps for caching
-        final messagesJson = messages.map((message) {
+        final messagesJson = limitedMessages.map((message) {
           final json = message.toJson();
           json['id'] = message.id; // Ensure ID is included
           return json;
@@ -195,7 +379,7 @@ class ChatService {
         );
       }
 
-      return messages;
+      return limitedMessages;
     } catch (e, st) {
       Logger.error('getMessages error', error: e, stackTrace: st, tag: 'ChatService');
       return [];
@@ -207,7 +391,9 @@ class ChatService {
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     try {
-      await _firestore.collection('families/$familyId/messages').add(message.toJson());
+      // Use FirestorePathUtils to get the correct prefixed path
+      final collectionPath = FirestorePathUtils.getFamilySubcollectionPath(familyId, 'messages');
+      await _firestore.collection(collectionPath).add(message.toJson());
 
       // Invalidate cache after successful send
       await _invalidateChatMessagesCache(familyId);
@@ -241,7 +427,7 @@ class ChatService {
       final chatId = _getChatId(currentUserId, otherUserId);
       
       return _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('messages')
           .orderBy('timestamp', descending: false)
@@ -249,11 +435,11 @@ class ChatService {
           .asyncMap((snapshot) async {
             final messages = <ChatMessage>[];
             for (var doc in snapshot.docs) {
-              final data = doc.data();
-              var messageData = {
-                'id': doc.id,
-                ...data,
-              };
+      final data = doc.data() as Map<String, dynamic>? ?? {};
+      var messageData = {
+        'id': doc.id,
+        ...data,
+      } as Map<String, dynamic>;
               
               // If senderName is missing, try to get it from user document
               if (messageData['senderName'] == null || 
@@ -261,7 +447,7 @@ class ChatService {
                 final senderId = messageData['senderId'] as String?;
                 if (senderId != null) {
                   try {
-                    final userDoc = await _firestore.collection('users').doc(senderId).get();
+                    final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(senderId).get();
                     if (userDoc.exists) {
                       final userData = userDoc.data();
                       messageData['senderName'] = userData?['displayName'] as String? ?? 
@@ -312,7 +498,7 @@ class ChatService {
       );
       
       await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('messages')
           .add(privateMessage.toJson());
@@ -335,7 +521,7 @@ class ChatService {
     
     try {
       final snapshot = await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('messages')
           .orderBy('timestamp', descending: true)
@@ -358,17 +544,17 @@ class ChatService {
   /// Get hub messages stream
   Stream<List<ChatMessage>> getHubMessagesStream(String hubId) {
     return _firestore
-        .collection('hubs/$hubId/messages')
+        .collection(FirestorePathUtils.getCollectionPath('hubs/$hubId/messages'))
         .orderBy('timestamp', descending: false)
         .snapshots()
         .asyncMap((snapshot) async {
           final messages = <ChatMessage>[];
           for (var doc in snapshot.docs) {
-            final data = doc.data();
-            var messageData = {
-              'id': doc.id,
-              ...data,
-            };
+      final data = doc.data() as Map<String, dynamic>? ?? {};
+      var messageData = {
+        'id': doc.id,
+        ...data,
+      } as Map<String, dynamic>;
             
             // If senderName is missing, try to get it from user document
             if (messageData['senderName'] == null || 
@@ -376,7 +562,7 @@ class ChatService {
               final senderId = messageData['senderId'] as String?;
               if (senderId != null) {
                 try {
-                  final userDoc = await _firestore.collection('users').doc(senderId).get();
+                  final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(senderId).get();
                   if (userDoc.exists) {
                     final userData = userDoc.data();
                     messageData['senderName'] = userData?['displayName'] as String? ?? 
@@ -410,7 +596,7 @@ class ChatService {
 
     try {
       final snapshot = await _firestore
-          .collection('families/$familyId/messages')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'messages'))
           .orderBy('timestamp', descending: false)
           .startAfterDocument(lastDoc)
           .limit(limit)
@@ -418,11 +604,11 @@ class ChatService {
 
       final messages = <ChatMessage>[];
       for (var doc in snapshot.docs) {
-        final data = doc.data();
-        var messageData = {
-          'id': doc.id,
-          ...data,
-        };
+      final data = doc.data() as Map<String, dynamic>? ?? {};
+      var messageData = {
+        'id': doc.id,
+        ...data,
+      } as Map<String, dynamic>;
 
         // If senderName is missing, try to get it from user document
         if (messageData['senderName'] == null ||
@@ -430,7 +616,7 @@ class ChatService {
           final senderId = messageData['senderId'] as String?;
           if (senderId != null) {
             try {
-              final userDoc = await _firestore.collection('users').doc(senderId).get();
+              final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(senderId).get();
               if (userDoc.exists) {
                 final userData = userDoc.data();
                 messageData['senderName'] = userData?['displayName'] as String? ??
@@ -461,7 +647,7 @@ class ChatService {
   /// Send a message to a hub
   Future<void> sendHubMessage(String hubId, ChatMessage message) async {
     try {
-      await _firestore.collection('hubs/$hubId/messages').add(message.toJson());
+      await _firestore.collection(FirestorePathUtils.getCollectionPath('hubs/$hubId/messages')).add(message.toJson());
     } catch (e) {
       Logger.error('sendHubMessage error', error: e, tag: 'ChatService');
       rethrow;
@@ -483,7 +669,7 @@ class ChatService {
     try {
       // Get the latest message
       final snapshot = await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('messages')
           .orderBy('timestamp', descending: true)
@@ -537,7 +723,7 @@ class ChatService {
     try {
       // Store the last read timestamp for this user in this chat
       await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('readStatus')
           .doc(currentUserId)
@@ -564,7 +750,7 @@ class ChatService {
     
     try {
       final doc = await _firestore
-          .collection('families/$familyId/privateMessages')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('readStatus')
           .doc(currentUserId)

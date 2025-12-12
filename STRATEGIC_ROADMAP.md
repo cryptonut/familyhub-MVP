@@ -44,6 +44,67 @@ Transform Family Hub into a multi-hub platform where families can manage not jus
   - Subscription management system
   - Feature flag system for premium hubs
   - Usage analytics for premium features
+  - Subscription gifting system (see Phase 2)
+
+- [ ] **Encrypted Chat (Premium Feature)**
+  - **Status:** 🚧 Planned for Premium Tier
+  - **Priority:** High - Privacy and security differentiator
+  - **Objective:** Provide end-to-end encrypted messaging with auto-destruct capabilities as a premium feature
+  
+  **Key Features:**
+  - [ ] **End-to-End Encryption (E2EE)**
+    - Implement Signal Protocol or similar E2EE standard
+    - Key exchange and management system
+    - Forward secrecy (keys rotate periodically)
+    - Message encryption/decryption on device
+    - Encrypted message storage in Firestore (server cannot read)
+  
+  - [ ] **Auto-Destruct Messages**
+    - User-configurable message expiration (1 hour, 1 day, 1 week, custom)
+    - Per-message or per-conversation settings
+    - Automatic deletion after expiration
+    - Visual indicators for expiring messages (countdown timer)
+    - Screenshot detection (optional, platform-dependent)
+    - Notification when message expires
+  
+  - [ ] **Security Features**
+    - Device key management (secure key storage)
+    - Key backup/recovery (optional, user-controlled)
+    - Verification codes for contact verification
+    - Security indicators (lock icons, encryption status)
+    - Audit log for security events (optional)
+  
+  - [ ] **User Experience**
+    - Seamless encryption (transparent to user)
+    - Clear indicators when chat is encrypted
+    - Settings to enable/disable encryption per hub
+    - Migration path for existing unencrypted chats
+    - Performance optimization (encryption shouldn't slow down messaging)
+  
+  - [ ] **Technical Requirements**
+    - Choose encryption library (e.g., `cryptography` package for Dart)
+    - Implement key exchange protocol
+    - Encrypt messages before sending to Firestore
+    - Decrypt messages on receipt
+    - Handle key rotation and re-encryption
+    - Implement message expiration service
+    - Background job to delete expired messages
+  
+  - [ ] **Monetization**
+    - Available to Premium tier subscribers
+    - Can be enabled per hub (family, extended family, etc.)
+    - Optional: One-time purchase for lifetime encryption access
+    - Value proposition: "Private, secure family communication"
+  
+  **Success Metrics:**
+  - 60%+ of premium users enable encrypted chat
+  - 40%+ of encrypted messages use auto-destruct
+  - Zero security incidents (no message leaks)
+  - User satisfaction: 4.5+ stars for security features
+  
+  **Estimated Timeline:**
+  - Q2 2026: E2EE implementation
+  - Q3 2026: Auto-destruct and advanced features
 
 - [ ] **Hub Type System**
   - Extend hub model to support hub types
@@ -226,6 +287,108 @@ Transform Family Hub into a multi-hub platform where families can manage not jus
   - Restore purchases works on both platforms
   - Subscription expiration handled gracefully
   - Free tier users see upgrade prompts
+
+- [ ] **Subscription Gifting System**
+  - **Status:** 🚧 Planned for Phase 2 (Q2 2025)
+  - **Priority:** Medium - Monetization enhancement
+  - **Objective:** Allow users to purchase premium subscriptions as gifts when inviting family members, creating a seamless onboarding experience and additional revenue stream
+  
+  **Key Features:**
+  - [ ] **Gift Subscription IAP Products**
+    - Create IAP product IDs for gift subscriptions:
+      - `premium_gift_monthly` - 1 month premium gift
+      - `premium_gift_yearly` - 1 year premium gift
+      - `premium_gift_3months` - 3 months premium gift (optional)
+    - Products should be consumable/non-consumable based on platform requirements
+    - Pricing should match or slightly discount regular subscription prices
+  
+  - [ ] **Invitation Flow Integration**
+    - Add "Gift Premium Subscription" option to invitation screens:
+      - `FamilyInvitationScreen` - When inviting to family
+      - `InviteMembersDialog` - When inviting to hub
+    - Show gift subscription options before sending invitation
+    - Allow invitor to select gift duration (1 month, 3 months, 1 year)
+    - Display gift pricing and benefits clearly
+  
+  - [ ] **Gift Purchase Flow**
+    - User selects gift subscription option during invitation
+    - Initiate IAP purchase flow for gift product
+    - Store gift purchase details in Firestore:
+      - `gift_subscriptions/{giftId}` collection
+      - Fields: `purchaserId`, `recipientEmail`, `recipientUserId` (null until redeemed), `subscriptionTier`, `duration`, `purchaseDate`, `expiresAt`, `status` ('pending' | 'redeemed' | 'expired'), `purchaseToken`
+    - Link gift to invitation code/email
+  
+  - [ ] **Gift Redemption**
+    - When invitee accepts invitation and creates account:
+      - Check if invitation has associated gift subscription
+      - If gift exists and status is 'pending':
+        - Automatically apply premium subscription to new user
+        - Update gift status to 'redeemed'
+        - Set subscription expiration based on gift duration
+        - Send notification to both invitor and invitee
+    - Handle case where invitee already has account (apply gift on acceptance)
+    - Handle case where gift expires before redemption (show expired message)
+  
+  - [ ] **Gift Management UI**
+    - Add "Gift Subscriptions" section to subscription screen
+    - Show pending gifts (not yet redeemed)
+    - Show redeemed gifts (with recipient info)
+    - Show expired gifts
+    - Allow invitor to resend gift notification
+    - Display gift status and expiration dates
+  
+  - [ ] **Notifications & Communication**
+    - Send email/SMS to invitee when gift is purchased:
+      - "You've been gifted a Premium subscription!"
+      - Include invitation link and gift details
+      - Explain benefits of premium subscription
+    - Send confirmation to invitor when gift is purchased
+    - Send notification to invitor when gift is redeemed
+    - Send reminder if gift is about to expire (7 days before)
+  
+  - [ ] **Technical Requirements**
+    - Extend `SubscriptionService` with gift methods:
+      - `Future<String> purchaseGiftSubscription(String recipientEmail, SubscriptionDuration duration)`
+      - `Future<void> redeemGiftSubscription(String giftId, String userId)`
+      - `Future<List<GiftSubscription>> getGiftSubscriptions({String? recipientEmail})`
+      - `Future<GiftSubscription?> getGiftByInvitationCode(String invitationCode)`
+    - Create `GiftSubscription` model:
+      - `id`, `purchaserId`, `recipientEmail`, `recipientUserId`, `subscriptionTier`, `duration`, `purchaseDate`, `expiresAt`, `status`, `purchaseToken`, `invitationCode`
+    - Update invitation models to include optional `giftSubscriptionId`
+    - Add gift subscription collection to Firestore security rules
+    - Handle IAP purchase verification for gifts (same as regular subscriptions)
+  
+  - [ ] **User Experience**
+    - Clear value proposition: "Give the gift of premium features"
+    - Show gift options prominently in invitation flow
+    - Make it easy to add gift during invitation (one-tap option)
+    - Show gift status in invitation confirmation
+    - Celebrate gift redemption with both parties
+  
+  - [ ] **Monetization Strategy**
+    - Gift subscriptions priced same as regular subscriptions (or slight discount for yearly)
+    - Consider "gift bundles" (e.g., buy 3 months, get 1 month free)
+    - Track gift purchase conversion rate
+    - Track gift redemption rate
+    - Monitor average gift duration purchased
+  
+  **Success Metrics:**
+  - 15%+ of invitations include gift subscriptions
+  - 80%+ gift redemption rate (gifts are actually used)
+  - Average gift duration: 6+ months
+  - Gift subscriptions drive 20%+ of new premium subscriptions
+  - User satisfaction: 4.5+ stars for gift feature
+  
+  **Estimated Timeline:**
+  - Q2 2025: IAP products and purchase flow
+  - Q2 2025: Invitation integration and redemption
+  - Q3 2025: Gift management UI and notifications
+  
+  **Dependencies:**
+  - Requires IAP infrastructure to be complete
+  - Requires invitation system to support gift linking
+  - Requires subscription service to support gift redemption
+  - Backend validation recommended for gift purchases
 
 **Deliverables:**
 - Widget framework MVP
@@ -852,9 +1015,138 @@ This roadmap is a **living document** and should be updated:
 
 ---
 
+### Phase 5: Social Feed Redesign (Q1-Q2 2026)
+**Status:** 🚧 Planned
+
+#### Overview
+Transform the chat system from SMS-style bubbles to a modern social feed experience similar to X (formerly Twitter), with support for threaded comments, rich media previews, polls, and cross-hub engagement.
+
+#### Key Features
+
+**5.1 Feed-Style UI**
+- [ ] **Timeline Layout**
+  - Replace bubble-based chat with vertical feed layout
+  - Post cards with author info, timestamp, engagement metrics
+  - Infinite scroll with pre-loading of content
+  - Pull-to-refresh functionality
+  - Smooth scrolling performance optimization
+
+- [ ] **Rich Media Previews**
+  - Automatic URL preview cards (like X link cards)
+  - Image/video previews in feed
+  - Expandable media galleries
+  - Embedded content support (YouTube, etc.)
+
+- [ ] **Post Interactions**
+  - Like/Unlike posts (heart icon)
+  - Comment threading (nested replies)
+  - Share/Repost functionality
+  - Bookmark/Save posts
+  - Engagement counters (likes, comments, shares)
+
+**5.2 Polling System**
+- [ ] **Poll Creation**
+  - Create polls with 2-4 options
+  - Set poll duration (1 hour to 7 days)
+  - Add poll description/context
+  - Attach poll to a post or create standalone poll
+
+- [ ] **Poll Participation**
+  - Vote on polls (single choice)
+  - View real-time results (percentage bars)
+  - See who voted (optional, privacy-controlled)
+  - Poll expiration handling
+
+- [ ] **Cross-Hub Polling**
+  - Option to open polls to other hubs in "My Hubs" list
+  - Multi-hub poll aggregation
+  - Hub-specific poll visibility controls
+  - Cross-hub engagement metrics
+
+**5.3 Comment Threading**
+- [ ] **Nested Comments**
+  - Reply to posts (top-level comments)
+  - Reply to comments (nested replies, 2-3 levels deep)
+  - Thread collapse/expand
+  - Comment count indicators
+
+- [ ] **Comment Interactions**
+  - Like comments
+  - Edit own comments
+  - Delete own comments (admins can delete any)
+  - Report inappropriate comments
+
+**5.4 Technical Requirements**
+- [ ] Redesign `ChatMessage` model to support:
+  - Post type (text, poll, media)
+  - Poll data structure (options, votes, expiration)
+  - Comment threading (parentId, threadId)
+  - Engagement metrics (likes, comments, shares)
+  - Cross-hub visibility flags
+
+- [ ] Create `FeedService` to replace/enhance `ChatService`:
+  - Feed querying with pagination
+  - Poll creation and voting
+  - Comment threading logic
+  - Engagement tracking
+  - Cross-hub feed aggregation
+
+- [ ] Build new `FeedScreen` component:
+  - Feed list view with post cards
+  - Post detail view with full thread
+  - Poll voting UI
+  - Comment composer
+  - Media preview components
+
+- [ ] Implement URL preview service:
+  - Fetch metadata from URLs (Open Graph, Twitter Cards)
+  - Generate preview cards
+  - Cache previews for performance
+  - Handle preview errors gracefully
+
+**5.5 Cross-Hub Integration**
+- [ ] **Hub Selection for Polls**
+  - UI to select which hubs can participate
+  - Hub list from "My Hubs" screen
+  - Default to current hub, allow expansion
+  - Visual indicators for multi-hub polls
+
+- [ ] **Multi-Hub Feed View**
+  - Option to view feed from all hubs
+  - Filter by specific hub
+  - Hub badges on posts
+  - Cross-hub engagement visibility
+
+**5.6 Migration Strategy**
+- [ ] **Backward Compatibility**
+  - Migrate existing chat messages to feed format
+  - Preserve message history
+  - Convert old bubbles to feed posts
+  - Maintain existing chat functionality during transition
+
+- [ ] **Feature Flags**
+  - Enable/disable feed UI per hub
+  - Gradual rollout to test groups
+  - A/B testing between old and new UI
+  - Rollback capability
+
+**Success Metrics:**
+- 80%+ user engagement with new feed UI
+- 60%+ poll participation rate
+- 50%+ cross-hub poll engagement
+- Average 3+ comments per post
+- 90%+ URL preview success rate
+- User satisfaction: 4.5+ stars
+
+**Estimated Timeline:**
+- **Q1 2026**: Feed UI redesign, basic polling
+- **Q2 2026**: Comment threading, cross-hub polls, URL previews
+
+---
+
 **Document Owner**: Product & Engineering Teams  
-**Last Reviewed**: December 2024  
-**Next Review**: January 2025  
+**Last Reviewed**: December 10, 2025  
+**Next Review**: January 2026  
 **Status**: Active Planning
 
 ---

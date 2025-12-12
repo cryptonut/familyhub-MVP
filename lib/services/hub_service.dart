@@ -6,47 +6,98 @@ import '../core/errors/app_exceptions.dart';
 import '../models/hub.dart';
 import '../models/hub_invite.dart';
 import 'auth_service.dart';
+import 'subscription_service.dart';
+import '../utils/firestore_path_utils.dart';
 
 class HubService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final AuthService _authService = AuthService();
+  final SubscriptionService _subscriptionService = SubscriptionService();
 
   String? get currentUserId => _auth.currentUser?.uid;
 
   /// Get all hubs for the current user
+  /// Queries both prefixed and unprefixed collections to find all hubs (including old ones)
   Future<List<Hub>> getUserHubs() async {
     final userId = currentUserId;
     if (userId == null) return [];
 
     try {
-      // Get hubs where user is creator or member
-      final snapshot = await _firestore
-          .collection('hubs')
-          .where('creatorId', isEqualTo: userId)
-          .get();
-
-      final createdHubs = snapshot.docs
-          .map((doc) => Hub.fromJson({'id': doc.id, ...doc.data()}))
-          .toList();
-
-      // Also get hubs where user is a member
-      final memberSnapshot = await _firestore
-          .collection('hubs')
-          .where('memberIds', arrayContains: userId)
-          .get();
-
-      final memberHubs = memberSnapshot.docs
-          .map((doc) => Hub.fromJson({'id': doc.id, ...doc.data()}))
-          .toList();
-
-      // Combine and remove duplicates
       final allHubs = <String, Hub>{};
-      for (var hub in createdHubs) {
-        allHubs[hub.id] = hub;
+      final prefixedPath = FirestorePathUtils.getCollectionPath('hubs');
+      final unprefixedPath = 'hubs';
+      
+      // Query prefixed collection (new hubs)
+      try {
+        // Get hubs where user is creator
+        final prefixedCreatedSnapshot = await _firestore
+            .collection(prefixedPath)
+            .where('creatorId', isEqualTo: userId)
+            .get();
+
+        for (var doc in prefixedCreatedSnapshot.docs) {
+          try {
+            final hub = Hub.fromJson({'id': doc.id, ...doc.data()});
+            allHubs[hub.id] = hub;
+          } catch (e) {
+            Logger.warning('Error parsing prefixed hub ${doc.id}', error: e, tag: 'HubService');
+          }
+        }
+
+        // Get hubs where user is a member
+        final prefixedMemberSnapshot = await _firestore
+            .collection(prefixedPath)
+            .where('memberIds', arrayContains: userId)
+            .get();
+
+        for (var doc in prefixedMemberSnapshot.docs) {
+          try {
+            final hub = Hub.fromJson({'id': doc.id, ...doc.data()});
+            allHubs[hub.id] = hub;
+          } catch (e) {
+            Logger.warning('Error parsing prefixed hub ${doc.id}', error: e, tag: 'HubService');
+          }
+        }
+      } catch (e) {
+        Logger.warning('Error querying prefixed hubs collection', error: e, tag: 'HubService');
       }
-      for (var hub in memberHubs) {
-        allHubs[hub.id] = hub;
+
+      // Query unprefixed collection (old hubs) - only if prefixed path is different
+      if (prefixedPath != unprefixedPath) {
+        try {
+          // Get hubs where user is creator
+          final unprefixedCreatedSnapshot = await _firestore
+              .collection(unprefixedPath)
+              .where('creatorId', isEqualTo: userId)
+              .get();
+
+          for (var doc in unprefixedCreatedSnapshot.docs) {
+            try {
+              final hub = Hub.fromJson({'id': doc.id, ...doc.data()});
+              allHubs[hub.id] = hub; // Will overwrite if duplicate, but that's OK
+            } catch (e) {
+              Logger.warning('Error parsing unprefixed hub ${doc.id}', error: e, tag: 'HubService');
+            }
+          }
+
+          // Get hubs where user is a member
+          final unprefixedMemberSnapshot = await _firestore
+              .collection(unprefixedPath)
+              .where('memberIds', arrayContains: userId)
+              .get();
+
+          for (var doc in unprefixedMemberSnapshot.docs) {
+            try {
+              final hub = Hub.fromJson({'id': doc.id, ...doc.data()});
+              allHubs[hub.id] = hub; // Will overwrite if duplicate, but that's OK
+            } catch (e) {
+              Logger.warning('Error parsing unprefixed hub ${doc.id}', error: e, tag: 'HubService');
+            }
+          }
+        } catch (e) {
+          Logger.warning('Error querying unprefixed hubs collection', error: e, tag: 'HubService');
+        }
       }
 
       return allHubs.values.toList()
@@ -58,11 +109,35 @@ class HubService {
   }
 
   /// Get a specific hub by ID
+  /// Checks both prefixed and unprefixed collections to find the hub
   Future<Hub?> getHub(String hubId) async {
     try {
-      final doc = await _firestore.collection('hubs').doc(hubId).get();
-      if (!doc.exists) return null;
-      return Hub.fromJson({'id': doc.id, ...doc.data()!});
+      final prefixedPath = FirestorePathUtils.getCollectionPath('hubs');
+      
+      // Try prefixed collection first
+      var doc = await _firestore
+          .collection(prefixedPath)
+          .doc(hubId)
+          .get();
+      
+      if (doc.exists) {
+        return Hub.fromJson({'id': doc.id, ...doc.data()!});
+      }
+      
+      // If not found and prefixed path is different, try unprefixed collection
+      final unprefixedPath = 'hubs';
+      if (prefixedPath != unprefixedPath) {
+        doc = await _firestore
+            .collection(unprefixedPath)
+            .doc(hubId)
+            .get();
+        
+        if (doc.exists) {
+          return Hub.fromJson({'id': doc.id, ...doc.data()!});
+        }
+      }
+      
+      return null;
     } catch (e) {
       Logger.error('Error getting hub', error: e, tag: 'HubService');
       return null;
@@ -70,13 +145,28 @@ class HubService {
   }
 
   /// Create a new hub
+  /// 
+  /// Validates premium hub access if hubType is premium (extended_family, homeschooling, coparenting)
   Future<Hub> createHub({
     required String name,
     required String description,
     String? icon,
+    HubType hubType = HubType.family,
+    Map<String, dynamic>? typeSpecificData,
   }) async {
     final userId = currentUserId;
     if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
+
+    // Validate premium hub access
+    if (hubType != HubType.family) {
+      final hasAccess = await _subscriptionService.hasPremiumHubAccess(hubType.value);
+      if (!hasAccess) {
+        throw PermissionException(
+          'Premium hub access required. Please upgrade your subscription.',
+          code: 'premium-required',
+        );
+      }
+    }
 
     final hub = Hub(
       id: const Uuid().v4(),
@@ -86,12 +176,17 @@ class HubService {
       memberIds: [userId], // Creator is automatically a member
       createdAt: DateTime.now(),
       icon: icon,
+      hubType: hubType,
+      typeSpecificData: typeSpecificData,
     );
 
     try {
       final data = hub.toJson();
       data.remove('id');
-      await _firestore.collection('hubs').doc(hub.id).set(data);
+      await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubs'))
+          .doc(hub.id)
+          .set(data);
       return hub;
     } catch (e) {
       Logger.error('Error creating hub', error: e, tag: 'HubService');
@@ -139,7 +234,10 @@ class HubService {
         return; // Already a member
       }
 
-      await _firestore.collection('hubs').doc(hubId).update({
+      await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubs'))
+          .doc(hubId)
+          .update({
         'memberIds': FieldValue.arrayUnion([userId]),
       });
     } catch (e) {
@@ -151,7 +249,10 @@ class HubService {
   /// Remove a member from a hub
   Future<void> removeMember(String hubId, String userId) async {
     try {
-      await _firestore.collection('hubs').doc(hubId).update({
+      await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubs'))
+          .doc(hubId)
+          .update({
         'memberIds': FieldValue.arrayRemove([userId]),
       });
     } catch (e) {
@@ -172,7 +273,10 @@ class HubService {
     }
 
     try {
-      await _firestore.collection('hubs').doc(hubId).update(updates);
+      await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubs'))
+          .doc(hubId)
+          .update(updates);
     } catch (e) {
       Logger.error('Error updating hub', error: e, tag: 'HubService');
       rethrow;
@@ -191,7 +295,10 @@ class HubService {
     }
 
     try {
-      await _firestore.collection('hubs').doc(hubId).delete();
+      await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubs'))
+          .doc(hubId)
+          .delete();
     } catch (e) {
       Logger.error('Error deleting hub', error: e, tag: 'HubService');
       rethrow;
@@ -237,7 +344,10 @@ class HubService {
     try {
       final data = invite.toJson();
       data.remove('id');
-      await _firestore.collection('hubInvites').doc(invite.id).set(data);
+      await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubInvites'))
+          .doc(invite.id)
+          .set(data);
       return invite;
     } catch (e) {
       Logger.error('Error creating invite', error: e, tag: 'HubService');
@@ -248,7 +358,10 @@ class HubService {
   /// Get invite by ID
   Future<HubInvite?> getInvite(String inviteId) async {
     try {
-      final doc = await _firestore.collection('hubInvites').doc(inviteId).get();
+      final doc = await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubInvites'))
+          .doc(inviteId)
+          .get();
       if (!doc.exists) return null;
       return HubInvite.fromJson({'id': doc.id, ...doc.data()!});
     } catch (e) {
@@ -281,7 +394,10 @@ class HubService {
       await addMember(invite.hubId, userId);
 
       // Update invite status
-      await _firestore.collection('hubInvites').doc(inviteId).update({
+      await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubInvites'))
+          .doc(inviteId)
+          .update({
         'status': 'accepted',
         'userId': userId, // Store the user who accepted
       });
@@ -303,7 +419,7 @@ class HubService {
       // Get invites by email
       final emailSnapshot = currentUser.email.isNotEmpty
           ? await _firestore
-              .collection('hubInvites')
+              .collection(FirestorePathUtils.getCollectionPath('hubInvites'))
               .where('email', isEqualTo: currentUser.email)
               .where('status', isEqualTo: 'pending')
               .get()
@@ -311,7 +427,7 @@ class HubService {
 
       // Get invites by userId (if any)
       final userIdSnapshot = await _firestore
-          .collection('hubInvites')
+          .collection(FirestorePathUtils.getCollectionPath('hubInvites'))
           .where('userId', isEqualTo: userId)
           .where('status', isEqualTo: 'pending')
           .get();

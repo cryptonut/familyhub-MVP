@@ -35,6 +35,8 @@ import 'shopping/shopping_home_screen.dart';
 import 'hubs/my_hubs_screen.dart';
 import 'hubs/my_friends_hub_screen.dart';
 import 'uat/uat_screen.dart';
+import 'subscription/subscription_screen.dart';
+import 'admin/grant_premium_test_screen.dart';
 import '../services/task_service.dart';
 import '../services/navigation_order_service.dart';
 import '../widgets/reorderable_navigation_bar.dart';
@@ -100,9 +102,56 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _navigationOrder = order;
         });
+        // Validate order and reset if corrupted
+        _validateAndFixNavigationOrder();
       }
     } catch (e) {
       Logger.error('Error loading navigation order', error: e, tag: 'HomeScreen');
+      // Reset to default on error
+      if (mounted) {
+        setState(() {
+          _navigationOrder = [0, 1, 2, 3, 4, 5, 6];
+        });
+      }
+    }
+  }
+
+  void _validateAndFixNavigationOrder() {
+    // Validate: must have 7 items, first must be 0, all must be 0-6, no duplicates
+    final defaultOrder = [0, 1, 2, 3, 4, 5, 6];
+    final isValid = _navigationOrder.length == 7 &&
+        _navigationOrder[0] == 0 &&
+        _navigationOrder.every((i) => i >= 0 && i < 7) &&
+        _navigationOrder.toSet().length == 7; // No duplicates
+    
+    if (!isValid) {
+      Logger.warning('Invalid navigation order detected: $_navigationOrder, resetting to default', tag: 'HomeScreen');
+      _resetNavigationOrder();
+    }
+  }
+
+  Future<void> _resetNavigationOrder() async {
+    try {
+      await _navigationOrderService.resetToDefault();
+      if (mounted) {
+        final appState = Provider.of<AppState>(context, listen: false);
+        setState(() {
+          _navigationOrder = [0, 1, 2, 3, 4, 5, 6];
+        });
+        // Reset PageController to home
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(0);
+        }
+        appState.setCurrentIndex(0);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Navigation order reset to default due to corruption'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      Logger.error('Error resetting navigation order', error: e, tag: 'HomeScreen');
     }
   }
 
@@ -558,6 +607,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return _navigationOrder.map((screenIndex) => allScreens[screenIndex]).toList();
   }
 
+  /// Get navigation position for a given screen index
+  int _getNavPositionForScreenIndex(int screenIndex) {
+    final navIndex = _navigationOrder.indexOf(screenIndex);
+    return navIndex >= 0 ? navIndex : 0; // Default to 0 if not found
+  }
+
   /// Build ordered navigation destinations based on navigation order
   List<NavigationDestination> _buildOrderedDestinations() {
     // All destinations in their default order (by screen index)
@@ -632,6 +687,11 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('Debug User Info'),
               onTap: () => Navigator.pop(context, 'debug'),
             ),
+            ListTile(
+              leading: const Icon(Icons.workspace_premium, color: Colors.orange),
+              title: const Text('Grant Premium Access (Test)'),
+              onTap: () => Navigator.pop(context, 'grant_premium'),
+            ),
           ],
         ),
         actions: [
@@ -652,6 +712,13 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } else if (result == 'fix_family') {
       await _showFixFamilyDialog(context, authService);
+    } else if (result == 'grant_premium') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const GrantPremiumTestScreen(),
+        ),
+      );
     } else if (result == 'debug') {
       // Show debug information
       final user = authService.currentUser;
@@ -1252,6 +1319,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
+                    const PopupMenuItem(
+                      value: 'subscription',
+                      child: Row(
+                        children: [
+                          Icon(Icons.star, size: 20, color: Colors.amber),
+                          SizedBox(width: 8),
+                          Text('Subscription'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'reset_nav_order',
+                      child: Row(
+                        children: [
+                          Icon(Icons.restore, size: 20, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text('Reset Navigation Order'),
+                        ],
+                      ),
+                    ),
                     const PopupMenuDivider(),
                   ];
                   
@@ -1382,6 +1470,34 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (context) => const PrivacyCenterScreen(),
             ),
           );
+        } else if (value == 'subscription') {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SubscriptionScreen(),
+            ),
+          );
+        } else if (value == 'reset_nav_order') {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Reset Navigation Order'),
+              content: const Text('This will reset your navigation bar to the default order. Continue?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Reset'),
+                ),
+              ],
+            ),
+          );
+          if (confirm == true) {
+            await _resetNavigationOrder();
+          }
         } else if (value == 'admin_menu') {
           await _showAdminMenu(context, authService);
         } else if (value == 'developer_menu') {
@@ -1460,18 +1576,26 @@ class _HomeScreenState extends State<HomeScreen> {
             children: _buildOrderedScreens(),
           ),
           bottomNavigationBar: ReorderableNavigationBar(
-            selectedIndex: appState.currentIndex,
+            selectedIndex: _getNavPositionForScreenIndex(appState.currentIndex), // Map screen index to nav position
             onDestinationSelected: (screenIndex) {
-              // screenIndex is the actual screen index (0-6)
-              // Find which navigation position this screen is at
+              // screenIndex is the actual screen index (0-6) from ReorderableNavigationBar
+              // Find which navigation position this screen is at in the current order
               final navIndex = _navigationOrder.indexOf(screenIndex);
-              if (navIndex >= 0) {
+              if (navIndex >= 0 && navIndex < _navigationOrder.length) {
+                // Update app state with the screen index
                 appState.setCurrentIndex(screenIndex);
-                _pageController.animateToPage(
-                  navIndex,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
+                // Navigate to the correct page position
+                if (_pageController.hasClients) {
+                  _pageController.animateToPage(
+                    navIndex,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              } else {
+                // If mapping fails, reset to default order
+                Logger.warning('Navigation mapping failed: screenIndex=$screenIndex, order=$_navigationOrder', tag: 'HomeScreen');
+                _resetNavigationOrder();
               }
             },
             onOrderChanged: (newOrder) {
@@ -1484,6 +1608,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             destinations: _buildOrderedDestinations(),
+            initialOrder: _navigationOrder,
           ),
         );
       },

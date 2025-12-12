@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/services/logger_service.dart';
+import '../utils/firestore_path_utils.dart';
 import '../services/auth_service.dart';
 
 /// Service for managing navigation bar item order (stored in Firestore per user)
@@ -21,7 +22,7 @@ class NavigationOrderService {
         return List.from(_defaultOrder);
       }
 
-      final userDoc = await _firestore.collection('users').doc(userId).get();
+      final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).get();
       
       if (!userDoc.exists || userDoc.data() == null) {
         return List.from(_defaultOrder);
@@ -68,7 +69,7 @@ class NavigationOrderService {
         throw Exception('Navigation order must contain all indices 0-6');
       }
       
-      await _firestore.collection('users').doc(userId).set({
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).set({
         'navigationOrder': order,
       }, SetOptions(merge: true));
       
@@ -88,7 +89,7 @@ class NavigationOrderService {
         return;
       }
 
-      await _firestore.collection('users').doc(userId).set({
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).set({
         'navigationOrder': _defaultOrder,
       }, SetOptions(merge: true));
       

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/services/logger_service.dart';
 import '../models/event_template.dart';
 import '../models/calendar_event.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 import 'package:uuid/uuid.dart';
 
@@ -22,7 +23,7 @@ class EventTemplateService {
       }
 
       final snapshot = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('eventTemplates')
           .orderBy('createdAt', descending: true)
@@ -54,7 +55,7 @@ class EventTemplateService {
       templateData.remove('id');
 
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('eventTemplates')
           .doc(templateId)
@@ -81,7 +82,7 @@ class EventTemplateService {
       templateData.remove('id');
 
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('eventTemplates')
           .doc(template.id)
@@ -104,7 +105,7 @@ class EventTemplateService {
       }
 
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('eventTemplates')
           .doc(templateId)

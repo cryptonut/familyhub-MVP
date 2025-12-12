@@ -4,6 +4,7 @@ import '../core/services/logger_service.dart';
 import '../core/constants/app_constants.dart';
 import '../core/errors/app_exceptions.dart';
 import '../models/task.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 import 'notification_service.dart';
 import 'family_wallet_service.dart';
@@ -42,7 +43,7 @@ class TaskService {
   Future<String> get _collectionPath async {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
-    return 'families/$familyId/tasks';
+    return FirestorePathUtils.getFamilySubcollectionPath(familyId, 'tasks');
   }
 
   Future<List<Task>> getTasks({int limit = 50, bool forceRefresh = false}) async {
@@ -156,7 +157,7 @@ class TaskService {
       
       final pageSize = 50; // Default page size for task stream
       return _firestore
-          .collection('families/$familyId/tasks')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'tasks'))
           .orderBy('createdAt', descending: true)
           .limit(pageSize) // Add pagination limit
           .snapshots()
@@ -281,7 +282,7 @@ class TaskService {
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
     try {
-      final docRef = _firestore.collection('families/$familyId/tasks').doc(task.id);
+      final docRef = _firestore.collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'tasks')).doc(task.id);
       final doc = await docRef.get();
       
       if (!doc.exists) {
@@ -309,7 +310,7 @@ class TaskService {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
     
-    final docRef = _firestore.collection('families/$familyId/tasks').doc(taskId);
+    final docRef = _firestore.collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'tasks')).doc(taskId);
     final taskDoc = await docRef.get();
     
     if (!taskDoc.exists) {
@@ -378,7 +379,7 @@ class TaskService {
     if (userId == null) throw AuthException('User not authenticated', code: 'not-authenticated');
     
     try {
-      final docRef = _firestore.collection('families/$familyId/tasks').doc(taskId);
+      final docRef = _firestore.collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'tasks')).doc(taskId);
       final doc = await docRef.get(GetOptions(source: Source.server));
       
       if (!doc.exists) {

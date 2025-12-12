@@ -30,9 +30,12 @@ class _TetrisScreenState extends State<TetrisScreen> {
   int _lines = 0;
   bool _gameOver = false;
   bool _isPaused = false;
+  bool _showInstructions = false;
+  bool _hasSeenInstructions = false;
   Timer? _gameTimer;
   List<Map<String, dynamic>> _highScores = [];
   static const String _highScoresKey = 'tetris_high_scores';
+  static const String _hasSeenInstructionsKey = 'tetris_has_seen_instructions';
   
   final GamesService _gamesService = GamesService();
   final AuthService _authService = AuthService();
@@ -43,7 +46,9 @@ class _TetrisScreenState extends State<TetrisScreen> {
   
   // Touch control state
   DateTime? _lastTapTime;
+  DateTime? _pressStartTime;
   static const Duration _tapDebounce = Duration(milliseconds: 100);
+  static const Duration _pressThreshold = Duration(milliseconds: 200); // Minimum time for sustained press
   Offset? _panStartPosition;
   static const double _swipeThreshold = 30.0; // Minimum distance for swipe
 
@@ -79,7 +84,49 @@ class _TetrisScreenState extends State<TetrisScreen> {
   void initState() {
     super.initState();
     _loadHighScores();
-    _initGame();
+    _checkFirstTimePlayer();
+  }
+  
+  Future<void> _checkFirstTimePlayer() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _hasSeenInstructions = prefs.getBool(_hasSeenInstructionsKey) ?? false;
+      
+      if (!_hasSeenInstructions) {
+        // Show instructions overlay before starting the game
+        setState(() {
+          _showInstructions = true;
+        });
+      } else {
+        // Start the game immediately if user has seen instructions
+        _initGame();
+      }
+    } catch (e) {
+      Logger.warning('Error checking first-time player status', error: e, tag: 'TetrisScreen');
+      // If there's an error, show instructions anyway
+      setState(() {
+        _showInstructions = true;
+      });
+    }
+  }
+  
+  Future<void> _dismissInstructions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_hasSeenInstructionsKey, true);
+      _hasSeenInstructions = true;
+      setState(() {
+        _showInstructions = false;
+      });
+      // Start the game after dismissing instructions
+      _initGame();
+    } catch (e) {
+      Logger.warning('Error saving instructions status', error: e, tag: 'TetrisScreen');
+      setState(() {
+        _showInstructions = false;
+      });
+      _initGame();
+    }
   }
 
   @override
@@ -137,6 +184,9 @@ class _TetrisScreenState extends State<TetrisScreen> {
   }
 
   void _initGame() {
+    // Don't start the game if instructions are showing
+    if (_showInstructions) return;
+    
     _board = List.generate(rows, (_) => List.filled(cols, 0));
     _score = 0;
     _lines = 0;
@@ -145,6 +195,10 @@ class _TetrisScreenState extends State<TetrisScreen> {
     _spawnPiece();
     _startGame();
     setState(() {});
+  }
+  
+  void _restartGame() {
+    _initGame();
   }
 
   Future<void> _handleGameOver() async {
@@ -406,16 +460,33 @@ class _TetrisScreenState extends State<TetrisScreen> {
     }
   }
   
-  void _handleTap(Offset localPosition, Size boardSize) {
+  void _handleTapDown(Offset localPosition, Size boardSize) {
     if (_gameOver || _isPaused || _currentPiece == null) return;
     
-    // Debounce rapid taps
+    // Record press start time for sustained press detection
+    _pressStartTime = DateTime.now();
+  }
+  
+  void _handleTapUp(Offset localPosition, Size boardSize) {
+    if (_gameOver || _isPaused || _currentPiece == null || _pressStartTime == null) return;
+    
     final now = DateTime.now();
+    final pressDuration = now.difference(_pressStartTime!);
+    _pressStartTime = null;
+    
+    // Debounce rapid taps
     if (_lastTapTime != null && now.difference(_lastTapTime!) < _tapDebounce) {
       return;
     }
     _lastTapTime = now;
     
+    // If this was a quick tap (less than press threshold), rotate
+    if (pressDuration < _pressThreshold) {
+      _rotate();
+      return;
+    }
+    
+    // For sustained press, determine direction based on position
     // Calculate cell dimensions (accounting for border)
     final cellWidth = boardSize.width / (cols + 2);
     final cellHeight = boardSize.height / (rows + 2);
@@ -436,12 +507,6 @@ class _TetrisScreenState extends State<TetrisScreen> {
     final boardCol = col - 1;
     final boardRow = row - 1;
     
-    // Check if tap is in bottom row (hard drop)
-    if (boardRow >= rows - 1) {
-      _hardDrop();
-      return;
-    }
-    
     // Calculate current piece width
     final pieceWidth = _currentPiece![0].length;
     final pieceLeftCol = _currentCol;
@@ -454,14 +519,13 @@ class _TetrisScreenState extends State<TetrisScreen> {
     } else if (boardCol > pieceRightCol) {
       // Right zone - move right
       _moveRight();
-    } else {
-      // Block zone - rotate
-      _rotate();
     }
+    // For sustained press on the block itself, do nothing (rotation already handled for quick tap)
   }
   
   void _handlePanStart(Offset position) {
     _panStartPosition = position;
+    _pressStartTime = DateTime.now(); // Track press start for drag gestures
   }
   
   void _handlePanUpdate(Offset position) {
@@ -473,7 +537,7 @@ class _TetrisScreenState extends State<TetrisScreen> {
     
     // Determine if this is a horizontal or vertical swipe
     if (absDeltaX > _swipeThreshold && absDeltaX > absDeltaY) {
-      // Horizontal swipe
+      // Horizontal swipe - move side to side
       if (delta.dx < 0) {
         _moveLeft();
       } else {
@@ -491,6 +555,7 @@ class _TetrisScreenState extends State<TetrisScreen> {
   
   void _handlePanEnd() {
     _panStartPosition = null;
+    _pressStartTime = null;
   }
 
   List<List<int>> _getDisplayBoard() {
@@ -793,11 +858,13 @@ class _TetrisScreenState extends State<TetrisScreen> {
         ),
       ),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Game Board - Takes up most of the screen
-            Expanded(
-              child: LayoutBuilder(
+            Column(
+              children: [
+                // Game Board - Takes up most of the screen
+                Expanded(
+                  child: LayoutBuilder(
                 builder: (context, constraints) {
                   // Calculate board size to maximize screen usage
                   final availableWidth = constraints.maxWidth;
@@ -832,7 +899,10 @@ class _TetrisScreenState extends State<TetrisScreen> {
                         builder: (context, constraints) {
                           return GestureDetector(
                             onTapDown: (details) {
-                              _handleTap(details.localPosition, constraints.biggest);
+                              _handleTapDown(details.localPosition, constraints.biggest);
+                            },
+                            onTapUp: (details) {
+                              _handleTapUp(details.localPosition, constraints.biggest);
                             },
                             onPanStart: (details) {
                               _handlePanStart(details.localPosition);
@@ -877,44 +947,67 @@ class _TetrisScreenState extends State<TetrisScreen> {
                   );
                 },
               ),
+                ),
+              ],
             ),
-            
-            // Control Instructions (only show when game is paused or just started)
-            if (_isPaused || _score == 0)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade900.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade700, width: 1),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Touch Controls',
-                        style: TextStyle(
-                          color: Colors.blue.shade200,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+            // Instructions overlay (only shown before first game)
+            if (_showInstructions)
+              Container(
+                color: Colors.black.withOpacity(0.7),
+                child: Center(
+                  child: Container(
+                    margin: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.blue.shade700, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 5,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          _buildControlHint('Tap left of block', '← Move left'),
-                          _buildControlHint('Tap on block', '↻ Rotate'),
-                          _buildControlHint('Tap right of block', '→ Move right'),
-                          _buildControlHint('Tap bottom row', '⬇ Hard drop'),
-                          _buildControlHint('Swipe down', '⬇ Soft drop'),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.sports_esports,
+                          size: 64,
+                          color: Colors.blue.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'How to Play',
+                          style: TextStyle(
+                            color: Colors.blue.shade300,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildControlHint('Quick tap on block', '↻ Rotate'),
+                        const SizedBox(height: 12),
+                        _buildControlHint('Sustained press left of block', '← Move left'),
+                        const SizedBox(height: 12),
+                        _buildControlHint('Sustained press right of block', '→ Move right'),
+                        const SizedBox(height: 12),
+                        _buildControlHint('Swipe down', '⬇ Soft drop'),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _dismissInstructions,
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('OK, Let\'s Play!'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            backgroundColor: Colors.blue.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

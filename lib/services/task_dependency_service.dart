@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/services/logger_service.dart';
 import '../models/task.dart';
 import '../models/task_dependency.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 import 'package:uuid/uuid.dart';
 
@@ -26,7 +27,7 @@ class TaskDependencyService {
       );
 
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('tasks')
           .doc(taskId)
@@ -48,7 +49,7 @@ class TaskDependencyService {
   Future<void> removeDependency(String taskId, String dependencyId, String familyId) async {
     try {
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('tasks')
           .doc(taskId)
@@ -70,7 +71,7 @@ class TaskDependencyService {
   Future<List<TaskDependency>> getDependencies(String taskId, String familyId) async {
     try {
       final snapshot = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('tasks')
           .doc(taskId)
@@ -93,7 +94,7 @@ class TaskDependencyService {
   Future<List<Task>> getDependentTasks(String taskId, String familyId) async {
     try {
       final snapshot = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('tasks')
           .where('dependencies', arrayContains: taskId)
@@ -158,7 +159,7 @@ class TaskDependencyService {
   Future<void> _updateTaskBlockedStatus(String taskId, String familyId) async {
     try {
       final taskDoc = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('tasks')
           .doc(taskId)

@@ -14,11 +14,13 @@ import '../video/video_call_screen.dart';
 import '../chat/private_chat_screen.dart';
 import '../../services/video_call_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/privacy_filter_service.dart';
 import '../../config/config.dart';
 import 'create_hub_event_dialog.dart';
 import 'invite_members_dialog.dart';
 import 'hub_settings_screen.dart';
 import 'hub_chat_screen.dart';
+import 'extended_family_member_management_screen.dart';
 import '../../widgets/chat_widget.dart';
 
 class MyFriendsHubScreen extends StatefulWidget {
@@ -36,6 +38,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
   final CalendarService _calendarService = CalendarService();
   final VideoCallService _videoCallService = VideoCallService();
   final ChatService _chatService = ChatService();
+  final PrivacyFilterService _privacyFilterService = PrivacyFilterService();
   
   List<UserModel> _members = [];
   List<CalendarEvent> _upcomingEvents = [];
@@ -76,16 +79,20 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
       final allEvents = await _calendarService.getEvents();
       final now = DateTime.now();
       final monthFromNow = now.add(const Duration(days: 30));
-      final upcomingEvents = allEvents
+      var upcomingEvents = allEvents
           .where((event) {
             // Filter to only show events that belong to this hub
             // Events with hubId matching this hub, or null hubId (family events) should not appear
-            return event.hubId == widget.hub.id &&
-                event.startTime.isAfter(now) && 
-                event.startTime.isBefore(monthFromNow);
+            return event.hubId == widget.hub.id || event.hubIds.contains(widget.hub.id);
           })
+          .where((event) => event.startTime.isAfter(now) && event.startTime.isBefore(monthFromNow))
           .toList()
         ..sort((a, b) => a.startTime.compareTo(b.startTime));
+      
+      // Apply privacy filtering for extended family hubs
+      if (widget.hub.isExtendedFamilyHub) {
+        upcomingEvents = await _privacyFilterService.filterEvents(upcomingEvents, widget.hub.id);
+      }
 
       // Load upcoming birthdays (next month)
       // Note: We'll need to add birthday field to UserModel or handle differently
@@ -170,6 +177,21 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
               onPressed: _startVideoCall,
               tooltip: 'Start Video Call',
             ),
+          if (widget.hub.isExtendedFamilyHub && _isHubCreator)
+            IconButton(
+              icon: const Icon(Icons.people),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ExtendedFamilyMemberManagementScreen(
+                      hub: widget.hub,
+                    ),
+                  ),
+                );
+              },
+              tooltip: 'Manage Extended Family',
+            ),
           if (_isHubCreator)
             IconButton(
               icon: const Icon(Icons.settings),
@@ -216,8 +238,17 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
   }
 
   Widget _buildHubChatSection() {
+    // For extended family hubs, we need to filter messages based on privacy
+    Stream<List<ChatMessage>> messagesStream = _chatService.getHubMessagesStream(widget.hub.id);
+    
+    if (widget.hub.isExtendedFamilyHub) {
+      messagesStream = messagesStream.asyncMap((messages) async {
+        return await _privacyFilterService.filterMessages(messages, widget.hub.id);
+      });
+    }
+    
     return ChatWidget(
-      messagesStream: _chatService.getHubMessagesStream(widget.hub.id),
+      messagesStream: messagesStream,
       onSendMessage: (messageText) async {
         final currentUserId = _chatService.currentUserId;
         final currentUserName = _chatService.currentUserName ?? 'You';

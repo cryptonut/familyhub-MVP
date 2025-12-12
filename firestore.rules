@@ -7,18 +7,49 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Helper function to check if user document exists
+    // Helper function to check if user document exists (checks all possible collection paths)
     function userDocumentExists() {
-      return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() && (
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        exists(/databases/$(database)/documents/dev_users/$(request.auth.uid)) ||
+        exists(/databases/$(database)/documents/test_users/$(request.auth.uid))
+      );
     }
     
-    // Helper function to get user's family ID (safely handles missing document or field)
-    function getUserFamilyId() {
-      return userDocumentExists() && 
+    // Helper function to get user's family ID from users collection
+    function getUserFamilyIdFromUsers() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         'familyId' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data ?
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.familyId :
         null;
+    }
+    
+    // Helper function to get user's family ID from dev_users collection
+    function getUserFamilyIdFromDevUsers() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/dev_users/$(request.auth.uid)) &&
+        'familyId' in get(/databases/$(database)/documents/dev_users/$(request.auth.uid)).data ?
+        get(/databases/$(database)/documents/dev_users/$(request.auth.uid)).data.familyId :
+        null;
+    }
+    
+    // Helper function to get user's family ID from test_users collection
+    function getUserFamilyIdFromTestUsers() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/test_users/$(request.auth.uid)) &&
+        'familyId' in get(/databases/$(database)/documents/test_users/$(request.auth.uid)).data ?
+        get(/databases/$(database)/documents/test_users/$(request.auth.uid)).data.familyId :
+        null;
+    }
+    
+    // Helper function to get user's family ID (safely handles missing document or field)
+    // Checks all possible collection paths
+    function getUserFamilyId() {
+      let familyId = getUserFamilyIdFromUsers();
+      return familyId != null ? familyId : (
+        getUserFamilyIdFromDevUsers() != null ? getUserFamilyIdFromDevUsers() : getUserFamilyIdFromTestUsers()
+      );
     }
     
     // Helper function to check if user belongs to a family
@@ -31,21 +62,101 @@ service cloud.firestore {
     }
     
     // Helper function to check if user is Banker or Admin (safely handles missing document)
+    // Checks all possible collection paths
     function isBankerOrAdmin() {
-      return isAuthenticated() && 
-        userDocumentExists() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['banker', 'admin']);
+      return isAuthenticated() && userDocumentExists() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         'roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['banker', 'admin'])) ||
+        (exists(/databases/$(database)/documents/dev_users/$(request.auth.uid)) &&
+         'roles' in get(/databases/$(database)/documents/dev_users/$(request.auth.uid)).data &&
+         get(/databases/$(database)/documents/dev_users/$(request.auth.uid)).data.roles.hasAny(['banker', 'admin'])) ||
+        (exists(/databases/$(database)/documents/test_users/$(request.auth.uid)) &&
+         'roles' in get(/databases/$(database)/documents/test_users/$(request.auth.uid)).data &&
+         get(/databases/$(database)/documents/test_users/$(request.auth.uid)).data.roles.hasAny(['banker', 'admin']))
+      );
     }
     
     // Helper function to check if user is Admin (safely handles missing document)
+    // Checks all possible collection paths
     function isAdmin() {
-      return isAuthenticated() && 
-        userDocumentExists() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin', 'Admin']);
+      return isAuthenticated() && userDocumentExists() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         'roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin', 'Admin'])) ||
+        (exists(/databases/$(database)/documents/dev_users/$(request.auth.uid)) &&
+         'roles' in get(/databases/$(database)/documents/dev_users/$(request.auth.uid)).data &&
+         get(/databases/$(database)/documents/dev_users/$(request.auth.uid)).data.roles.hasAny(['admin', 'Admin'])) ||
+        (exists(/databases/$(database)/documents/test_users/$(request.auth.uid)) &&
+         'roles' in get(/databases/$(database)/documents/test_users/$(request.auth.uid)).data &&
+         get(/databases/$(database)/documents/test_users/$(request.auth.uid)).data.roles.hasAny(['admin', 'Admin']))
+      );
     }
     
     // Users collection - users can read/write their own data
     match /users/{userId} {
+      // Users can read their own document
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can read other users' documents (needed for family members list and invitation verification)
+      allow read: if isAuthenticated();
+      
+      // Users can write their own document
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow Bankers/Admins to update roles field of other users in their family
+      allow update: if isAuthenticated() && 
+        request.auth.uid == userId ||
+        (isBankerOrAdmin() && 
+         belongsToFamily(resource.data.familyId) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles']));
+      
+      // Allow Bankers/Admins to update relationship field of other users in their family
+      allow update: if isAuthenticated() && 
+        request.auth.uid != userId &&
+        isBankerOrAdmin() &&
+        belongsToFamily(resource.data.familyId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['relationship']);
+      
+      // Ignored conflicts subcollection - users can manage their own ignored conflicts
+      match /ignoredConflicts/{conflictKey} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+    
+    // Dev users collection - same rules as users (for dev environment)
+    match /dev_users/{userId} {
+      // Users can read their own document
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can read other users' documents (needed for family members list and invitation verification)
+      allow read: if isAuthenticated();
+      
+      // Users can write their own document
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow Bankers/Admins to update roles field of other users in their family
+      allow update: if isAuthenticated() && 
+        request.auth.uid == userId ||
+        (isBankerOrAdmin() && 
+         belongsToFamily(resource.data.familyId) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roles']));
+      
+      // Allow Bankers/Admins to update relationship field of other users in their family
+      allow update: if isAuthenticated() && 
+        request.auth.uid != userId &&
+        isBankerOrAdmin() &&
+        belongsToFamily(resource.data.familyId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['relationship']);
+      
+      // Ignored conflicts subcollection - users can manage their own ignored conflicts
+      match /ignoredConflicts/{conflictKey} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+    
+    // Test users collection - same rules as users (for qa/test environment)
+    match /test_users/{userId} {
       // Users can read their own document
       allow read: if isAuthenticated() && request.auth.uid == userId;
       
@@ -455,6 +566,72 @@ service cloud.firestore {
       }
     }
     
+    // Dev families collection - same rules as families (for dev environment)
+    match /dev_families/{familyId} {
+      // Allow read if user belongs to the family
+      allow read: if belongsToFamily(familyId);
+      
+      // Allow creating family document if it doesn't exist (for first job creation)
+      allow create: if belongsToFamily(familyId) &&
+        request.resource.data.walletBalance is number;
+      
+      // Allow updating walletBalance field for family members (for job creation/approval)
+      // This handles both updates to existing documents and set() with merge on new documents
+      // Also allow admins to update openMatchmakingEnabled setting
+      allow update: if belongsToFamily(familyId) && (
+        // Update walletBalance (existing rule)
+        (request.resource.data.walletBalance is number &&
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['walletBalance']) ||
+          !exists(/databases/$(database)/documents/dev_families/$(familyId)))) ||
+        // Update openMatchmakingEnabled (admin only)
+        (isAdmin() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['openMatchmakingEnabled']) &&
+         request.resource.data.openMatchmakingEnabled is bool) ||
+        // Allow set() with merge for both fields
+        (!exists(/databases/$(database)/documents/dev_families/$(familyId)) &&
+         (request.resource.data.walletBalance is number || request.resource.data.openMatchmakingEnabled is bool))
+      );
+      
+      // All subcollections follow same pattern as families - delegate to a helper or duplicate structure
+      // For now, allow all authenticated family members (same as families)
+      match /{document=**} {
+        allow read, write: if belongsToFamily(familyId);
+      }
+    }
+    
+    // Test families collection - same rules as families (for qa/test environment)
+    match /test_families/{familyId} {
+      // Allow read if user belongs to the family
+      allow read: if belongsToFamily(familyId);
+      
+      // Allow creating family document if it doesn't exist (for first job creation)
+      allow create: if belongsToFamily(familyId) &&
+        request.resource.data.walletBalance is number;
+      
+      // Allow updating walletBalance field for family members (for job creation/approval)
+      // This handles both updates to existing documents and set() with merge on new documents
+      // Also allow admins to update openMatchmakingEnabled setting
+      allow update: if belongsToFamily(familyId) && (
+        // Update walletBalance (existing rule)
+        (request.resource.data.walletBalance is number &&
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['walletBalance']) ||
+          !exists(/databases/$(database)/documents/test_families/$(familyId)))) ||
+        // Update openMatchmakingEnabled (admin only)
+        (isAdmin() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['openMatchmakingEnabled']) &&
+         request.resource.data.openMatchmakingEnabled is bool) ||
+        // Allow set() with merge for both fields
+        (!exists(/databases/$(database)/documents/test_families/$(familyId)) &&
+         (request.resource.data.walletBalance is number || request.resource.data.openMatchmakingEnabled is bool))
+      );
+      
+      // All subcollections follow same pattern as families - delegate to a helper or duplicate structure
+      // For now, allow all authenticated family members (same as families)
+      match /{document=**} {
+        allow read, write: if belongsToFamily(familyId);
+      }
+    }
+    
     // Notifications collection (top-level, for backward compatibility)
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
@@ -480,6 +657,64 @@ service cloud.firestore {
             exists(/databases/$(database)/documents/hubs/$(hubId)) &&
             (get(/databases/$(database)/documents/hubs/$(hubId)).data.creatorId == request.auth.uid ||
              request.auth.uid in get(/databases/$(database)/documents/hubs/$(hubId)).data.memberIds);
+        }
+        
+        allow read: if isHubMember();
+        allow create: if isHubMember() && 
+          request.resource.data.senderId == request.auth.uid;
+        allow update: if isHubMember() && 
+          resource.data.senderId == request.auth.uid;
+        allow delete: if isHubMember() && 
+          resource.data.senderId == request.auth.uid;
+      }
+    }
+    
+    // Dev hubs collection (for dev environment)
+    match /dev_hubs/{hubId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.creatorId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        (resource.data.creatorId == request.auth.uid ||
+         resource.data.memberIds.hasAny([request.auth.uid]));
+      allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
+      
+      // Hub messages subcollection
+      match /messages/{messageId} {
+        // Helper function to check if user is a hub member
+        function isHubMember() {
+          return isAuthenticated() && 
+            exists(/databases/$(database)/documents/dev_hubs/$(hubId)) &&
+            (get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.creatorId == request.auth.uid ||
+             request.auth.uid in get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.memberIds);
+        }
+        
+        allow read: if isHubMember();
+        allow create: if isHubMember() && 
+          request.resource.data.senderId == request.auth.uid;
+        allow update: if isHubMember() && 
+          resource.data.senderId == request.auth.uid;
+        allow delete: if isHubMember() && 
+          resource.data.senderId == request.auth.uid;
+      }
+    }
+    
+    // Test hubs collection (for qa/test environment)
+    match /test_hubs/{hubId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.creatorId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        (resource.data.creatorId == request.auth.uid ||
+         resource.data.memberIds.hasAny([request.auth.uid]));
+      allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
+      
+      // Hub messages subcollection
+      match /messages/{messageId} {
+        // Helper function to check if user is a hub member
+        function isHubMember() {
+          return isAuthenticated() && 
+            exists(/databases/$(database)/documents/test_hubs/$(hubId)) &&
+            (get(/databases/$(database)/documents/test_hubs/$(hubId)).data.creatorId == request.auth.uid ||
+             request.auth.uid in get(/databases/$(database)/documents/test_hubs/$(hubId)).data.memberIds);
         }
         
         allow read: if isHubMember();
@@ -610,6 +845,176 @@ service cloud.firestore {
       allow delete: if isAuthenticated();
       // No updates allowed (immutable)
       allow update: if false;
+    }
+    
+    // Helper function to check if request is from a service account
+    // Service accounts authenticate via IAM and always have token.email set
+    // Regular users authenticate via Firebase Auth and may not have token.email
+    // Simple check: if authenticated with token.email and no user document, it's a service account
+    function isServiceAccount() {
+      return isAuthenticated() && 
+        request.auth.token.email != null &&
+        !userDocumentExists();
+    }
+    
+    // Helper function to check if user is Tester or Admin (safely handles missing document)
+    // Checks all possible collection paths
+    // Also allows service accounts (for automated scripts) - service accounts have token.email
+    function isTesterOrAdmin() {
+      // Allow service accounts (for automated UAT test case creation)
+      // Service accounts always have token.email set when authenticating via IAM
+      return isServiceAccount() || (
+        isAuthenticated() && userDocumentExists() && (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           'roles' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['tester', 'admin', 'Admin'])) ||
+          (exists(/databases/$(database)/documents/dev_users/$(request.auth.uid)) &&
+           'roles' in get(/databases/$(database)/documents/dev_users/$(request.auth.uid)).data &&
+           get(/databases/$(database)/documents/dev_users/$(request.auth.uid)).data.roles.hasAny(['tester', 'admin', 'Admin'])) ||
+          (exists(/databases/$(database)/documents/test_users/$(request.auth.uid)) &&
+           'roles' in get(/databases/$(database)/documents/test_users/$(request.auth.uid)).data &&
+           get(/databases/$(database)/documents/test_users/$(request.auth.uid)).data.roles.hasAny(['tester', 'admin', 'Admin']))
+        )
+      );
+    }
+    
+    // UAT Test Rounds collection (unprefixed - shared test artifacts)
+    match /uat_test_rounds/{roundId} {
+      // Allow authenticated testers/admins to read test rounds
+      allow read: if isTesterOrAdmin();
+      
+      // Allow authenticated testers/admins to create test rounds
+      allow create: if isTesterOrAdmin() && 
+        request.resource.data.createdBy == request.auth.uid;
+      
+      // Allow authenticated testers/admins to update test rounds
+      allow update: if isTesterOrAdmin();
+      
+      // Allow authenticated testers/admins to delete test rounds
+      allow delete: if isTesterOrAdmin();
+      
+      // Test cases subcollection
+      match /test_cases/{testCaseId} {
+        // Allow authenticated testers/admins to read test cases
+        allow read: if isTesterOrAdmin();
+        
+        // Allow authenticated testers/admins to create test cases
+        allow create: if isTesterOrAdmin();
+        
+        // Allow authenticated testers/admins to update test cases
+        allow update: if isTesterOrAdmin();
+        
+        // Allow authenticated testers/admins to delete test cases
+        allow delete: if isTesterOrAdmin();
+        
+        // Sub-test cases subcollection
+        match /sub_test_cases/{subTestCaseId} {
+          // Allow authenticated testers/admins to read sub-test cases
+          allow read: if isTesterOrAdmin();
+          
+          // Allow authenticated testers/admins to create sub-test cases
+          allow create: if isTesterOrAdmin();
+          
+          // Allow authenticated testers/admins to update sub-test cases
+          allow update: if isTesterOrAdmin();
+          
+          // Allow authenticated testers/admins to delete sub-test cases
+          allow delete: if isTesterOrAdmin();
+        }
+      }
+    }
+    
+    // Dev UAT Test Rounds collection (prefixed - dev environment test artifacts)
+    match /dev_uat_test_rounds/{roundId} {
+      // Allow service accounts (for automated scripts) and authenticated testers/admins
+      allow read: if isTesterOrAdmin() || isServiceAccount();
+      
+      // Allow service accounts to create (for automated test case creation)
+      // Also allow authenticated testers/admins to create test rounds
+      allow create: if isServiceAccount() || (isTesterOrAdmin() && 
+        request.resource.data.createdBy == request.auth.uid);
+      
+      // Allow service accounts and authenticated testers/admins to update test rounds
+      allow update: if isTesterOrAdmin() || isServiceAccount();
+      
+      // Allow service accounts and authenticated testers/admins to delete test rounds
+      allow delete: if isTesterOrAdmin() || isServiceAccount();
+      
+      // Test cases subcollection
+      match /test_cases/{testCaseId} {
+        // Allow service accounts and authenticated testers/admins to read test cases
+        allow read: if isTesterOrAdmin() || isServiceAccount();
+        
+        // Allow service accounts and authenticated testers/admins to create test cases
+        allow create: if isTesterOrAdmin() || isServiceAccount();
+        
+        // Allow service accounts and authenticated testers/admins to update test cases
+        allow update: if isTesterOrAdmin() || isServiceAccount();
+        
+        // Allow service accounts and authenticated testers/admins to delete test cases
+        allow delete: if isTesterOrAdmin() || isServiceAccount();
+        
+        // Sub-test cases subcollection
+        match /sub_test_cases/{subTestCaseId} {
+          // Allow service accounts and authenticated testers/admins to read sub-test cases
+          allow read: if isTesterOrAdmin() || isServiceAccount();
+          
+          // Allow service accounts and authenticated testers/admins to create sub-test cases
+          allow create: if isTesterOrAdmin() || isServiceAccount();
+          
+          // Allow service accounts and authenticated testers/admins to update sub-test cases
+          allow update: if isTesterOrAdmin() || isServiceAccount();
+          
+          // Allow service accounts and authenticated testers/admins to delete sub-test cases
+          allow delete: if isTesterOrAdmin() || isServiceAccount();
+        }
+      }
+    }
+    
+    // Test UAT Test Rounds collection (prefixed - test/qa environment test artifacts)
+    match /test_uat_test_rounds/{roundId} {
+      // Allow authenticated testers/admins to read test rounds
+      allow read: if isTesterOrAdmin();
+      
+      // Allow authenticated testers/admins to create test rounds
+      allow create: if isTesterOrAdmin() && 
+        request.resource.data.createdBy == request.auth.uid;
+      
+      // Allow authenticated testers/admins to update test rounds
+      allow update: if isTesterOrAdmin();
+      
+      // Allow authenticated testers/admins to delete test rounds
+      allow delete: if isTesterOrAdmin();
+      
+      // Test cases subcollection
+      match /test_cases/{testCaseId} {
+        // Allow authenticated testers/admins to read test cases
+        allow read: if isTesterOrAdmin();
+        
+        // Allow authenticated testers/admins to create test cases
+        allow create: if isTesterOrAdmin();
+        
+        // Allow authenticated testers/admins to update test cases
+        allow update: if isTesterOrAdmin();
+        
+        // Allow authenticated testers/admins to delete test cases
+        allow delete: if isTesterOrAdmin();
+        
+        // Sub-test cases subcollection
+        match /sub_test_cases/{subTestCaseId} {
+          // Allow authenticated testers/admins to read sub-test cases
+          allow read: if isTesterOrAdmin();
+          
+          // Allow authenticated testers/admins to create sub-test cases
+          allow create: if isTesterOrAdmin();
+          
+          // Allow authenticated testers/admins to update sub-test cases
+          allow update: if isTesterOrAdmin();
+          
+          // Allow authenticated testers/admins to delete sub-test cases
+          allow delete: if isTesterOrAdmin();
+        }
+      }
     }
   }
 }

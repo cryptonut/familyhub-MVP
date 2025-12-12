@@ -43,5 +43,20 @@ class ProdConfig implements AppConfig {
   
   @override
   String? get chessWebSocketUrl => null; // WebSocket URL for real-time chess tournaments (to be configured when tournament server is set up)
+  
+  @override
+  bool get enablePremiumHubs => false; // Disable premium features in prod until ready for launch
+  
+  @override
+  bool get enableExtendedFamilyHub => false;
+  
+  @override
+  bool get enableHomeschoolingHub => false;
+  
+  @override
+  bool get enableCoparentingHub => false;
+  
+  @override
+  bool get enableEncryptedChat => false; // Disable encrypted chat in prod until ready for launch
 }
 

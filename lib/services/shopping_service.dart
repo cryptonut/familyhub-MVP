@@ -10,6 +10,7 @@ import '../models/shopping_item.dart';
 import '../models/shopping_category.dart';
 import '../models/shopping_receipt.dart';
 import '../models/smart_recurring_list.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 
 /// Service for managing shopping lists, items, and receipts
@@ -102,7 +103,7 @@ class ShoppingService {
     if (cachedId != null) {
       Logger.debug('streamShoppingLists: Using cached familyId: $cachedId', tag: 'ShoppingService');
       return _firestore
-          .collection('families/$cachedId/shoppingLists')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(cachedId, 'shoppingLists'))
           .orderBy('isDefault', descending: true)
           .orderBy('createdAt', descending: true)
           .snapshots()
@@ -141,7 +142,7 @@ class ShoppingService {
       
       // Stream shopping lists for this family - don't restart on auth changes
       return _firestore
-          .collection('families/$initialFamilyId/shoppingLists')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(initialFamilyId, 'shoppingLists'))
           .orderBy('isDefault', descending: true)
           .orderBy('createdAt', descending: true)
           .snapshots()
@@ -188,7 +189,7 @@ class ShoppingService {
 
     try {
       final doc = await _firestore
-          .collection('families/$familyId/shoppingLists')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists'))
           .doc(listId)
           .get();
 
@@ -234,7 +235,7 @@ class ShoppingService {
     );
 
     await _firestore
-        .collection('families/$familyId/shoppingLists')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists'))
         .doc(listId)
         .set(list.toJson()..remove('id'));
 
@@ -256,7 +257,7 @@ class ShoppingService {
     data.remove('id');
 
     await _firestore
-        .collection('families/$familyId/shoppingLists')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists'))
         .doc(list.id)
         .update(data);
 
@@ -270,7 +271,7 @@ class ShoppingService {
 
     // Soft delete by archiving
     await _firestore
-        .collection('families/$familyId/shoppingLists')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists'))
         .doc(listId)
         .update({
       'isArchived': true,
@@ -282,7 +283,7 @@ class ShoppingService {
 
   Future<void> _unsetOtherDefaults(String familyId, {String? excludeId}) async {
     final snapshot = await _firestore
-        .collection('families/$familyId/shoppingLists')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists'))
         .where('isDefault', isEqualTo: true)
         .get();
 
@@ -336,7 +337,7 @@ class ShoppingService {
     if (cachedId != null) {
       Logger.debug('streamShoppingItems: Using cached familyId: $cachedId', tag: 'ShoppingService');
       return _firestore
-          .collection('families/$cachedId/shoppingLists/$listId/items')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(cachedId, 'shoppingLists/$listId/items'))
           .orderBy('categoryName')
           .orderBy('createdAt', descending: true)
           .snapshots()
@@ -363,7 +364,7 @@ class ShoppingService {
 
       Logger.debug('streamShoppingItems: Starting stream with familyId: $familyId', tag: 'ShoppingService');
       return _firestore
-          .collection('families/$familyId/shoppingLists/$listId/items')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
           .orderBy('categoryName')
           .orderBy('createdAt', descending: true)
           .snapshots()
@@ -413,7 +414,7 @@ class ShoppingService {
     );
 
     await _firestore
-        .collection('families/$familyId/shoppingLists/$listId/items')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
         .doc(itemId)
         .set(item.toJson()..remove('id'));
 
@@ -433,7 +434,7 @@ class ShoppingService {
     data.remove('id');
 
     await _firestore
-        .collection('families/$familyId/shoppingLists/${item.listId}/items')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/${item.listId}/items'))
         .doc(item.id)
         .update(data);
 
@@ -453,7 +454,7 @@ class ShoppingService {
     }
 
     await _firestore
-        .collection('families/$familyId/shoppingLists/$listId/items')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
         .doc(itemId)
         .update({
       'quantity': newQuantity,
@@ -468,7 +469,7 @@ class ShoppingService {
 
     final now = DateTime.now();
     await _firestore
-        .collection('families/$familyId/shoppingLists/$listId/items')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
         .doc(itemId)
         .update({
       'status': ShoppingItemStatus.gotIt.name,
@@ -490,7 +491,7 @@ class ShoppingService {
 
     final now = DateTime.now();
     await _firestore
-        .collection('families/$familyId/shoppingLists/$listId/items')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
         .doc(itemId)
         .update({
       'status': ShoppingItemStatus.unavailable.name,
@@ -511,7 +512,7 @@ class ShoppingService {
 
     final now = DateTime.now();
     await _firestore
-        .collection('families/$familyId/shoppingLists/$listId/items')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
         .doc(itemId)
         .update({
       'status': ShoppingItemStatus.cancelled.name,
@@ -531,7 +532,7 @@ class ShoppingService {
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     await _firestore
-        .collection('families/$familyId/shoppingLists/$listId/items')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
         .doc(itemId)
         .update({
       'status': ShoppingItemStatus.pending.name,
@@ -551,7 +552,7 @@ class ShoppingService {
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     await _firestore
-        .collection('families/$familyId/shoppingLists/$listId/items')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
         .doc(itemId)
         .delete();
 
@@ -563,7 +564,7 @@ class ShoppingService {
   Future<void> _updateListItemCounts(String familyId, String listId) async {
     try {
       final snapshot = await _firestore
-          .collection('families/$familyId/shoppingLists/$listId/items')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
           .get();
 
       int itemCount = 0;
@@ -581,7 +582,7 @@ class ShoppingService {
       }
 
       await _firestore
-          .collection('families/$familyId/shoppingLists')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists'))
           .doc(listId)
           .update({
         'itemCount': itemCount,
@@ -597,7 +598,7 @@ class ShoppingService {
     // Store purchase history for smart suggestions
     try {
       await _firestore
-          .collection('families/$familyId/purchaseHistory')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'purchaseHistory'))
           .doc(itemId)
           .set({
         'lastPurchased': DateTime.now().toIso8601String(),
@@ -620,7 +621,7 @@ class ShoppingService {
 
     try {
       final snapshot = await _firestore
-          .collection('families/$familyId/shoppingCategories')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingCategories'))
           .orderBy('order')
           .get();
 
@@ -646,7 +647,7 @@ class ShoppingService {
     final batch = _firestore.batch();
     for (var category in ShoppingCategory.defaultCategories) {
       final docRef = _firestore
-          .collection('families/$familyId/shoppingCategories')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingCategories'))
           .doc(category.id);
       batch.set(docRef, category.toJson()..remove('id'));
     }
@@ -760,7 +761,7 @@ class ShoppingService {
     );
 
     await _firestore
-        .collection('families/$familyId/receipts')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'receipts'))
         .doc(receiptId)
         .set(receipt.toJson()..remove('id'));
 
@@ -778,7 +779,7 @@ class ShoppingService {
 
     try {
       final snapshot = await _firestore
-          .collection('families/$familyId/receipts')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'receipts'))
           .orderBy('createdAt', descending: true)
           .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
 
@@ -806,7 +807,7 @@ class ShoppingService {
     data.remove('id');
 
     await _firestore
-        .collection('families/$familyId/receipts')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'receipts'))
         .doc(receipt.id)
         .update(data);
 
@@ -819,7 +820,7 @@ class ShoppingService {
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     await _firestore
-        .collection('families/$familyId/receipts')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'receipts'))
         .doc(receiptId)
         .update({
       'isVerified': true,
@@ -839,14 +840,14 @@ class ShoppingService {
     try {
       // Get frequently purchased items
       final historySnapshot = await _firestore
-          .collection('families/$familyId/purchaseHistory')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'purchaseHistory'))
           .orderBy('purchaseCount', descending: true)
           .limit(20)
           .get();
 
       // Get recent items from completed lists
       final listsSnapshot = await _firestore
-          .collection('families/$familyId/shoppingLists')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists'))
           .where('isArchived', isEqualTo: false)
           .orderBy('updatedAt', descending: true)
           .limit(5)
@@ -895,7 +896,7 @@ class ShoppingService {
       final end = endDate ?? DateTime.now();
 
       final receiptsSnapshot = await _firestore
-          .collection('families/$familyId/receipts')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'receipts'))
           .where('isVerified', isEqualTo: true)
           .where('purchaseDate', isGreaterThanOrEqualTo: start.toIso8601String())
           .where('purchaseDate', isLessThanOrEqualTo: end.toIso8601String())
@@ -964,7 +965,7 @@ class ShoppingService {
 
     try {
       final snapshot = await _firestore
-          .collection('families/$familyId/smartRecurringLists')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'smartRecurringLists'))
           .orderBy('usageCount', descending: true)
           .orderBy('lastUsedAt', descending: true)
           .get(GetOptions(source: forceRefresh ? Source.server : Source.cache));
@@ -994,7 +995,7 @@ class ShoppingService {
       }
 
       return _firestore
-          .collection('families/$familyId/smartRecurringLists')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'smartRecurringLists'))
           .orderBy('usageCount', descending: true)
           .orderBy('lastUsedAt', descending: true)
           .snapshots()
@@ -1067,7 +1068,7 @@ class ShoppingService {
       );
 
       await _firestore
-          .collection('families/$familyId/smartRecurringLists')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'smartRecurringLists'))
           .doc(existingList.id)
           .update(updatedList.toJson()..remove('id'));
 
@@ -1091,7 +1092,7 @@ class ShoppingService {
       );
 
       await _firestore
-          .collection('families/$familyId/smartRecurringLists')
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'smartRecurringLists'))
           .doc(smartListId)
           .set(smartList.toJson()..remove('id'));
 
@@ -1107,7 +1108,7 @@ class ShoppingService {
 
     // Get the smart list
     final smartListDoc = await _firestore
-        .collection('families/$familyId/smartRecurringLists')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'smartRecurringLists'))
         .doc(smartListId)
         .get();
 
@@ -1147,7 +1148,7 @@ class ShoppingService {
 
     // Update smart list usage
     await _firestore
-        .collection('families/$familyId/smartRecurringLists')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'smartRecurringLists'))
         .doc(smartListId)
         .update({
       'usageCount': smartList.usageCount + 1,
@@ -1164,7 +1165,7 @@ class ShoppingService {
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
     await _firestore
-        .collection('families/$familyId/smartRecurringLists')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'smartRecurringLists'))
         .doc(smartListId)
         .delete();
 

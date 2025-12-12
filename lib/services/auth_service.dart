@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../models/user_model.dart';
 import '../utils/relationship_utils.dart';
+import '../utils/firestore_path_utils.dart';
+import '../config/config.dart';
 import 'package:uuid/uuid.dart';
 import '../core/services/logger_service.dart';
 import '../core/constants/app_constants.dart';
@@ -106,7 +108,16 @@ class AuthService {
       }
     }
 
-    final userRef = _firestore.collection('users').doc(user.uid);
+    // CRITICAL FIX: Check both prefixed and unprefixed collections for backward compatibility
+    // If user was created before firestorePrefix was implemented, data is in unprefixed collection
+    final prefixedCollection = FirestorePathUtils.getUsersCollection();
+    final unprefixedCollection = 'users';
+    // Check if we're using a prefix by comparing collection names
+    final usePrefix = prefixedCollection != unprefixedCollection;
+    
+    var userRef = _firestore.collection(prefixedCollection).doc(user.uid);
+    DocumentSnapshot? userDoc;
+    bool needsMigration = false;
     
     // CRITICAL FIX from code review: Ensure user doc exists before queries
     // This prevents Firestore rules circular dependency issues on Android cold-start
@@ -129,7 +140,6 @@ class AuthService {
         // The channel reset loop (initChannel -> shutdownNow) happens when queries
         // are made before the gRPC channel is ready. Wait on first attempt.
         // Use a global flag to ensure only ONE query initializes the channel at a time
-        DocumentSnapshot userDoc;
         
         // Wait for gRPC channel to initialize on first attempt (Android only)
         if (attempt == 0 && !kIsWeb) {
@@ -160,10 +170,25 @@ class AuthService {
           }
         }
         
-        // Use server source to ensure fresh data
+        // Try prefixed collection first (current environment)
         userDoc = await userRef
             .get(GetOptions(source: Source.server))
             .timeout(AppConstants.firestoreQueryTimeout);
+        
+        // If not found and we're using a prefix, try unprefixed collection (migration path)
+        if (!userDoc.exists && usePrefix && attempt == 0) {
+          Logger.info('User not found in prefixed collection ($prefixedCollection), trying unprefixed ($unprefixedCollection)...', tag: 'AuthService');
+          final unprefixedRef = _firestore.collection(unprefixedCollection).doc(user.uid);
+          final unprefixedDoc = await unprefixedRef
+              .get(GetOptions(source: Source.server))
+              .timeout(AppConstants.firestoreQueryTimeout);
+          
+          if (unprefixedDoc.exists) {
+            Logger.info('User found in unprefixed collection, will migrate to prefixed collection', tag: 'AuthService');
+            userDoc = unprefixedDoc;
+            needsMigration = true;
+          }
+        }
         
         final elapsed = DateTime.now().difference(startTime);
         if (kDebugMode) {
@@ -199,6 +224,21 @@ class AuthService {
         if (data == null) {
           Logger.warning('User document has no data', tag: 'AuthService');
           return null;
+        }
+        
+        // Migrate user data from unprefixed to prefixed collection if needed
+        if (needsMigration && usePrefix) {
+          try {
+            Logger.info('Migrating user data from $unprefixedCollection to $prefixedCollection...', tag: 'AuthService');
+            final dataMap = data as Map<String, dynamic>;
+            await _firestore.collection(prefixedCollection)
+                .doc(user.uid)
+                .set(dataMap, SetOptions(merge: false));
+            Logger.info('User data migration completed successfully', tag: 'AuthService');
+          } catch (e, st) {
+            Logger.error('Error migrating user data', error: e, stackTrace: st, tag: 'AuthService');
+            // Continue with existing data even if migration fails
+          }
         }
         
         Logger.debug('Successfully loaded user data in ${elapsed.inMilliseconds}ms', tag: 'AuthService');
@@ -390,7 +430,7 @@ class AuthService {
           try {
             Logger.debug('Method 1: Querying users collection by familyId...', tag: 'AuthService');
             final familyCheck = await _firestore
-                .collection('users')
+                .collection(FirestorePathUtils.getUsersCollection())
                 .where('familyId', isEqualTo: cleanFamilyId)
                 .limit(1)
                 .get(GetOptions(source: Source.server));
@@ -414,7 +454,7 @@ class AuthService {
             try {
               Logger.debug('Method 2: Reading all users and checking manually...', tag: 'AuthService');
               final allUsers = await _firestore
-                  .collection('users')
+                  .collection(FirestorePathUtils.getUsersCollection())
                   .limit(AppConstants.usersQueryLimit)
                   .get(GetOptions(source: Source.server));
               
@@ -622,7 +662,7 @@ class AuthService {
         // Use set() to overwrite any auto-created document with wrong familyId
         // Use merge: false to ensure we completely overwrite any existing document
         await _firestore
-            .collection('users')
+            .collection(FirestorePathUtils.getUsersCollection())
             .doc(userCredential.user!.uid)
             .set(userModel.toJson(), SetOptions(merge: false));
 
@@ -640,7 +680,7 @@ class AuthService {
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
           await Future.delayed(Duration(milliseconds: 150 * attempt));
           final verifyDoc = await _firestore
-              .collection('users')
+              .collection(FirestorePathUtils.getUsersCollection())
               .doc(userCredential.user!.uid)
               .get(GetOptions(source: Source.server));
           if (verifyDoc.exists) {
@@ -654,7 +694,7 @@ class AuthService {
               Logger.debug('  Something is overwriting the document - fixing again...', tag: 'AuthService');
               
               // Use set() with merge: false to completely overwrite
-              await _firestore.collection('users').doc(userCredential.user!.uid).set({
+              await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userCredential.user!.uid).set({
                 'uid': userCredential.user!.uid,
                 'email': email,
                 'displayName': displayName,
@@ -701,7 +741,7 @@ class AuthService {
             Logger.warning('⚠️ FINAL CHECK: Document was overwritten! Fixing...', tag: 'AuthService');
             Logger.debug('  Expected: "$finalFamilyId"', tag: 'AuthService');
             Logger.debug('  Found: "$foundFamilyId"', tag: 'AuthService');
-            await _firestore.collection('users').doc(userCredential.user!.uid).update({
+            await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userCredential.user!.uid).update({
               'familyId': finalFamilyId,
               'roles': roles,
             });
@@ -710,7 +750,7 @@ class AuthService {
             // Verify the fix worked
             await Future.delayed(const Duration(milliseconds: 200));
             final verifyFix = await _firestore
-                .collection('users')
+                .collection(FirestorePathUtils.getUsersCollection())
                 .doc(userCredential.user!.uid)
                 .get(GetOptions(source: Source.server));
             final verifyFamilyId = verifyFix.data()?['familyId'] as String?;
@@ -743,7 +783,7 @@ class AuthService {
             Logger.debug('  Expected: "$finalFamilyId"', tag: 'AuthService');
             Logger.debug('  Found: "$preRemoveFamilyId"', tag: 'AuthService');
             Logger.debug('  Fixing one more time...', tag: 'AuthService');
-            await _firestore.collection('users').doc(userCredential.user!.uid).set({
+            await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userCredential.user!.uid).set({
               'uid': userCredential.user!.uid,
               'email': email,
               'displayName': displayName,
@@ -851,7 +891,7 @@ class AuthService {
       Logger.debug('User ID: ${user.uid}', tag: 'AuthService');
       
       final familyCheck = await _firestore
-          .collection('users')
+          .collection(FirestorePathUtils.getUsersCollection())
           .where('familyId', isEqualTo: cleanFamilyId)
           .limit(1)
           .get();
@@ -871,7 +911,7 @@ class AuthService {
         
         try {
           final allUsers = await _firestore
-              .collection('users')
+              .collection(FirestorePathUtils.getUsersCollection())
               .limit(10)
               .get();
           
@@ -886,7 +926,7 @@ class AuthService {
         }
         
         // Get current user's familyId to see the format
-        final currentUserDoc = await _firestore.collection('users').doc(user.uid).get();
+        final currentUserDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).get();
         if (currentUserDoc.exists) {
           final currentData = currentUserDoc.data();
           final currentFamilyId = currentData?['familyId'] as String?;
@@ -914,7 +954,7 @@ class AuthService {
       }
 
       // Update user's familyId (this will switch them to the new family)
-      await _firestore.collection('users').doc(user.uid).update({
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).update({
         'familyId': cleanFamilyId,
       });
       
@@ -952,7 +992,7 @@ class AuthService {
     Logger.debug('UserModel familyId: ${currentUserModel.familyId}', tag: 'AuthService');
     
     // Read directly from Firestore to ensure we have the latest value
-    final userDoc = await _firestore.collection('users').doc(user.uid).get(GetOptions(source: Source.server));
+    final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).get(GetOptions(source: Source.server));
     if (userDoc.exists) {
       final docData = userDoc.data();
       final docFamilyId = docData?['familyId'] as String?;
@@ -976,7 +1016,7 @@ class AuthService {
     
     // Try to update first, if that fails (document might not exist), use set
     try {
-      await _firestore.collection('users').doc(user.uid).update({
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).update({
         'familyId': newFamilyId,
       });
     } catch (e) {
@@ -988,7 +1028,7 @@ class AuthService {
         createdAt: DateTime.now(),
         familyId: newFamilyId,
       );
-      await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).set(userModel.toJson());
     }
     
     return newFamilyId;
@@ -1000,14 +1040,14 @@ class AuthService {
     if (user == null) throw AuthException('User not logged in', code: 'not-authenticated');
     
     // Get current user document
-    final doc = await _firestore.collection('users').doc(user.uid).get();
+    final doc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).get();
     
     if (!doc.exists) {
       // Document doesn't exist, create it with familyId
       final newFamilyId = const Uuid().v4();
         // Check if this is the first user in the family
         final existingFamilyMembers = await _firestore
-            .collection('users')
+            .collection(FirestorePathUtils.getUsersCollection())
             .where('familyId', isEqualTo: newFamilyId)
             .get();
       
@@ -1022,7 +1062,7 @@ class AuthService {
         familyId: newFamilyId,
         roles: roles,
       );
-      await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).set(userModel.toJson());
       return;
     }
     
@@ -1043,9 +1083,9 @@ class AuthService {
     final newFamilyId = const Uuid().v4();
     
     // Use set with merge to ensure we don't lose other fields
-    await _firestore.collection('users').doc(user.uid).set({
-      'familyId': newFamilyId,
-    }, SetOptions(merge: true));
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).set({
+        'familyId': newFamilyId,
+      }, SetOptions(merge: true));
   }
   
   // Force initialize family ID (for debugging/fixing existing users)
@@ -1057,7 +1097,7 @@ class AuthService {
     final newFamilyId = const Uuid().v4();
     
     // Get current document to preserve existing data
-    final doc = await _firestore.collection('users').doc(user.uid).get();
+    final doc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).get();
     
     if (doc.exists) {
       // Update existing document
@@ -1075,7 +1115,7 @@ class AuthService {
         createdAt: DateTime.now(),
         familyId: newFamilyId,
       );
-      await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).set(userModel.toJson());
     }
     
     return newFamilyId;
@@ -1117,7 +1157,7 @@ class AuthService {
 
     // Verify the target family exists (at least one user has this familyId)
     final familyCheck = await _firestore
-        .collection('users')
+        .collection(FirestorePathUtils.getUsersCollection())
         .where('familyId', isEqualTo: cleanFamilyId)
         .limit(1)
         .get(GetOptions(source: Source.server));
@@ -1166,9 +1206,9 @@ class AuthService {
       
       // Query users by email
       final query = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: email.trim().toLowerCase())
-          .limit(1)
+            .collection(FirestorePathUtils.getUsersCollection())
+            .where('email', isEqualTo: email.trim().toLowerCase())
+            .limit(1)
           .get(GetOptions(source: Source.server));
 
       if (query.docs.isEmpty) {
@@ -1194,7 +1234,7 @@ class AuthService {
   /// Get a user model by user ID
   Future<UserModel?> getUserModel(String userId) async {
     try {
-      final doc = await _firestore.collection('users').doc(userId).get();
+      final doc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).get();
       if (!doc.exists) return null;
       return UserModel.fromJson(doc.data()!);
     } catch (e) {
@@ -1204,6 +1244,8 @@ class AuthService {
   }
 
   // Get family members
+  // CRITICAL FIX: Check both prefixed and unprefixed collections to find all family members
+  // This is needed because some members might still be in the unprefixed collection
   Future<List<UserModel>> getFamilyMembers() async {
     try {
       final currentUserModel = await getCurrentUserModel();
@@ -1216,56 +1258,83 @@ class AuthService {
       Logger.debug('getFamilyMembers: Current user ID: ${currentUserModel.uid}', tag: 'AuthService');
       Logger.debug('getFamilyMembers: Current user email: ${currentUserModel.email}', tag: 'AuthService');
       
-      QuerySnapshot snapshot;
+      final prefixedCollection = FirestorePathUtils.getUsersCollection();
+      final unprefixedCollection = 'users';
+      final usePrefix = prefixedCollection != unprefixedCollection;
+      
+      final allFamilyMembers = <UserModel>[];
+      final seenUserIds = <String>{};
+      
+      // Query prefixed collection (current environment)
       try {
-        snapshot = await _firestore
-            .collection('users')
-            .where('familyId', isEqualTo: currentUserModel.familyId)
-            .get(GetOptions(source: Source.server));
-      } catch (e, st) {
-        Logger.warning('getFamilyMembers: Query failed with error', error: e, stackTrace: st, tag: 'AuthService');
-        Logger.debug('getFamilyMembers: This might be a permission issue or missing index', tag: 'AuthService');
-        
-        // Fallback: Try to get all users and filter manually (less efficient but works)
-        Logger.debug('getFamilyMembers: Attempting fallback method (get all users and filter)...', tag: 'AuthService');
+        Logger.debug('getFamilyMembers: Querying prefixed collection: $prefixedCollection', tag: 'AuthService');
+        QuerySnapshot prefixedSnapshot;
         try {
+          prefixedSnapshot = await _firestore
+              .collection(prefixedCollection)
+              .where('familyId', isEqualTo: currentUserModel.familyId)
+              .get(GetOptions(source: Source.server));
+        } catch (e) {
+          // If query fails (e.g., missing index), use fallback
+          Logger.warning('getFamilyMembers: Prefixed query failed, using fallback', error: e, tag: 'AuthService');
           final allUsersSnapshot = await _firestore
-              .collection('users')
+              .collection(prefixedCollection)
               .limit(100)
               .get(GetOptions(source: Source.server));
           
-          Logger.debug('getFamilyMembers: Retrieved ${allUsersSnapshot.docs.length} total users', tag: 'AuthService');
+          prefixedSnapshot = allUsersSnapshot;
+        }
+        
+        for (var doc in prefixedSnapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final docFamilyId = data['familyId'] as String?;
+          if (docFamilyId == currentUserModel.familyId && !seenUserIds.contains(doc.id)) {
+            allFamilyMembers.add(UserModel.fromJson(data));
+            seenUserIds.add(doc.id);
+            Logger.debug('  Found in $prefixedCollection: ${data['displayName']} (${doc.id})', tag: 'AuthService');
+          }
+        }
+      } catch (e, st) {
+        Logger.warning('getFamilyMembers: Error querying prefixed collection', error: e, stackTrace: st, tag: 'AuthService');
+      }
+      
+      // Also query unprefixed collection if using prefix (for backward compatibility)
+      if (usePrefix) {
+        try {
+          Logger.debug('getFamilyMembers: Querying unprefixed collection: $unprefixedCollection', tag: 'AuthService');
+          QuerySnapshot unprefixedSnapshot;
+          try {
+            unprefixedSnapshot = await _firestore
+                .collection(unprefixedCollection)
+                .where('familyId', isEqualTo: currentUserModel.familyId)
+                .get(GetOptions(source: Source.server));
+          } catch (e) {
+            // If query fails, use fallback
+            Logger.warning('getFamilyMembers: Unprefixed query failed, using fallback', error: e, tag: 'AuthService');
+            final allUsersSnapshot = await _firestore
+                .collection(unprefixedCollection)
+                .limit(100)
+                .get(GetOptions(source: Source.server));
+            
+            unprefixedSnapshot = allUsersSnapshot;
+          }
           
-          final matchingUsers = allUsersSnapshot.docs.where((doc) {
+          for (var doc in unprefixedSnapshot.docs) {
             final data = doc.data() as Map<String, dynamic>;
             final docFamilyId = data['familyId'] as String?;
-            final matches = docFamilyId == currentUserModel.familyId;
-            if (matches) {
-              Logger.debug('  Found match: ${data['displayName']} (${doc.id}), familyId: "$docFamilyId"', tag: 'AuthService');
+            if (docFamilyId == currentUserModel.familyId && !seenUserIds.contains(doc.id)) {
+              allFamilyMembers.add(UserModel.fromJson(data));
+              seenUserIds.add(doc.id);
+              Logger.debug('  Found in $unprefixedCollection: ${data['displayName']} (${doc.id})', tag: 'AuthService');
             }
-            return matches;
-          }).toList();
-          
-          Logger.debug('getFamilyMembers: Fallback found ${matchingUsers.length} matching members', tag: 'AuthService');
-          
-          return matchingUsers
-              .map((doc) => UserModel.fromJson(doc.data() as Map<String, dynamic>))
-              .toList();
-        } catch (fallbackError, fallbackSt) {
-          Logger.error('getFamilyMembers: Fallback method also failed', error: fallbackError, stackTrace: fallbackSt, tag: 'AuthService');
-          return [];
+          }
+        } catch (e, st) {
+          Logger.warning('getFamilyMembers: Error querying unprefixed collection', error: e, stackTrace: st, tag: 'AuthService');
         }
       }
 
-      Logger.debug('getFamilyMembers: Found ${snapshot.docs.length} members', tag: 'AuthService');
-      for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        Logger.debug('  - ${data['displayName']} (${doc.id}), familyId: "${data['familyId']}"', tag: 'AuthService');
-      }
-
-      return snapshot.docs
-          .map((doc) => UserModel.fromJson(doc.data() as Map<String, dynamic>))
-          .toList();
+      Logger.debug('getFamilyMembers: Found ${allFamilyMembers.length} total family members', tag: 'AuthService');
+      return allFamilyMembers;
     } catch (e, stackTrace) {
       Logger.error('getFamilyMembers: Unexpected error', error: e, stackTrace: stackTrace, tag: 'AuthService');
       return [];
@@ -1275,7 +1344,7 @@ class AuthService {
   /// Get user by ID
   Future<UserModel?> getUserById(String userId) async {
     try {
-      final doc = await _firestore.collection('users').doc(userId).get();
+      final doc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).get();
       if (!doc.exists) return null;
       return UserModel.fromJson({
         'uid': userId,
@@ -1298,7 +1367,7 @@ class AuthService {
     try {
       // Try with index first (if it exists)
       final snapshot = await _firestore
-          .collection('users')
+          .collection(FirestorePathUtils.getUsersCollection())
           .where('familyId', isEqualTo: currentUserModel.familyId)
           .orderBy('createdAt', descending: false)
           .limit(1)
@@ -1356,7 +1425,7 @@ class AuthService {
     }
     
     // Verify target user is in the same family
-    final targetUserDoc = await _firestore.collection('users').doc(userId).get();
+    final targetUserDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).get();
     if (!targetUserDoc.exists) {
       throw AuthException('User not found', code: 'user-not-found');
     }
@@ -1380,7 +1449,7 @@ class AuthService {
       updateData['relationship'] = null;
     }
     
-    await _firestore.collection('users').doc(userId).update(updateData);
+    await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).update(updateData);
     
     // Automatically set reciprocal relationship if applicable
     if (relationship != null && relationship.isNotEmpty && !isCreator) {
@@ -1395,7 +1464,7 @@ class AuthService {
       if (requiredRelationship != null && 
           currentUserModel.relationship != requiredRelationship) {
         // Update the setter's relationship to make the reciprocal work
-        await _firestore.collection('users').doc(currentUser.uid).update({
+        await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(currentUser.uid).update({
           'relationship': requiredRelationship,
         });
         Logger.debug('Automatically set reciprocal relationship: ${currentUserModel.displayName} -> $requiredRelationship', tag: 'AuthService');
@@ -1417,7 +1486,7 @@ class AuthService {
     }
     
     // Verify target user is in the same family
-    final targetUserDoc = await _firestore.collection('users').doc(userId).get();
+    final targetUserDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).get();
     if (!targetUserDoc.exists) {
       throw AuthException('User not found', code: 'user-not-found');
     }
@@ -1433,7 +1502,7 @@ class AuthService {
     }
     
     // Update roles
-    await _firestore.collection('users').doc(userId).update({
+    await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).update({
       'roles': roles,
     });
   }
@@ -1496,9 +1565,9 @@ class AuthService {
     }
     
     // Update both Firestore and Firebase Auth
-    await _firestore.collection('users').doc(user.uid).update({
-      'displayName': displayName,
-    });
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).update({
+        'displayName': displayName,
+      });
     
     Logger.info('updateDisplayNameFromAuth: Updated Firestore displayName to $displayName', tag: 'AuthService');
     
@@ -1519,7 +1588,7 @@ class AuthService {
     if (currentUser == null) throw AuthException('User not logged in', code: 'not-authenticated');
     
     // Get current user document
-    final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+    final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(currentUser.uid).get();
     if (!userDoc.exists) {
       throw AuthException('User document not found. Please use "Fix User Document" first.', code: 'user-not-found');
     }
@@ -1540,7 +1609,7 @@ class AuthService {
     // Add admin role if not already present
     if (!currentRoles.contains(AppConstants.roleAdmin)) {
       currentRoles.add(AppConstants.roleAdmin);
-      await _firestore.collection('users').doc(currentUser.uid).update({
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(currentUser.uid).update({
         'roles': currentRoles,
       });
     } else {
@@ -1619,7 +1688,7 @@ class AuthService {
   Future<void> deleteUserData(String userId, String? familyId) async {
     // Delete user document
     try {
-      await _firestore.collection('users').doc(userId).delete();
+      await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(userId).delete();
       Logger.info('deleteUserData: Deleted user document for $userId', tag: 'AuthService');
     } catch (e, st) {
       Logger.warning('deleteUserData: Error deleting user document', error: e, stackTrace: st, tag: 'AuthService');
@@ -1660,7 +1729,7 @@ class AuthService {
 
     // Delete family wallet document if it exists
     try {
-      await _firestore.collection('families').doc(familyId).delete();
+      await _firestore.collection(FirestorePathUtils.getFamiliesCollection()).doc(familyId).delete();
       Logger.info('deleteFamilyData: Deleted family wallet document', tag: 'AuthService');
     } catch (e, st) {
       Logger.warning('deleteFamilyData: Could not delete family wallet document', error: e, stackTrace: st, tag: 'AuthService');

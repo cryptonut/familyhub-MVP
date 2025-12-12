@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/services/logger_service.dart';
 import '../models/chat_message.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 import 'package:uuid/uuid.dart';
 
@@ -28,7 +29,7 @@ class MessageThreadService {
 
       // Get parent message to determine threadId
       final parentDoc = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection(chatId != null ? 'privateMessages' : 'messages')
           .doc(chatId ?? messageId)
@@ -52,7 +53,7 @@ class MessageThreadService {
 
       // Save reply
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection(chatId != null ? 'privateMessages' : 'messages')
           .doc(chatId ?? messageId)
@@ -62,7 +63,7 @@ class MessageThreadService {
 
       // Update parent message reply count
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection(chatId != null ? 'privateMessages' : 'messages')
           .doc(chatId ?? messageId)
@@ -89,7 +90,7 @@ class MessageThreadService {
     final threadId = chatId ?? messageId;
     
     return _firestore
-        .collection('families')
+        .collection(FirestorePathUtils.getFamiliesCollection())
         .doc(familyId)
         .collection(chatId != null ? 'privateMessages' : 'messages')
         .doc(chatId ?? messageId)
@@ -117,7 +118,7 @@ class MessageThreadService {
       final threadId = chatId ?? messageId;
       
       final snapshot = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection(chatId != null ? 'privateMessages' : 'messages')
           .doc(chatId ?? messageId)

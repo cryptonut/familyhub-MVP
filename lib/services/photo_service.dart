@@ -11,6 +11,7 @@ import '../models/family_photo.dart';
 import '../models/photo_album.dart';
 import '../models/photo_comment.dart';
 import '../services/image_compression_service.dart';
+import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
 import 'query_cache_service.dart';
 
@@ -100,7 +101,7 @@ class PhotoService {
       photoData.remove('id');
 
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .doc(photoId)
@@ -193,7 +194,7 @@ class PhotoService {
       photoData.remove('id');
 
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .doc(photoId)
@@ -249,7 +250,7 @@ class PhotoService {
 
       final pageSize = limit.clamp(1, 500);
       Query query = _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .orderBy('uploadedAt', descending: true)
@@ -300,9 +301,7 @@ class PhotoService {
   /// Get photos stream for real-time updates
   Stream<List<FamilyPhoto>> getPhotosStream(String familyId, {String? albumId}) {
     Query query = _firestore
-        .collection('families')
-        .doc(familyId)
-        .collection('photos');
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'photos'));
 
     if (albumId != null) {
       query = query.where('albumId', isEqualTo: albumId);
@@ -332,7 +331,7 @@ class PhotoService {
   }) async {
     try {
       Query query = _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .orderBy('uploadedAt', descending: true)
@@ -362,7 +361,7 @@ class PhotoService {
   Future<FamilyPhoto?> getPhoto(String familyId, String photoId) async {
     try {
       final doc = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .doc(photoId)
@@ -403,7 +402,7 @@ class PhotoService {
 
       // Delete from Firestore
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .doc(photoId)
@@ -411,7 +410,7 @@ class PhotoService {
 
       // Delete comments
       final commentsSnapshot = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .doc(photoId)
@@ -462,7 +461,7 @@ class PhotoService {
       albumData.remove('id');
 
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('albums')
           .doc(albumId)
@@ -479,7 +478,7 @@ class PhotoService {
   Future<List<PhotoAlbum>> getAlbums(String familyId) async {
     try {
       final snapshot = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('albums')
           .orderBy('createdAt', descending: true)
@@ -500,9 +499,7 @@ class PhotoService {
   /// Get albums stream for real-time updates
   Stream<List<PhotoAlbum>> getAlbumsStream(String familyId) {
     return _firestore
-        .collection('families')
-        .doc(familyId)
-        .collection('albums')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'albums'))
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
@@ -542,7 +539,7 @@ class PhotoService {
       commentData.remove('id');
 
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .doc(photoId)
@@ -561,7 +558,7 @@ class PhotoService {
   Future<List<PhotoComment>> getComments(String familyId, String photoId) async {
     try {
       final snapshot = await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .doc(photoId)
@@ -584,9 +581,7 @@ class PhotoService {
   /// Get comments stream for real-time updates
   Stream<List<PhotoComment>> getCommentsStream(String familyId, String photoId) {
     return _firestore
-        .collection('families')
-        .doc(familyId)
-        .collection('photos')
+        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'photos'))
         .doc(photoId)
         .collection('comments')
         .orderBy('createdAt')
@@ -605,7 +600,7 @@ class PhotoService {
   Future<void> recordPhotoView(String familyId, String photoId) async {
     try {
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('photos')
           .doc(photoId)
@@ -633,7 +628,7 @@ class PhotoService {
   Future<void> _updateAlbumPhotoCount(String familyId, String albumId, int delta) async {
     try {
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('albums')
           .doc(albumId)
@@ -650,7 +645,7 @@ class PhotoService {
   Future<void> updateAlbumCover(String familyId, String albumId, String photoId) async {
     try {
       await _firestore
-          .collection('families')
+          .collection(FirestorePathUtils.getFamiliesCollection())
           .doc(familyId)
           .collection('albums')
           .doc(albumId)

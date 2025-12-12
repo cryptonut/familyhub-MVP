@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../services/uat_service.dart';
 import '../../core/services/logger_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
+import '../../utils/app_theme.dart';
+import '../../widgets/ui_components.dart';
 
 class UATScreen extends StatefulWidget {
   const UATScreen({super.key});
@@ -19,6 +21,7 @@ class _UATScreenState extends State<UATScreen> {
   Map<String, bool> _expandedCases = {};
   bool _isLoading = true;
   bool _isTester = false;
+  bool _canManageTestCases = false;
 
   @override
   void initState() {
@@ -29,9 +32,11 @@ class _UATScreenState extends State<UATScreen> {
   Future<void> _checkTesterStatus() async {
     try {
       final tester = await _uatService.isTester();
+      final canManage = await _uatService.canManageTestCases();
       if (mounted) {
         setState(() {
           _isTester = tester;
+          _canManageTestCases = canManage;
         });
         if (tester) {
           _loadTestRounds();
@@ -224,19 +229,29 @@ class _UATScreenState extends State<UATScreen> {
         ),
         actions: [
           if (!testCase.isLocked) ...[
-            TextButton(
+            OutlinedButton.icon(
               onPressed: () {
                 Navigator.pop(context);
                 _markAsFailed(testCase.id);
               },
-              child: const Text('Fail', style: TextStyle(color: Colors.red)),
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Fail'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.errorColor,
+                side: BorderSide(color: AppTheme.errorColor),
+              ),
             ),
-            TextButton(
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(context);
                 _markAsPassed(testCase.id);
               },
-              child: const Text('Pass', style: TextStyle(color: Colors.green)),
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Pass'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.successColor,
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
           TextButton(
@@ -297,19 +312,29 @@ class _UATScreenState extends State<UATScreen> {
         ),
         actions: [
           if (!subTestCase.isLocked) ...[
-            TextButton(
+            OutlinedButton.icon(
               onPressed: () {
                 Navigator.pop(context);
                 _markAsFailed(testCaseId, subTestCaseId: subTestCase.id);
               },
-              child: const Text('Fail', style: TextStyle(color: Colors.red)),
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Fail'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.errorColor,
+                side: BorderSide(color: AppTheme.errorColor),
+              ),
             ),
-            TextButton(
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(context);
                 _markAsPassed(testCaseId, subTestCaseId: subTestCase.id);
               },
-              child: const Text('Pass', style: TextStyle(color: Colors.green)),
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Pass'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.successColor,
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
           TextButton(
@@ -342,8 +367,21 @@ class _UATScreenState extends State<UATScreen> {
       appBar: AppBar(
         title: const Text('User Acceptance Testing'),
         actions: [
+          if (_canManageTestCases && _selectedRoundId != null)
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: 'Add Test Case',
+              onPressed: () => _showAddTestCaseDialog(),
+            ),
+          if (_canManageTestCases)
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              tooltip: 'Add Test Round',
+              onPressed: () => _showAddTestRoundDialog(),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
             onPressed: () {
               if (_selectedRoundId != null) {
                 _loadTestCases(_selectedRoundId!);
@@ -354,6 +392,13 @@ class _UATScreenState extends State<UATScreen> {
           ),
         ],
       ),
+      floatingActionButton: _canManageTestCases && _selectedRoundId != null
+          ? FloatingActionButton(
+              onPressed: () => _showAddTestCaseDialog(),
+              tooltip: 'Add Test Case',
+              child: const Icon(Icons.add),
+            )
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _testRounds.isEmpty
@@ -364,18 +409,58 @@ class _UATScreenState extends State<UATScreen> {
                   children: [
                     // Test Round Selector
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      padding: const EdgeInsets.all(AppTheme.spacingMD),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
                       child: DropdownButtonFormField<String>(
                         value: _selectedRoundId,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Test Round',
-                          border: OutlineInputBorder(),
+                          labelStyle: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: Theme.of(context).colorScheme.surface,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppTheme.spacingMD,
+                            vertical: AppTheme.spacingMD,
+                          ),
                         ),
                         items: _testRounds.map((round) {
                           return DropdownMenuItem(
                             value: round.id,
-                            child: Text(round.name),
+                            child: Text(
+                              round.name,
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            ),
                           );
                         }).toList(),
                         onChanged: (value) {
@@ -391,68 +476,104 @@ class _UATScreenState extends State<UATScreen> {
                     // Test Cases List
                     Expanded(
                       child: _testCases.isEmpty
-                          ? const Center(
-                              child: Text('No test cases available for this round.'),
+                          ? EmptyState(
+                              icon: Icons.checklist_outlined,
+                              title: 'No Test Cases',
+                              message: 'No test cases available for this round.\nTest cases will appear here once they are added by administrators.',
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(AppTheme.spacingMD),
                               itemCount: _testCases.length,
                               itemBuilder: (context, index) {
                                 final testCase = _testCases[index];
                                 final subCases = _subTestCases[testCase.id] ?? [];
                                 final isExpanded = _expandedCases[testCase.id] ?? false;
 
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
+                                return ModernCard(
+                                  margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
                                   child: ExpansionTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: _getStatusColor(testCase.status),
-                                      child: Text(
-                                        '${testCase.number}',
-                                        style: const TextStyle(color: Colors.white),
-                                      ),
-                                    ),
-                                    title: Text(testCase.title),
-                                    subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Status: ${testCase.status.toUpperCase()}',
-                                          style: TextStyle(
-                                            color: _getStatusColor(testCase.status),
-                                            fontWeight: FontWeight.bold,
+                                    tilePadding: EdgeInsets.zero,
+                                    childrenPadding: EdgeInsets.zero,
+                                    leading: GestureDetector(
+                                      onTap: () => _showTestCaseDetails(testCase),
+                                      child: Container(
+                                        width: 48,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          color: _getStatusColor(testCase.status).withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                                          border: Border.all(
+                                            color: _getStatusColor(testCase.status).withValues(alpha: 0.3),
+                                            width: 2,
                                           ),
                                         ),
-                                        if (testCase.testedBy != null)
-                                          Text(
-                                            'Tested by: ${testCase.testedBy}',
-                                            style: const TextStyle(fontSize: 12),
+                                        child: Center(
+                                          child: Text(
+                                            '${testCase.number}',
+                                            style: TextStyle(
+                                              color: _getStatusColor(testCase.status),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
+                                            ),
                                           ),
-                                      ],
+                                        ),
+                                      ),
+                                    ),
+                                    title: GestureDetector(
+                                      onTap: () => _showTestCaseDetails(testCase),
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(top: AppTheme.spacingXS),
+                                        child: Text(
+                                          testCase.title,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    subtitle: GestureDetector(
+                                      onTap: () => _showTestCaseDetails(testCase),
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(top: AppTheme.spacingSM),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _buildStatusChip(testCase.status),
+                                            if (testCase.testedBy != null) ...[
+                                              const SizedBox(height: AppTheme.spacingXS),
+                                              Text(
+                                                'Tested by: ${testCase.testedBy}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                ),
+                                              ),
+                                            ],
+                                            if (subCases.isNotEmpty) ...[
+                                              const SizedBox(height: AppTheme.spacingXS),
+                                              Chip(
+                                                label: Text('${subCases.length} sub-tests'),
+                                                labelStyle: const TextStyle(fontSize: 11),
+                                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        if (subCases.isNotEmpty)
-                                          Chip(
-                                            label: Text('${subCases.length} sub-tests'),
-                                            labelStyle: const TextStyle(fontSize: 10),
-                                          ),
                                         if (!testCase.isLocked)
                                           IconButton(
-                                            icon: const Icon(Icons.info_outline),
+                                            icon: const Icon(Icons.info_outline, size: 20),
+                                            tooltip: 'View details',
                                             onPressed: () => _showTestCaseDetails(testCase),
                                           ),
-                                        if (!testCase.isLocked)
-                                          IconButton(
-                                            icon: const Icon(Icons.check, color: Colors.green),
-                                            onPressed: () => _markAsPassed(testCase.id),
-                                          ),
-                                        if (!testCase.isLocked)
-                                          IconButton(
-                                            icon: const Icon(Icons.close, color: Colors.red),
-                                            onPressed: () => _markAsFailed(testCase.id),
-                                          ),
+                                        if (testCase.isLocked)
+                                          _buildStatusChip(testCase.status),
                                       ],
                                     ),
                                     onExpansionChanged: (expanded) {
@@ -463,77 +584,140 @@ class _UATScreenState extends State<UATScreen> {
                                     children: [
                                       if (testCase.description.isNotEmpty)
                                         Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Text(testCase.description),
-                                        ),
-                                      if (subCases.isNotEmpty) ...[
-                                        const Divider(),
-                                        const Padding(
-                                          padding: EdgeInsets.all(8.0),
-                                          child: Text(
-                                            'Sub-Test Cases:',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
+                                          padding: const EdgeInsets.all(AppTheme.spacingMD),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(AppTheme.spacingMD),
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                              borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                                            ),
+                                            child: Text(
+                                              testCase.description,
+                                              style: TextStyle(
+                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                height: 1.5,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                        ...subCases.map((subCase) {
-                                          return ListTile(
-                                            leading: CircleAvatar(
-                                              radius: 12,
-                                              backgroundColor: _getStatusColor(subCase.status),
-                                              child: Text(
-                                                '${subCase.number}',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 10,
+                                      if (subCases.isNotEmpty || _canManageTestCases) ...[
+                                        Divider(
+                                          height: 1,
+                                          thickness: 1,
+                                          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppTheme.spacingMD,
+                                            vertical: AppTheme.spacingSM,
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Sub-Test Cases',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 14,
+                                                  color: Theme.of(context).colorScheme.onSurface,
                                                 ),
                                               ),
-                                            ),
-                                            title: Text(subCase.title),
-                                            subtitle: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  'Status: ${subCase.status.toUpperCase()}',
-                                                  style: TextStyle(
-                                                    color: _getStatusColor(subCase.status),
-                                                    fontSize: 12,
+                                              if (_canManageTestCases)
+                                                TextButton.icon(
+                                                  onPressed: () => _showAddSubTestCaseDialog(testCase.id),
+                                                  icon: const Icon(Icons.add, size: 18),
+                                                  label: const Text('Add'),
+                                                  style: TextButton.styleFrom(
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: AppTheme.spacingSM,
+                                                      vertical: AppTheme.spacingXS,
+                                                    ),
                                                   ),
                                                 ),
-                                                if (subCase.testedBy != null)
-                                                  Text(
-                                                    'Tested by: ${subCase.testedBy}',
-                                                    style: const TextStyle(fontSize: 11),
-                                                  ),
-                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        ...subCases.map((subCase) {
+                                          return Container(
+                                            margin: const EdgeInsets.symmetric(
+                                              horizontal: AppTheme.spacingMD,
+                                              vertical: AppTheme.spacingXS,
                                             ),
-                                            trailing: !subCase.isLocked
-                                                ? Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      IconButton(
-                                                        icon: const Icon(Icons.info_outline, size: 18),
-                                                        onPressed: () =>
-                                                            _showSubTestCaseDetails(subCase, testCase.id),
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                              borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                                              border: Border.all(
+                                                color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+                                              ),
+                                            ),
+                                            child: ListTile(
+                                              contentPadding: const EdgeInsets.symmetric(
+                                                horizontal: AppTheme.spacingMD,
+                                                vertical: AppTheme.spacingXS,
+                                              ),
+                                              leading: GestureDetector(
+                                                onTap: () => _showSubTestCaseDetails(subCase, testCase.id),
+                                                child: Container(
+                                                  width: 32,
+                                                  height: 32,
+                                                  decoration: BoxDecoration(
+                                                    color: _getStatusColor(subCase.status).withValues(alpha: 0.15),
+                                                    borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+                                                  ),
+                                                  child: Center(
+                                                    child: Text(
+                                                      '${subCase.number}',
+                                                      style: TextStyle(
+                                                        color: _getStatusColor(subCase.status),
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 12,
                                                       ),
-                                                      IconButton(
-                                                        icon: const Icon(Icons.check, color: Colors.green, size: 18),
-                                                        onPressed: () =>
-                                                            _markAsPassed(testCase.id, subTestCaseId: subCase.id),
-                                                      ),
-                                                      IconButton(
-                                                        icon: const Icon(Icons.close, color: Colors.red, size: 18),
-                                                        onPressed: () =>
-                                                            _markAsFailed(testCase.id, subTestCaseId: subCase.id),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              title: GestureDetector(
+                                                onTap: () => _showSubTestCaseDetails(subCase, testCase.id),
+                                                child: Text(
+                                                  subCase.title,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w500,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                              subtitle: Padding(
+                                                padding: const EdgeInsets.only(top: AppTheme.spacingXS),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    _buildStatusChip(subCase.status, small: true),
+                                                    if (subCase.testedBy != null) ...[
+                                                      const SizedBox(height: AppTheme.spacingXS),
+                                                      Text(
+                                                        'Tested by: ${subCase.testedBy}',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                        ),
                                                       ),
                                                     ],
-                                                  )
-                                                : null,
-                                            onTap: () => _showSubTestCaseDetails(subCase, testCase.id),
+                                                  ],
+                                                ),
+                                              ),
+                                              trailing: !subCase.isLocked
+                                                  ? IconButton(
+                                                      icon: const Icon(Icons.info_outline, size: 18),
+                                                      tooltip: 'View details',
+                                                      onPressed: () =>
+                                                          _showSubTestCaseDetails(subCase, testCase.id),
+                                                    )
+                                                  : _buildStatusChip(subCase.status, small: true),
+                                              onTap: () => _showSubTestCaseDetails(subCase, testCase.id),
+                                            ),
                                           );
                                         }),
+                                        const SizedBox(height: AppTheme.spacingSM),
                                       ],
                                     ],
                                   ),
@@ -549,11 +733,360 @@ class _UATScreenState extends State<UATScreen> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'passed':
-        return Colors.green;
+        return AppTheme.successColor;
       case 'failed':
-        return Colors.red;
+        return AppTheme.errorColor;
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurfaceVariant;
+    }
+  }
+
+  Widget _buildStatusChip(String status, {bool small = false}) {
+    final color = _getStatusColor(status);
+    final text = status.toUpperCase();
+    
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: small ? 6 : 8,
+        vertical: small ? 2 : 4,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSM),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: small ? 10 : 11,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddTestRoundDialog() async {
+    final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Test Round'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Round Name',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.trim().isNotEmpty) {
+                Navigator.pop(context, true);
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      try {
+        await _uatService.createTestRound(
+          name: nameController.text.trim(),
+          description: descriptionController.text.trim(),
+        );
+        await _loadTestRounds();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Test round created successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        Logger.error('Error creating test round', error: e, tag: 'UATScreen');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showAddTestCaseDialog() async {
+    if (_selectedRoundId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a test round first'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final numberController = TextEditingController(
+      text: '${_testCases.length + 1}',
+    );
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final featureController = TextEditingController();
+    final testController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Test Case'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: numberController,
+                decoration: const InputDecoration(
+                  labelText: 'Number',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Title *',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: featureController,
+                decoration: const InputDecoration(
+                  labelText: 'Feature',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: testController,
+                decoration: const InputDecoration(
+                  labelText: 'Test Steps',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 4,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (titleController.text.trim().isNotEmpty) {
+                Navigator.pop(context, true);
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      try {
+        final number = int.tryParse(numberController.text.trim()) ?? (_testCases.length + 1);
+        await _uatService.addTestCase(
+          roundId: _selectedRoundId!,
+          number: number,
+          title: titleController.text.trim(),
+          description: descriptionController.text.trim(),
+          feature: featureController.text.trim().isEmpty ? null : featureController.text.trim(),
+          test: testController.text.trim().isEmpty ? null : testController.text.trim(),
+        );
+        await _loadTestCases(_selectedRoundId!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Test case added successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        Logger.error('Error adding test case', error: e, tag: 'UATScreen');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showAddSubTestCaseDialog(String testCaseId) async {
+    if (_selectedRoundId == null) return;
+
+    final subCases = _subTestCases[testCaseId] ?? [];
+    final numberController = TextEditingController(
+      text: '${subCases.length + 1}',
+    );
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final featureController = TextEditingController();
+    final testController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Sub-Test Case'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: numberController,
+                decoration: const InputDecoration(
+                  labelText: 'Number',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Title *',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: featureController,
+                decoration: const InputDecoration(
+                  labelText: 'Feature',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: testController,
+                decoration: const InputDecoration(
+                  labelText: 'Test Steps',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 4,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (titleController.text.trim().isNotEmpty) {
+                Navigator.pop(context, true);
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      try {
+        final number = int.tryParse(numberController.text.trim()) ?? (subCases.length + 1);
+        await _uatService.addSubTestCase(
+          roundId: _selectedRoundId!,
+          testCaseId: testCaseId,
+          number: number,
+          title: titleController.text.trim(),
+          description: descriptionController.text.trim(),
+          feature: featureController.text.trim().isEmpty ? null : featureController.text.trim(),
+          test: testController.text.trim().isEmpty ? null : testController.text.trim(),
+        );
+        await _loadTestCases(_selectedRoundId!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sub-test case added successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        Logger.error('Error adding sub-test case', error: e, tag: 'UATScreen');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../core/services/logger_service.dart';
@@ -12,6 +13,7 @@ import '../services/auth_service.dart';
 import '../services/app_state.dart';
 import '../services/calendar_sync_service.dart';
 import '../services/background_sync_service.dart';
+import '../services/deep_link_service.dart';
 import '../widgets/error_handler.dart';
 import '../models/user_model.dart';
 
@@ -32,6 +34,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   void initState() {
     super.initState();
     _checkForInviteCode();
+    _setupDeepLinkListener();
   }
 
   void _checkForInviteCode() {
@@ -130,6 +133,39 @@ class _AuthWrapperState extends State<AuthWrapper> {
         );
       }
     }
+  }
+
+  void _setupDeepLinkListener() {
+    const platform = MethodChannel('com.example.familyhub_mvp/deep_link');
+    
+    // Listen for deep links from Android
+    platform.setMethodCallHandler((call) async {
+      if (call.method == 'onDeepLink') {
+        final deepLink = call.arguments as String?;
+        if (deepLink != null && mounted) {
+          final context = this.context;
+          if (context != null) {
+            final uri = Uri.parse(deepLink);
+            final deepLinkService = DeepLinkService();
+            await deepLinkService.handleDeepLink(context, uri);
+          }
+        }
+      }
+    });
+    
+    // Get initial deep link if app was opened via deep link
+    platform.invokeMethod('getInitialDeepLink').then((deepLink) {
+      if (deepLink != null && mounted) {
+        final context = this.context;
+        if (context != null) {
+          final uri = Uri.parse(deepLink as String);
+          final deepLinkService = DeepLinkService();
+          deepLinkService.handleDeepLink(context, uri);
+        }
+      }
+    }).catchError((error) {
+      // No initial deep link, that's OK
+    });
   }
 
   @override
