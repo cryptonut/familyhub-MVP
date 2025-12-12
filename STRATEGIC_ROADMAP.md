@@ -5,7 +5,8 @@
 **Classification:** Strategic Planning
 
 **Related Documents:**
-- `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` - Comprehensive budgeting implementation plan
+- `docs/FAMILY_BUDGET_COMPONENT_PLAN.md` - Comprehensive budgeting feature specification
+- `docs/BUDGET_IMPLEMENTATION_PLAN.md` - Complete implementation plan with detailed tasks, timelines, and technical specifications
 
 ---
 
