@@ -121,10 +121,27 @@ git checkout develop
 .\build_and_distribute.ps1 dev firebase-manual
 ```
 
-### Promote to QA
+### Promote to QA (Automated - Recommended)
+```powershell
+.\release_to_qa_testers.ps1
+```
+
+This automated script:
+- Checks out `release/qa` branch
+- Merges `develop` into `release/qa`
+- **Auto-increments build number** (ensures unique version for email notifications)
+- Builds QA release APK
+- Distributes to `qa-testers` group on Firebase App Distribution
+
+**Why auto-increment?** Firebase App Distribution only sends email notifications for **new releases** with unique versions. Updating an existing release version doesn't trigger emails.
+
+### Promote to QA (Manual - If Needed)
 ```powershell
 git checkout release/qa
 git merge develop
+# Manually increment build number in pubspec.yaml (e.g., 1.0.1+2 → 1.0.1+3)
+git add pubspec.yaml
+git commit -m "chore: Bump build number for QA release"
 git push origin release/qa
 .\build_and_distribute.ps1 qa firebase-manual
 ```

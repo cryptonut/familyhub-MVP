@@ -62,7 +62,59 @@ After deployment, verify:
 
 ## QA Release Process
 
-See `release_to_qa_testers.ps1` for full QA release automation.
+### Automated QA Release (Recommended)
+
+Use the automated release script:
+
+```powershell
+.\release_to_qa_testers.ps1
+```
+
+This script automatically:
+- Checks out `release/qa` branch
+- Merges `develop` into `release/qa`
+- **Auto-increments build number** in `pubspec.yaml` (ensures unique version for each release)
+- Commits and pushes version change
+- Builds QA release APK
+- Distributes to `qa-testers` group on Firebase App Distribution
+- Generates release notes with commit history
+
+**Important:** The script automatically increments the build number (e.g., `1.0.1+2` → `1.0.1+3`) to ensure each release has a unique version. This is critical because:
+- Firebase App Distribution only sends email notifications for **new releases**, not updates to existing releases
+- Each unique version triggers email notifications to testers
+- The version increment is automatically committed to the repository
+
+**Version Format:** `Major.Minor.Patch+Build`
+- Example: `1.0.1+4` means version 1.0.1, build number 4
+- The build number is automatically incremented on each release
+
+### Manual QA Release (If Needed)
+
+If you need to manually create a QA release:
+
+1. **Checkout and merge:**
+   ```powershell
+   git checkout release/qa
+   git merge develop
+   ```
+
+2. **Increment build number in `pubspec.yaml`:**
+   ```yaml
+   version: 1.0.1+4  # Increment the number after the +
+   ```
+
+3. **Commit version change:**
+   ```powershell
+   git add pubspec.yaml
+   git commit -m "chore: Bump build number for QA release"
+   git push origin release/qa
+   ```
+
+4. **Build and distribute:**
+   ```powershell
+   flutter build apk --release --flavor qa --dart-define=FLAVOR=qa
+   firebase appdistribution:distribute build\app\outputs\flutter-apk\app-qa-release.apk --app YOUR_APP_ID --groups "qa-testers" --release-notes "QA Release Build"
+   ```
 
 ## Production Release Process
 

@@ -30,10 +30,14 @@ git merge develop
 
 ### 2. Update Version
 
-Update version in `pubspec.yaml`:
+**For QA Releases:** Use the automated script `release_to_qa_testers.ps1` which automatically increments the build number.
+
+**For Manual Releases:** Update version in `pubspec.yaml`:
 ```yaml
 version: 1.0.0+1  # Major.Minor.Patch+Build
 ```
+
+**Important:** The build number (number after `+`) must be unique for each release to ensure Firebase App Distribution sends email notifications to testers. The automated QA release script handles this automatically.
 
 ### 3. Build Release
 
