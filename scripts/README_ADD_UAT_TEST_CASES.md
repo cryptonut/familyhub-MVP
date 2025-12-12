@@ -73,10 +73,25 @@ But this requires Flutter compilation and may have issues.
 
 ## Script Usage
 
+**IMPORTANT: Data Isolation Between Environments**
+
+The script must be run **separately for each environment** because each flavor uses different Firestore collections:
+- **Dev flavor** uses `dev_uat_test_rounds` collection
+- **QA flavor** uses `test_uat_test_rounds` collection  
+- **Prod flavor** uses `uat_test_rounds` collection (unprefixed)
+
+This ensures data isolation between environments. If you want test artifacts available in multiple environments, you must run the script for each one.
+
 ```bash
 # With service account (recommended)
-set GOOGLE_APPLICATION_CREDENTIALS=scripts/firebase-service-account.json
+# For Dev environment:
 dart scripts/add_uat_test_cases.dart dev
+
+# For QA environment:
+dart scripts/add_uat_test_cases.dart qa
+
+# For Production environment:
+dart scripts/add_uat_test_cases.dart prod
 
 # With OAuth token
 dart scripts/add_uat_test_cases.dart dev YOUR_OAUTH_TOKEN
@@ -88,10 +103,10 @@ dart scripts/add_uat_test_cases.dart dev
 
 ## What the Script Does
 
-1. Creates a test round in the appropriate collection:
+1. Creates a test round in the appropriate collection based on environment:
    - `dev_uat_test_rounds` for dev environment
    - `test_uat_test_rounds` for qa environment
-   - `uat_test_rounds` for prod environment
+   - `uat_test_rounds` for prod environment (unprefixed)
 
 2. Adds 6 test cases covering:
    - Data Isolation
@@ -101,7 +116,24 @@ dart scripts/add_uat_test_cases.dart dev
    - Feature Gating
    - Subscription UI
 
-3. Adds sub-test cases for each test case (total: 24 sub-test cases)
+3. Adds sub-test cases for each test case (total: 26 sub-test cases)
+
+## Environment-Specific Collections
+
+Due to data isolation requirements, each flavor queries its own prefixed collection:
+- **Dev app** → looks in `dev_uat_test_rounds` (also checks `uat_test_rounds` as fallback)
+- **QA app** → looks in `test_uat_test_rounds` (also checks `uat_test_rounds` as fallback)
+- **Prod app** → looks in `uat_test_rounds` (unprefixed)
+
+**To make test artifacts visible in QA builds, you must run:**
+```bash
+dart scripts/add_uat_test_cases.dart qa
+```
+
+**To make test artifacts visible in Dev builds, you must run:**
+```bash
+dart scripts/add_uat_test_cases.dart dev
+```
 
 ## Next Steps
 
