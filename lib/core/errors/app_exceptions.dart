@@ -174,3 +174,8 @@ class SubscriptionException extends AppException {
   const SubscriptionException(super.message, {super.code, super.originalError});
 }
 
+/// Resource not found exceptions
+class NotFoundException extends AppException {
+  const NotFoundException(super.message, {super.code, super.originalError});
+}
+
