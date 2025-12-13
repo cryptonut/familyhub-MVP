@@ -94,6 +94,11 @@ dependencies:
   
   # In-App Purchases
   in_app_purchase: ^3.1.11
+  
+  # Budgeting & Analytics
+  fl_chart: ^0.68.0
+  pdf: ^3.11.1
+  csv: ^6.0.0
 
 dev_dependencies:
   flutter_test:

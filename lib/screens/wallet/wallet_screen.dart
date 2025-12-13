@@ -16,6 +16,7 @@ import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
 import 'request_payout_dialog.dart';
 import 'recurring_payments_screen.dart';
+import '../budget/budget_home_screen.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
@@ -292,6 +293,92 @@ class _WalletScreenState extends State<WalletScreen> {
                             ],
                           ],
                         ],
+                      ),
+                    ),
+                    
+                    // Budget Section - at the bottom
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom),
+                      child: Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                        ),
+                        child: InkWell(
+                          onTap: () {
+                            try {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const BudgetHomeScreen(),
+                                ),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error opening budgets: ${e.toString()}'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(AppTheme.radiusMD),
+                                  ),
+                                  child: const Icon(
+                                    Icons.account_balance_wallet,
+                                    color: AppTheme.primaryColor,
+                                    size: 28,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Family Budgets',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Track income, expenses, and savings goals',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Tap to manage budgets',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppTheme.primaryColor,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.grey,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ],

@@ -564,6 +564,67 @@ service cloud.firestore {
         allow update: if belongsToFamily(familyId);
         allow delete: if belongsToFamily(familyId);
       }
+      
+      // Budgets subcollection
+      match /budgets/{budgetId} {
+        allow read: if belongsToFamily(familyId);
+        allow create: if belongsToFamily(familyId) && 
+          request.resource.data.createdBy == request.auth.uid;
+        allow update: if belongsToFamily(familyId) && 
+          (resource.data.createdBy == request.auth.uid ||
+           isBankerOrAdmin());
+        allow delete: if belongsToFamily(familyId) && 
+          (resource.data.createdBy == request.auth.uid ||
+           isBankerOrAdmin());
+        
+        // Budget categories subcollection
+        match /categories/{categoryId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId);
+          allow update: if belongsToFamily(familyId);
+          allow delete: if belongsToFamily(familyId);
+        }
+        
+        // Budget items subcollection
+        match /items/{itemId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId) && 
+            request.resource.data.createdBy == request.auth.uid;
+          allow update: if belongsToFamily(familyId) && 
+            (resource.data.createdBy == request.auth.uid ||
+             isBankerOrAdmin());
+          allow delete: if belongsToFamily(familyId) && 
+            (resource.data.createdBy == request.auth.uid ||
+             isBankerOrAdmin());
+        }
+        
+        // Budget transactions subcollection
+        match /transactions/{transactionId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId) && 
+            request.resource.data.createdBy == request.auth.uid &&
+            request.resource.data.itemId != null; // Require itemId
+          allow update: if belongsToFamily(familyId) && 
+            (resource.data.createdBy == request.auth.uid ||
+             isBankerOrAdmin());
+          allow delete: if belongsToFamily(familyId) && 
+            (resource.data.createdBy == request.auth.uid ||
+             isBankerOrAdmin());
+        }
+        
+        // Savings goals subcollection
+        match /savingsGoals/{goalId} {
+          allow read: if belongsToFamily(familyId);
+          allow create: if belongsToFamily(familyId) && 
+            request.resource.data.createdBy == request.auth.uid;
+          allow update: if belongsToFamily(familyId) && 
+            (resource.data.createdBy == request.auth.uid ||
+             isBankerOrAdmin());
+          allow delete: if belongsToFamily(familyId) && 
+            (resource.data.createdBy == request.auth.uid ||
+             isBankerOrAdmin());
+        }
+      }
     }
     
     // Dev families collection - same rules as families (for dev environment)
