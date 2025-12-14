@@ -16,7 +16,6 @@ import 'subscription_service.dart';
 class CoparentingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final AuthService _authService = AuthService();
   final HubService _hubService = HubService();
   final SubscriptionService _subscriptionService = SubscriptionService();
   final Uuid _uuid = const Uuid();
@@ -317,6 +316,239 @@ class CoparentingService {
     } catch (e) {
       Logger.error('Error getting pending approvals count', error: e, tag: 'CoparentingService');
       return 0;
+    }
+  }
+
+  /// Get all custody schedules for a hub
+  Future<List<CustodySchedule>> getCustodySchedules(String hubId) async {
+    try {
+      final snapshot = await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'custodySchedules'))
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => CustodySchedule.fromJson({
+                'id': doc.id,
+                ...doc.data(),
+              }))
+          .toList();
+    } catch (e) {
+      Logger.error('Error getting custody schedules', error: e, tag: 'CoparentingService');
+      return [];
+    }
+  }
+
+  /// Update custody schedule
+  Future<void> updateCustodySchedule({
+    required String hubId,
+    required String scheduleId,
+    ScheduleType? type,
+    Map<String, String>? weeklySchedule,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      final updates = <String, dynamic>{};
+      if (type != null) updates['type'] = type.name;
+      if (weeklySchedule != null) updates['weeklySchedule'] = weeklySchedule;
+      if (startDate != null) updates['startDate'] = startDate.toIso8601String();
+      if (endDate != null) updates['endDate'] = endDate.toIso8601String();
+
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'custodySchedules'))
+          .doc(scheduleId)
+          .update(updates);
+
+      Logger.info('Custody schedule updated: $scheduleId', tag: 'CoparentingService');
+    } catch (e) {
+      Logger.error('Error updating custody schedule', error: e, tag: 'CoparentingService');
+      rethrow;
+    }
+  }
+
+  /// Add exception to custody schedule
+  Future<void> addScheduleException({
+    required String hubId,
+    required String scheduleId,
+    required ScheduleException exception,
+  }) async {
+    try {
+      final scheduleDoc = await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'custodySchedules'))
+          .doc(scheduleId)
+          .get();
+
+      if (!scheduleDoc.exists) {
+        throw NotFoundException('Schedule not found', code: 'schedule-not-found');
+      }
+
+      final schedule = CustodySchedule.fromJson({
+        'id': scheduleDoc.id,
+        ...scheduleDoc.data()!,
+      });
+
+      final updatedExceptions = List<ScheduleException>.from(schedule.exceptions)..add(exception);
+
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'custodySchedules'))
+          .doc(scheduleId)
+          .update({
+        'exceptions': updatedExceptions.map((e) => e.toJson()).toList(),
+      });
+
+      Logger.info('Exception added to schedule: $scheduleId', tag: 'CoparentingService');
+    } catch (e) {
+      Logger.error('Error adding schedule exception', error: e, tag: 'CoparentingService');
+      rethrow;
+    }
+  }
+
+  /// Delete custody schedule
+  Future<void> deleteCustodySchedule({
+    required String hubId,
+    required String scheduleId,
+  }) async {
+    try {
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'custodySchedules'))
+          .doc(scheduleId)
+          .delete();
+
+      Logger.info('Custody schedule deleted: $scheduleId', tag: 'CoparentingService');
+    } catch (e) {
+      Logger.error('Error deleting custody schedule', error: e, tag: 'CoparentingService');
+      rethrow;
+    }
+  }
+
+  /// Get all schedule change requests for a hub
+  Future<List<ScheduleChangeRequest>> getScheduleChangeRequests({
+    required String hubId,
+    String? childId,
+    ScheduleChangeStatus? status,
+  }) async {
+    try {
+      var query = _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'scheduleChangeRequests'))
+          .orderBy('createdAt', descending: true);
+
+      if (childId != null) {
+        query = query.where('childId', isEqualTo: childId);
+      }
+
+      if (status != null) {
+        query = query.where('status', isEqualTo: status.name);
+      }
+
+      final snapshot = await query.get();
+
+      return snapshot.docs
+          .map((doc) => ScheduleChangeRequest.fromJson({
+                'id': doc.id,
+                ...doc.data(),
+              }))
+          .toList();
+    } catch (e) {
+      Logger.error('Error getting schedule change requests', error: e, tag: 'CoparentingService');
+      return [];
+    }
+  }
+
+  /// Get pending schedule change requests count
+  Future<int> getPendingScheduleChangeRequestsCount(String hubId) async {
+    try {
+      final snapshot = await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'scheduleChangeRequests'))
+          .where('status', isEqualTo: ScheduleChangeStatus.pending.name)
+          .get();
+
+      return snapshot.docs.length;
+    } catch (e) {
+      Logger.error('Error getting pending schedule change requests count', error: e, tag: 'CoparentingService');
+      return 0;
+    }
+  }
+
+  /// Get expense by ID
+  Future<CoparentingExpense?> getExpense({
+    required String hubId,
+    required String expenseId,
+  }) async {
+    try {
+      final doc = await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'expenses'))
+          .doc(expenseId)
+          .get();
+
+      if (!doc.exists) return null;
+
+      return CoparentingExpense.fromJson({
+        'id': doc.id,
+        ...doc.data()!,
+      });
+    } catch (e) {
+      Logger.error('Error getting expense', error: e, tag: 'CoparentingService');
+      return null;
+    }
+  }
+
+  /// Mark expense as paid
+  Future<void> markExpenseAsPaid({
+    required String hubId,
+    required String expenseId,
+  }) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'expenses'))
+          .doc(expenseId)
+          .update({
+        'status': ExpenseStatus.paid.name,
+      });
+
+      Logger.info('Expense marked as paid: $expenseId', tag: 'CoparentingService');
+    } catch (e) {
+      Logger.error('Error marking expense as paid', error: e, tag: 'CoparentingService');
+      rethrow;
+    }
+  }
+
+  /// Reject expense with reason
+  Future<void> rejectExpenseWithReason({
+    required String hubId,
+    required String expenseId,
+    required String reason,
+  }) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'expenses'))
+          .doc(expenseId)
+          .update({
+        'status': ExpenseStatus.rejected.name,
+        'approvedBy': currentUserId,
+        'approvedAt': DateTime.now().toIso8601String(),
+        'rejectionReason': reason,
+      });
+
+      Logger.info('Expense rejected with reason: $expenseId', tag: 'CoparentingService');
+    } catch (e) {
+      Logger.error('Error rejecting expense with reason', error: e, tag: 'CoparentingService');
+      rethrow;
     }
   }
 }

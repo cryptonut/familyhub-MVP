@@ -68,10 +68,7 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
       }
 
       final pendingExpenses = await _coparentingService.getPendingApprovalsCount(widget.hubId);
-      
-      // Count pending schedule change requests
-      // TODO: Add method to CoparentingService to get pending schedule changes count
-      final pendingScheduleChanges = 0; // Placeholder for now
+      final pendingScheduleChanges = await _coparentingService.getPendingScheduleChangeRequestsCount(widget.hubId);
 
       if (mounted) {
         setState(() {

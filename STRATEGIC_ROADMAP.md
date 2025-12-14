@@ -587,7 +587,7 @@ Specialized hub type designed to assist parents with homeschooling coordination,
 ---
 
 ### Phase 4: Co-Parenting Hubs (Q4 2025)
-**Status:** 🚧 In Progress - ~40% Complete
+**Status:** ✅ **Core Features Complete** - ~85% Complete
 
 #### Overview
 Specialized hub designed to assist separated/divorced parents in coordinating child care, managing schedules, tracking expenses, and maintaining clear communication—all while minimizing conflict.
@@ -595,19 +595,25 @@ Specialized hub designed to assist separated/divorced parents in coordinating ch
 #### Key Features
 
 **4.1 Co-Parenting Coordination**
-- [ ] **Custody Schedule Management**
-  - Visual custody calendar
-  - Recurring schedule templates (week on/week off, etc.)
-  - Holiday schedule planning
-  - Schedule change requests/approvals
+- [x] **Custody Schedule Management** ✅ **COMPLETE**
+  - ✅ List and view custody schedules
+  - ✅ Create/edit schedules with multiple types (week on/week off, 2-2-3, every other weekend, custom)
+  - ✅ Custom weekly schedule builder
+  - ✅ Date range selection (start/end dates)
+  - ✅ Schedule exceptions support (model ready)
+  - ✅ Delete schedules
+  - 🚧 Visual custody calendar (future enhancement)
+  - 🚧 Holiday schedule planning (future enhancement)
 
-- [ ] **Expense Tracking & Splitting**
-  - Shared expense logging
-  - Category-based expenses (medical, education, activities, etc.)
-  - Receipt photo upload
-  - Automatic split calculations (50/50, percentage-based)
-  - Reimbursement requests
-  - Payment tracking
+- [x] **Expense Tracking & Splitting** ✅ **COMPLETE**
+  - ✅ Shared expense logging
+  - ✅ Category-based expenses (medical, education, activities, clothing, food, transportation, other)
+  - ✅ Receipt photo upload (camera/gallery)
+  - ✅ Automatic split calculations (customizable 0-100%)
+  - ✅ Approve/reject workflow
+  - ✅ Mark as paid functionality
+  - ✅ Receipt viewing
+  - 🚧 Reimbursement requests (future enhancement)
 
 - [ ] **Communication Tools**
   - Structured communication (message templates)
@@ -657,13 +663,15 @@ Specialized hub designed to assist separated/divorced parents in coordinating ch
   - Privacy controls for widget display
 
 **4.4 Technical Requirements**
-- [ ] Create `hubType: 'coparenting'` model
-- [ ] Build custody schedule system
-- [ ] Implement expense tracking with split calculations
-- [ ] Create communication logging system
-- [ ] Design child profile sharing system
-- [ ] Build export/reporting functionality
-- [ ] Implement tamper-proof logging
+- [x] Create `hubType: 'coparenting'` model ✅
+- [x] Build custody schedule system ✅
+- [x] Implement expense tracking with split calculations ✅
+- [x] Schedule change request system ✅
+- [x] Receipt upload to Firebase Storage ✅
+- [ ] Create communication logging system (future)
+- [ ] Design child profile sharing system (future)
+- [ ] Build export/reporting functionality (future)
+- [ ] Implement tamper-proof logging (future)
 
 **4.5 Monetization**
 - [ ] **Pricing Strategy**
