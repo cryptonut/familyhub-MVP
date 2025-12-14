@@ -500,17 +500,20 @@ class _ChatWidgetState extends State<ChatWidget> {
                           fontSize: 16,
                           color: Theme.of(context).primaryColor,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (widget.onViewFullChat != null)
-                      TextButton(
-                        onPressed: widget.onViewFullChat,
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      Flexible(
+                        child: TextButton(
+                          onPressed: widget.onViewFullChat,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('View Full', style: TextStyle(fontSize: 12)),
                         ),
-                        child: const Text('View Full', style: TextStyle(fontSize: 12)),
                       ),
                     Icon(
                       _isExpanded ? Icons.expand_less : Icons.expand_more,

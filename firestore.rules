@@ -713,9 +713,9 @@ service cloud.firestore {
       // Helper function to check if user is a hub member
       function isHubMember() {
         return isAuthenticated() && 
-          exists(/databases/$(database)/documents/hubs/$(hubId)) &&
-          (get(/databases/$(database)/documents/hubs/$(hubId)).data.creatorId == request.auth.uid ||
-           request.auth.uid in get(/databases/$(database)/documents/hubs/$(hubId)).data.memberIds);
+          (exists(/databases/$(database)/documents/hubs/$(hubId)) &&
+           (get(/databases/$(database)/documents/hubs/$(hubId)).data.creatorId == request.auth.uid ||
+            request.auth.uid in get(/databases/$(database)/documents/hubs/$(hubId)).data.memberIds));
       }
       
       // Hub messages subcollection
@@ -745,6 +745,20 @@ service cloud.firestore {
         allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
         allow update: if isHubMember() && request.auth.uid == resource.data.createdBy;
         allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Student profiles (homeschooling)
+      match /student_profiles/{profileId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && 
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() && 
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() && 
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
       }
       
       // Custody schedules (co-parenting)
@@ -786,9 +800,9 @@ service cloud.firestore {
       // Helper function to check if user is a hub member
       function isHubMember() {
         return isAuthenticated() && 
-          exists(/databases/$(database)/documents/dev_hubs/$(hubId)) &&
-          (get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.creatorId == request.auth.uid ||
-           request.auth.uid in get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.memberIds);
+          (exists(/databases/$(database)/documents/dev_hubs/$(hubId)) &&
+           (get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.creatorId == request.auth.uid ||
+            request.auth.uid in get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.memberIds));
       }
       
       // Hub messages subcollection
@@ -818,6 +832,20 @@ service cloud.firestore {
         allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
         allow update: if isHubMember() && request.auth.uid == resource.data.createdBy;
         allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Student profiles (homeschooling)
+      match /student_profiles/{profileId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && 
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() && 
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() && 
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
       }
       
       // Custody schedules (co-parenting)
@@ -859,9 +887,9 @@ service cloud.firestore {
       // Helper function to check if user is a hub member
       function isHubMember() {
         return isAuthenticated() && 
-          exists(/databases/$(database)/documents/test_hubs/$(hubId)) &&
-          (get(/databases/$(database)/documents/test_hubs/$(hubId)).data.creatorId == request.auth.uid ||
-           request.auth.uid in get(/databases/$(database)/documents/test_hubs/$(hubId)).data.memberIds);
+          (exists(/databases/$(database)/documents/test_hubs/$(hubId)) &&
+           (get(/databases/$(database)/documents/test_hubs/$(hubId)).data.creatorId == request.auth.uid ||
+            request.auth.uid in get(/databases/$(database)/documents/test_hubs/$(hubId)).data.memberIds));
       }
       
       // Hub messages subcollection
@@ -891,6 +919,20 @@ service cloud.firestore {
         allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
         allow update: if isHubMember() && request.auth.uid == resource.data.createdBy;
         allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Student profiles (homeschooling)
+      match /student_profiles/{profileId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && 
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() && 
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() && 
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
       }
       
       // Custody schedules (co-parenting)

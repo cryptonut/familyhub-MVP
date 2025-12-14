@@ -546,6 +546,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Icon(Icons.chevron_right, color: Colors.purple.shade700),
@@ -613,6 +614,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Icon(Icons.chevron_right, color: Colors.blue.shade700),
@@ -1871,15 +1873,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.task_alt, color: Colors.orange.shade700, size: 20),
                             const SizedBox(width: 8),
-                            Text(
-                              _activeJobsCount.toString(),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange.shade700,
+                            Flexible(
+                              child: Text(
+                                _activeJobsCount.toString(),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -1892,6 +1898,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             fontSize: 12,
                             color: Colors.grey[600],
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -1913,15 +1920,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
                             const SizedBox(width: 8),
-                            Text(
-                              _completedJobsCount.toString(),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green.shade700,
+                            Flexible(
+                              child: Text(
+                                _completedJobsCount.toString(),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green.shade700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -1934,6 +1945,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             fontSize: 12,
                             color: Colors.grey[600],
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

@@ -20,7 +20,8 @@ class Assignment {
   final DateTime createdAt;
   final String createdBy;
   final DateTime? completedAt;
-  final String? grade;
+  final String? completedBy;
+  final double? grade;
   final String? feedback;
 
   Assignment({
@@ -35,6 +36,7 @@ class Assignment {
     required this.createdAt,
     required this.createdBy,
     this.completedAt,
+    this.completedBy,
     this.grade,
     this.feedback,
   });
@@ -51,6 +53,7 @@ class Assignment {
         'createdAt': createdAt.toIso8601String(),
         'createdBy': createdBy,
         'completedAt': completedAt?.toIso8601String(),
+        'completedBy': completedBy,
         'grade': grade,
         'feedback': feedback,
       };
@@ -72,7 +75,8 @@ class Assignment {
         completedAt: json['completedAt'] != null
             ? DateTime.parse(json['completedAt'] as String)
             : null,
-        grade: json['grade'] as String?,
+        completedBy: json['completedBy'] as String?,
+        grade: json['grade'] != null ? (json['grade'] as num).toDouble() : null,
         feedback: json['feedback'] as String?,
       );
 
@@ -88,7 +92,8 @@ class Assignment {
     DateTime? createdAt,
     String? createdBy,
     DateTime? completedAt,
-    String? grade,
+    String? completedBy,
+    double? grade,
     String? feedback,
   }) {
     return Assignment(
@@ -103,6 +108,7 @@ class Assignment {
       createdAt: createdAt ?? this.createdAt,
       createdBy: createdBy ?? this.createdBy,
       completedAt: completedAt ?? this.completedAt,
+      completedBy: completedBy ?? this.completedBy,
       grade: grade ?? this.grade,
       feedback: feedback ?? this.feedback,
     );

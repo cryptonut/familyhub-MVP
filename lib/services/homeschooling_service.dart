@@ -70,7 +70,7 @@ class HomeschoolingService {
       );
 
       await _firestore
-          .collection(FirestorePathUtils.getCollectionPath('student_profiles'))
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'student_profiles'))
           .doc(profile.id)
           .set(profile.toJson());
 
@@ -86,8 +86,7 @@ class HomeschoolingService {
   Future<List<StudentProfile>> getStudentProfiles(String hubId) async {
     try {
       final snapshot = await _firestore
-          .collection(FirestorePathUtils.getCollectionPath('student_profiles'))
-          .where('hubId', isEqualTo: hubId)
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'student_profiles'))
           .get();
 
       return snapshot.docs
@@ -99,6 +98,68 @@ class HomeschoolingService {
     } catch (e) {
       Logger.error('Error getting student profiles', error: e, tag: 'HomeschoolingService');
       return [];
+    }
+  }
+
+  /// Update student profile
+  Future<void> updateStudentProfile(
+    String hubId,
+    String profileId, {
+    String? name,
+    DateTime? dateOfBirth,
+    String? gradeLevel,
+    List<String>? subjects,
+  }) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      final updates = <String, dynamic>{};
+
+      if (name != null) {
+        updates['name'] = name;
+      }
+      if (dateOfBirth != null) {
+        updates['dateOfBirth'] = dateOfBirth.toIso8601String();
+      }
+      if (gradeLevel != null) {
+        updates['gradeLevel'] = gradeLevel;
+      }
+      if (subjects != null) {
+        updates['subjects'] = subjects;
+      }
+
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'student_profiles'))
+          .doc(profileId)
+          .update(updates);
+
+      Logger.info('Student profile updated: $profileId', tag: 'HomeschoolingService');
+    } catch (e) {
+      Logger.error('Error updating student profile', error: e, tag: 'HomeschoolingService');
+      rethrow;
+    }
+  }
+
+  /// Delete student profile
+  Future<void> deleteStudentProfile(String hubId, String profileId) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'student_profiles'))
+          .doc(profileId)
+          .delete();
+
+      Logger.info('Student profile deleted: $profileId', tag: 'HomeschoolingService');
+    } catch (e) {
+      Logger.error('Error deleting student profile', error: e, tag: 'HomeschoolingService');
+      rethrow;
     }
   }
 
@@ -241,7 +302,7 @@ class HomeschoolingService {
       final snapshot = await query.get();
 
       return snapshot.docs
-          .map((doc) => LessonPlan.fromJson({
+          .map<LessonPlan>((doc) => LessonPlan.fromJson({
                 'id': doc.id,
                 ...doc.data(),
               }))
@@ -249,6 +310,52 @@ class HomeschoolingService {
     } catch (e) {
       Logger.error('Error getting lesson plans', error: e, tag: 'HomeschoolingService');
       return [];
+    }
+  }
+
+  /// Update assignment
+  Future<void> updateAssignment({
+    required String hubId,
+    required String assignmentId,
+    String? title,
+    String? description,
+    String? subject,
+    String? studentId,
+    DateTime? dueDate,
+    AssignmentStatus? status,
+    String? completedBy,
+    double? grade,
+    String? feedback,
+  }) async {
+    try {
+      final updates = <String, dynamic>{};
+
+      if (title != null) updates['title'] = title;
+      if (description != null) updates['description'] = description;
+      if (subject != null) updates['subject'] = subject;
+      if (studentId != null) updates['studentId'] = studentId;
+      if (dueDate != null) updates['dueDate'] = dueDate.toIso8601String();
+      if (status != null) {
+        updates['status'] = status.name;
+        if (status == AssignmentStatus.completed || status == AssignmentStatus.graded) {
+          updates['completedAt'] = DateTime.now().toIso8601String();
+          if (completedBy != null) {
+            updates['completedBy'] = completedBy;
+          }
+        }
+      }
+      if (grade != null) updates['grade'] = grade;
+      if (feedback != null) updates['feedback'] = feedback;
+
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'assignments'))
+          .doc(assignmentId)
+          .update(updates);
+
+      Logger.info('Assignment updated: $assignmentId', tag: 'HomeschoolingService');
+    } catch (e) {
+      Logger.error('Error updating assignment', error: e, tag: 'HomeschoolingService');
+      rethrow;
     }
   }
 
@@ -289,6 +396,53 @@ class HomeschoolingService {
       Logger.info('Assignment status updated: $assignmentId', tag: 'HomeschoolingService');
     } catch (e) {
       Logger.error('Error updating assignment status', error: e, tag: 'HomeschoolingService');
+      rethrow;
+    }
+  }
+
+  /// Update lesson plan
+  Future<void> updateLessonPlan({
+    required String hubId,
+    required String lessonPlanId,
+    String? subject,
+    String? title,
+    String? description,
+    List<String>? learningObjectives,
+    List<String>? resources,
+    DateTime? scheduledDate,
+    int? estimatedDurationMinutes,
+    LessonStatus? status,
+  }) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      final updates = <String, dynamic>{};
+
+      if (subject != null) updates['subject'] = subject;
+      if (title != null) updates['title'] = title;
+      if (description != null) updates['description'] = description;
+      if (learningObjectives != null) updates['learningObjectives'] = learningObjectives;
+      if (resources != null) updates['resources'] = resources;
+      if (scheduledDate != null) updates['scheduledDate'] = scheduledDate.toIso8601String();
+      if (estimatedDurationMinutes != null) updates['estimatedDurationMinutes'] = estimatedDurationMinutes;
+      if (status != null) {
+        updates['status'] = status.name;
+        if (status == LessonStatus.completed) {
+          updates['completedAt'] = DateTime.now().toIso8601String();
+        }
+      }
+
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'lessonPlans'))
+          .doc(lessonPlanId)
+          .update(updates);
+
+      Logger.info('Lesson plan updated: $lessonPlanId', tag: 'HomeschoolingService');
+    } catch (e) {
+      Logger.error('Error updating lesson plan', error: e, tag: 'HomeschoolingService');
       rethrow;
     }
   }

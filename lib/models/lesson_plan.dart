@@ -1,5 +1,12 @@
 import 'package:uuid/uuid.dart';
 
+enum LessonStatus {
+  planned,
+  inProgress,
+  completed,
+  cancelled,
+}
+
 class LessonPlan {
   final String id;
   final String hubId;
@@ -10,6 +17,7 @@ class LessonPlan {
   final List<String> resources;
   final DateTime? scheduledDate;
   final int estimatedDurationMinutes;
+  final LessonStatus status;
   final DateTime createdAt;
   final String createdBy;
   final DateTime? completedAt;
@@ -24,6 +32,7 @@ class LessonPlan {
     this.resources = const [],
     this.scheduledDate,
     this.estimatedDurationMinutes = 60,
+    this.status = LessonStatus.planned,
     required this.createdAt,
     required this.createdBy,
     this.completedAt,
@@ -39,6 +48,7 @@ class LessonPlan {
         'resources': resources,
         'scheduledDate': scheduledDate?.toIso8601String(),
         'estimatedDurationMinutes': estimatedDurationMinutes,
+        'status': status.name,
         'createdAt': createdAt.toIso8601String(),
         'createdBy': createdBy,
         'completedAt': completedAt?.toIso8601String(),
@@ -56,6 +66,12 @@ class LessonPlan {
             ? DateTime.parse(json['scheduledDate'] as String)
             : null,
         estimatedDurationMinutes: json['estimatedDurationMinutes'] as int? ?? 60,
+        status: json['status'] != null
+            ? LessonStatus.values.firstWhere(
+                (e) => e.name == json['status'],
+                orElse: () => LessonStatus.planned,
+              )
+            : LessonStatus.planned,
         createdAt: DateTime.parse(json['createdAt'] as String),
         createdBy: json['createdBy'] as String,
         completedAt: json['completedAt'] != null
@@ -73,6 +89,7 @@ class LessonPlan {
     List<String>? resources,
     DateTime? scheduledDate,
     int? estimatedDurationMinutes,
+    LessonStatus? status,
     DateTime? createdAt,
     String? createdBy,
     DateTime? completedAt,
@@ -87,6 +104,7 @@ class LessonPlan {
       resources: resources ?? this.resources,
       scheduledDate: scheduledDate ?? this.scheduledDate,
       estimatedDurationMinutes: estimatedDurationMinutes ?? this.estimatedDurationMinutes,
+      status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       createdBy: createdBy ?? this.createdBy,
       completedAt: completedAt ?? this.completedAt,

@@ -48,7 +48,15 @@ class _TaskDependencyWidgetState extends State<TaskDependencyWidget> {
       final taskMap = <String, Task>{};
       for (var dep in dependencies) {
         try {
-          final task = await _taskService.getTask(dep.dependsOnTaskId, widget.familyId);
+          final taskInfo = await _taskService.getTaskInfo(dep.dependsOnTaskId);
+          Task? task;
+          if (taskInfo != null && taskInfo['data'] != null) {
+            try {
+              task = Task.fromJson({'id': taskInfo['id'], ...taskInfo['data'] as Map<String, dynamic>});
+            } catch (e) {
+              // Task might not exist anymore or parse error
+            }
+          }
           if (task != null) {
             taskMap[dep.dependsOnTaskId] = task;
           }
@@ -74,7 +82,7 @@ class _TaskDependencyWidgetState extends State<TaskDependencyWidget> {
 
   Future<void> _addDependency() async {
     // Show dialog to select a task
-    final tasks = await _taskService.getTasks(widget.familyId);
+    final tasks = await _taskService.getTasks();
     final availableTasks = tasks
         .where((t) => t.id != widget.taskId && !_dependencies.any((d) => d.dependsOnTaskId == t.id))
         .toList();

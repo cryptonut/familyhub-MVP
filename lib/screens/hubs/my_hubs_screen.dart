@@ -6,6 +6,9 @@ import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
 import 'my_friends_hub_screen.dart';
 import 'create_hub_dialog.dart';
+import '../homeschooling/homeschooling_hub_screen.dart';
+import '../extended_family/extended_family_hub_screen.dart';
+import '../coparenting/coparenting_hub_screen.dart';
 
 class MyHubsScreen extends StatefulWidget {
   const MyHubsScreen({super.key});
@@ -115,16 +118,30 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
   Widget _buildHubCard(Hub hub) {
     return ModernCard(
       onTap: () {
-        if (hub.name == 'My Friends') {
+        // Navigate based on hub type
+        if (hub.hubType == HubType.homeschooling) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => MyFriendsHubScreen(hub: hub),
+              builder: (context) => HomeschoolingHubScreen(hubId: hub.id),
+            ),
+          );
+        } else if (hub.hubType == HubType.extendedFamily) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ExtendedFamilyHubScreen(hubId: hub.id),
+            ),
+          );
+        } else if (hub.hubType == HubType.coparenting) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CoparentingHubScreen(hubId: hub.id),
             ),
           );
         } else {
-          // For now, other hubs also open My Friends view
-          // You can create different views for different hub types later
+          // Default to My Friends view for other hub types
           Navigator.push(
             context,
             MaterialPageRoute(
