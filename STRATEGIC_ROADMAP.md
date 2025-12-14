@@ -409,7 +409,7 @@ Transform Family Hub into a multi-hub platform where families can manage not jus
 ---
 
 ### Phase 2: Extended Family Hubs (Q2 2025)
-**Status:** 🚧 Planned
+**Status:** 🚧 In Progress - ~50% Complete
 
 #### Overview
 Enable families to connect with extended family members (grandparents, aunts, uncles, cousins) in dedicated hubs with appropriate privacy controls and communication tools.
@@ -480,7 +480,7 @@ Enable families to connect with extended family members (grandparents, aunts, un
 ---
 
 ### Phase 3: Home Schooling Hubs (Q3 2025)
-**Status:** 🚧 Planned
+**Status:** 🚧 In Progress - ~40% Complete
 
 #### Overview
 Specialized hub type designed to assist parents with homeschooling coordination, curriculum management, progress tracking, and parent-teacher collaboration.
@@ -587,7 +587,7 @@ Specialized hub type designed to assist parents with homeschooling coordination,
 ---
 
 ### Phase 4: Co-Parenting Hubs (Q4 2025)
-**Status:** 🚧 Planned
+**Status:** 🚧 In Progress - ~40% Complete
 
 #### Overview
 Specialized hub designed to assist separated/divorced parents in coordinating child care, managing schedules, tracking expenses, and maintaining clear communication—all while minimizing conflict.
@@ -1020,7 +1020,7 @@ This roadmap is a **living document** and should be updated:
 ---
 
 ### Phase 5: Social Feed Redesign (Q1-Q2 2026)
-**Status:** 🚧 Planned
+**Status:** 🚧 **IN PROGRESS** - ~15% Complete
 
 #### Overview
 Transform the chat system from SMS-style bubbles to a modern social feed experience similar to X (formerly Twitter), with support for threaded comments, rich media previews, polls, and cross-hub engagement.

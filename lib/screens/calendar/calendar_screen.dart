@@ -18,6 +18,7 @@ import '../../services/undo_service.dart';
 import 'add_edit_event_screen.dart';
 import 'event_details_screen.dart';
 import 'gantt_chart_screen.dart';
+import 'event_templates_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   final DateTime? initialDate;
@@ -169,6 +170,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
               });
             },
             tooltip: _isSearchVisible ? 'Close search' : 'Search events',
+          ),
+          IconButton(
+            icon: const Icon(Icons.bookmark),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EventTemplatesScreen(),
+                ),
+              );
+            },
+            tooltip: 'Event Templates',
           ),
           IconButton(
             icon: const Icon(Icons.today),

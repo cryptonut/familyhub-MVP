@@ -710,16 +710,16 @@ service cloud.firestore {
          resource.data.memberIds.hasAny([request.auth.uid]));
       allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
       
+      // Helper function to check if user is a hub member
+      function isHubMember() {
+        return isAuthenticated() && 
+          exists(/databases/$(database)/documents/hubs/$(hubId)) &&
+          (get(/databases/$(database)/documents/hubs/$(hubId)).data.creatorId == request.auth.uid ||
+           request.auth.uid in get(/databases/$(database)/documents/hubs/$(hubId)).data.memberIds);
+      }
+      
       // Hub messages subcollection
       match /messages/{messageId} {
-        // Helper function to check if user is a hub member
-        function isHubMember() {
-          return isAuthenticated() && 
-            exists(/databases/$(database)/documents/hubs/$(hubId)) &&
-            (get(/databases/$(database)/documents/hubs/$(hubId)).data.creatorId == request.auth.uid ||
-             request.auth.uid in get(/databases/$(database)/documents/hubs/$(hubId)).data.memberIds);
-        }
-        
         allow read: if isHubMember();
         allow create: if isHubMember() && 
           request.resource.data.senderId == request.auth.uid;
@@ -727,6 +727,50 @@ service cloud.firestore {
           resource.data.senderId == request.auth.uid;
         allow delete: if isHubMember() && 
           resource.data.senderId == request.auth.uid;
+      }
+      
+      // Assignments (homeschooling)
+      match /assignments/{assignmentId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && 
+          (request.auth.uid == resource.data.createdBy || 
+           request.auth.uid == resource.data.studentId);
+        allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Lesson plans (homeschooling)
+      match /lessonPlans/{planId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && request.auth.uid == resource.data.createdBy;
+        allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Custody schedules (co-parenting)
+      match /custodySchedules/{scheduleId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && request.auth.uid == resource.data.createdBy;
+        allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Schedule change requests (co-parenting)
+      match /scheduleChangeRequests/{requestId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.requestedBy;
+        allow update: if isHubMember() && 
+          (request.auth.uid == resource.data.requestedBy || 
+           request.auth.uid == resource.data.respondedBy);
+      }
+      
+      // Co-parenting expenses
+      match /expenses/{expenseId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && 
+          (request.auth.uid == resource.data.createdBy || 
+           request.auth.uid == resource.data.paidBy);
       }
     }
     
@@ -739,16 +783,16 @@ service cloud.firestore {
          resource.data.memberIds.hasAny([request.auth.uid]));
       allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
       
+      // Helper function to check if user is a hub member
+      function isHubMember() {
+        return isAuthenticated() && 
+          exists(/databases/$(database)/documents/dev_hubs/$(hubId)) &&
+          (get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.creatorId == request.auth.uid ||
+           request.auth.uid in get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.memberIds);
+      }
+      
       // Hub messages subcollection
       match /messages/{messageId} {
-        // Helper function to check if user is a hub member
-        function isHubMember() {
-          return isAuthenticated() && 
-            exists(/databases/$(database)/documents/dev_hubs/$(hubId)) &&
-            (get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.creatorId == request.auth.uid ||
-             request.auth.uid in get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.memberIds);
-        }
-        
         allow read: if isHubMember();
         allow create: if isHubMember() && 
           request.resource.data.senderId == request.auth.uid;
@@ -756,6 +800,50 @@ service cloud.firestore {
           resource.data.senderId == request.auth.uid;
         allow delete: if isHubMember() && 
           resource.data.senderId == request.auth.uid;
+      }
+      
+      // Assignments (homeschooling)
+      match /assignments/{assignmentId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && 
+          (request.auth.uid == resource.data.createdBy || 
+           request.auth.uid == resource.data.studentId);
+        allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Lesson plans (homeschooling)
+      match /lessonPlans/{planId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && request.auth.uid == resource.data.createdBy;
+        allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Custody schedules (co-parenting)
+      match /custodySchedules/{scheduleId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && request.auth.uid == resource.data.createdBy;
+        allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Schedule change requests (co-parenting)
+      match /scheduleChangeRequests/{requestId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.requestedBy;
+        allow update: if isHubMember() && 
+          (request.auth.uid == resource.data.requestedBy || 
+           request.auth.uid == resource.data.respondedBy);
+      }
+      
+      // Co-parenting expenses
+      match /expenses/{expenseId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && 
+          (request.auth.uid == resource.data.createdBy || 
+           request.auth.uid == resource.data.paidBy);
       }
     }
     
@@ -768,16 +856,16 @@ service cloud.firestore {
          resource.data.memberIds.hasAny([request.auth.uid]));
       allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
       
+      // Helper function to check if user is a hub member
+      function isHubMember() {
+        return isAuthenticated() && 
+          exists(/databases/$(database)/documents/test_hubs/$(hubId)) &&
+          (get(/databases/$(database)/documents/test_hubs/$(hubId)).data.creatorId == request.auth.uid ||
+           request.auth.uid in get(/databases/$(database)/documents/test_hubs/$(hubId)).data.memberIds);
+      }
+      
       // Hub messages subcollection
       match /messages/{messageId} {
-        // Helper function to check if user is a hub member
-        function isHubMember() {
-          return isAuthenticated() && 
-            exists(/databases/$(database)/documents/test_hubs/$(hubId)) &&
-            (get(/databases/$(database)/documents/test_hubs/$(hubId)).data.creatorId == request.auth.uid ||
-             request.auth.uid in get(/databases/$(database)/documents/test_hubs/$(hubId)).data.memberIds);
-        }
-        
         allow read: if isHubMember();
         allow create: if isHubMember() && 
           request.resource.data.senderId == request.auth.uid;
@@ -785,6 +873,50 @@ service cloud.firestore {
           resource.data.senderId == request.auth.uid;
         allow delete: if isHubMember() && 
           resource.data.senderId == request.auth.uid;
+      }
+      
+      // Assignments (homeschooling)
+      match /assignments/{assignmentId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && 
+          (request.auth.uid == resource.data.createdBy || 
+           request.auth.uid == resource.data.studentId);
+        allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Lesson plans (homeschooling)
+      match /lessonPlans/{planId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && request.auth.uid == resource.data.createdBy;
+        allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Custody schedules (co-parenting)
+      match /custodySchedules/{scheduleId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && request.auth.uid == resource.data.createdBy;
+        allow delete: if isHubMember() && request.auth.uid == resource.data.createdBy;
+      }
+      
+      // Schedule change requests (co-parenting)
+      match /scheduleChangeRequests/{requestId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.requestedBy;
+        allow update: if isHubMember() && 
+          (request.auth.uid == resource.data.requestedBy || 
+           request.auth.uid == resource.data.respondedBy);
+      }
+      
+      // Co-parenting expenses
+      match /expenses/{expenseId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() && request.auth.uid == request.resource.data.createdBy;
+        allow update: if isHubMember() && 
+          (request.auth.uid == resource.data.createdBy || 
+           request.auth.uid == resource.data.paidBy);
       }
     }
     
@@ -1076,6 +1208,75 @@ service cloud.firestore {
           allow delete: if isTesterOrAdmin();
         }
       }
+    }
+    
+    // Extended family relationships (top-level collection)
+    match /extended_family_relationships/{relationshipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.addedBy;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.addedBy;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.addedBy;
+    }
+    
+    // Extended family privacy settings (top-level collection)
+    match /extended_family_privacy/{privacyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    // Student profiles (top-level collection for homeschooling)
+    match /student_profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.createdBy;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
+    }
+    
+    // Dev extended family relationships
+    match /dev_extended_family_relationships/{relationshipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.addedBy;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.addedBy;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.addedBy;
+    }
+    
+    // Dev extended family privacy
+    match /dev_extended_family_privacy/{privacyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    // Dev student profiles
+    match /dev_student_profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.createdBy;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
+    }
+    
+    // Test extended family relationships
+    match /test_extended_family_relationships/{relationshipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.addedBy;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.addedBy;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.addedBy;
+    }
+    
+    // Test extended family privacy
+    match /test_extended_family_privacy/{privacyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    // Test student profiles
+    match /test_student_profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.createdBy;
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.createdBy;
     }
   }
 }
