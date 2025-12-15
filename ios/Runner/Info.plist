@@ -66,5 +66,17 @@
 	<!-- Microphone Permission -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>FamilyHub needs microphone access for voice messages and video calls with family members.</string>
+	<!-- Deep Linking for Widgets -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>familyhub</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.example.familyhubMvp</string>
+		</dict>
+	</array>
 </dict>
 </plist>

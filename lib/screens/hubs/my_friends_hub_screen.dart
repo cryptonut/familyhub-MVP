@@ -14,6 +14,7 @@ import '../video/video_call_screen.dart';
 import '../chat/private_chat_screen.dart';
 import '../../services/video_call_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/feed_service.dart';
 import '../../services/privacy_filter_service.dart';
 import '../../config/config.dart';
 import 'create_hub_event_dialog.dart';
@@ -38,6 +39,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
   final CalendarService _calendarService = CalendarService();
   final VideoCallService _videoCallService = VideoCallService();
   final ChatService _chatService = ChatService();
+  final FeedService _feedService = FeedService();
   final PrivacyFilterService _privacyFilterService = PrivacyFilterService();
   
   List<UserModel> _members = [];
@@ -264,6 +266,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
           content: messageText,
           timestamp: DateTime.now(),
           hubId: widget.hub.id,
+          parentMessageId: null, // Ensure it's a top-level post
         );
 
         await _chatService.sendHubMessage(widget.hub.id, message);
@@ -271,6 +274,16 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
       currentUserId: _chatService.currentUserId,
       currentUserName: _chatService.currentUserName,
       maxHeight: 400, // Max height for embedded chat
+      hubId: widget.hub.id,
+      onLike: (messageId) async {
+        // Get familyId for like functionality
+        final userModel = await _authService.getCurrentUserModel();
+        final familyId = userModel?.familyId;
+        if (familyId == null) {
+          throw Exception('User not part of a family');
+        }
+        await _feedService.toggleLike(messageId: messageId, familyId: familyId, hubId: widget.hub.id);
+      },
       onViewFullChat: () {
         Navigator.push(
           context,

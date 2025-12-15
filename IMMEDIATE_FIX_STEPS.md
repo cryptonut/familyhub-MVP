@@ -1,77 +1,66 @@
-# IMMEDIATE FIX - Authentication Timeout
+# Immediate Fix Steps
 
-## Problem
-Login times out after 30 seconds on Android, even though OAuth clients are now in `google-services.json`.
+## ✅ **Your Phone IS Detected!**
+I can see: `SAMSUNG Mobile USB Composite Device` (but with Error status)
 
-## Root Cause
-**The app was NOT rebuilt after `google-services.json` was updated.** Android Gradle caches the `google-services.json` file during build, so the old build still has the empty OAuth client array.
+## 🔧 **Quick Fix (2 minutes)**
 
-## Evidence
-✅ `google-services.json` has 2 OAuth clients (verified)
-❌ New logcat has 0 Flutter messages (app not rebuilt)
-❌ No build directory exists (needs complete rebuild)
+### **Step 1: Update Driver in Device Manager**
 
-## Solution - Run These Commands
+1. **Press `Win + X`** → Select **"Device Manager"**
+2. **Look for** "SAMSUNG Mobile USB Composite Device" with **yellow warning icon**
+3. **Right-click** on it → **"Update Driver"**
+4. **Choose:** "Browse my computer for drivers"
+5. **Choose:** "Let me pick from a list of available drivers"
+6. **Select:** "Samsung Android Phone" or "Android Composite ADB Interface"
+7. **Click Next** → Install
 
-### Step 1: Complete Clean Rebuild
+### **Step 2: If That Doesn't Work**
+
+1. **Right-click** the device → **"Uninstall device"**
+2. **Check:** "Delete the driver software for this device"
+3. **Unplug** your phone
+4. **Download Samsung USB Driver:**
+   - https://developer.samsung.com/mobile/android-usb-driver.html
+5. **Install** the driver (as Administrator)
+6. **Reconnect** your phone
+7. **Windows should auto-install** the correct driver
+
+### **Step 3: Verify**
+
+After fixing, run:
 ```bash
-# Clean everything
-flutter clean
+adb devices
+```
 
-# Get dependencies
-flutter pub get
+Should show:
+```
+List of devices attached
+ABC123XYZ    device
+```
 
-# Uninstall old app from device
-adb uninstall com.example.familyhub_mvp
-
-# Rebuild and run
+Then run:
+```bash
 flutter run
 ```
 
-### Step 2: If Still Timing Out - Check API Key Restrictions
+---
 
-Go to [Google Cloud Console](https://console.cloud.google.com/):
-1. **APIs & Services > Credentials**
-2. Find API key: `YOUR_FIREBASE_API_KEY`
-3. Click to edit
-4. Under **API restrictions**:
-   - Ensure **Identity Toolkit API** is enabled
-   - OR set to "Don't restrict key" for testing
-5. Click **Save**
+## 🚀 **Alternative: Wireless Debugging (If USB Still Fails)**
 
-### Step 3: Verify OAuth Clients in Google Cloud
+1. **On phone:** Settings → Developer Options → **Wireless debugging** → ON
+2. **Tap "Pair device with pairing code"**
+3. **Note the IP and port** shown
+4. **On computer:**
+   ```bash
+   adb pair <IP>:<PORT>
+   ```
+   (Enter the pairing code when prompted)
+5. **Then:**
+   ```bash
+   adb connect <IP>:<PORT>
+   ```
 
-1. **APIs & Services > Credentials > OAuth 2.0 Client IDs**
-2. Verify Android client exists with:
-   - Package: `com.example.familyhub_mvp`
-   - SHA-1: `bb7a6a5f57f1dd0ded142a5c6f2614fd54c3c71c`
-3. If missing, create it manually
+---
 
-### Step 4: Test After Rebuild
-
-After running `flutter run`:
-1. Attempt login
-2. Should complete in 2-5 seconds
-3. Should NOT see "Still waiting" messages
-4. Should NOT timeout after 30s
-
-## Why This Will Work
-
-The OAuth client fix was **correct** - `google-services.json` has 2 OAuth clients. The issue is that Android Gradle needs to process this file during build. Without `flutter clean`, the old cached version is still used.
-
-## If Still Failing After Rebuild
-
-1. Check API key restrictions (most common)
-2. Verify OAuth consent screen is configured
-3. Re-download `google-services.json` from Firebase Console
-4. Check Firebase Auth is enabled in Firebase Console
-5. Temporarily disable App Check for testing
-
-## Quick Command Summary
-
-```bash
-flutter clean && flutter pub get && adb uninstall com.example.familyhub_mvp && flutter run
-```
-
-Run this and test login again.
-
+**Most likely fix:** Step 1 (Update Driver) should work immediately!

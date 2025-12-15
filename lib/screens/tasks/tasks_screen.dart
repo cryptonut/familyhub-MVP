@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../core/services/logger_service.dart';
 import '../../models/task.dart';
+import '../../models/task_dependency.dart' show TaskStatus;
 import '../../models/user_model.dart';
 import '../../services/task_service.dart';
 import '../../services/app_state.dart';
@@ -1233,14 +1234,41 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
             padding: EdgeInsets.zero,
             child: ListTile(
             leading: _buildLeadingWidget(task, isCompleted),
-            title: Text(
-              task.title,
-              style: TextStyle(
-                decoration: task.isCompleted
-                    ? TextDecoration.lineThrough
-                    : TextDecoration.none,
-                fontWeight: FontWeight.bold,
-              ),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    task.title,
+                    style: TextStyle(
+                      decoration: task.isCompleted
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (task.status == TaskStatus.blocked && !task.isCompleted) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'BLOCKED',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

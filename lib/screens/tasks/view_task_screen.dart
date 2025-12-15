@@ -2,16 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/task.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
+import '../../services/auth_service.dart';
+import '../../widgets/task_dependency_widget.dart';
 import 'refund_job_dialog.dart';
 import 'package:intl/intl.dart';
 
-class ViewTaskScreen extends StatelessWidget {
+class ViewTaskScreen extends StatefulWidget {
   final Task task;
 
   const ViewTaskScreen({super.key, required this.task});
 
   @override
+  State<ViewTaskScreen> createState() => _ViewTaskScreenState();
+}
+
+class _ViewTaskScreenState extends State<ViewTaskScreen> {
+  final AuthService _authService = AuthService();
+  String? _familyId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFamilyId();
+  }
+
+  Future<void> _loadFamilyId() async {
+    final userModel = await _authService.getCurrentUserModel();
+    if (mounted) {
+      setState(() {
+        _familyId = userModel?.familyId;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final task = widget.task;
     final dateFormat = DateFormat('MMM dd, yyyy');
     final timeFormat = DateFormat('HH:mm');
     
@@ -221,6 +247,18 @@ class ViewTaskScreen extends StatelessWidget {
                     ],
                   ],
                 ),
+              ),
+            ],
+            
+            // Dependencies
+            if (_familyId != null) ...[
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 16),
+              TaskDependencyWidget(
+                taskId: task.id,
+                familyId: _familyId!,
+                currentTask: task,
               ),
             ],
             

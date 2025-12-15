@@ -39,6 +39,7 @@ import '../../services/profile_photo_service.dart';
 import '../../screens/profile/edit_profile_screen.dart';
 import '../../widgets/chat_widget.dart';
 import '../../models/chat_message.dart';
+import '../../services/feed_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -62,6 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final BirthdayService _birthdayService = BirthdayService();
   final ProfilePhotoService _profilePhotoService = ProfilePhotoService();
   final ChatService _chatService = ChatService();
+  final FeedService _feedService = FeedService();
   final ImagePicker _imagePicker = ImagePicker();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -546,6 +548,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Icon(Icons.chevron_right, color: Colors.purple.shade700),
@@ -613,6 +616,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Icon(Icons.chevron_right, color: Colors.blue.shade700),
@@ -1871,15 +1875,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.task_alt, color: Colors.orange.shade700, size: 20),
                             const SizedBox(width: 8),
-                            Text(
-                              _activeJobsCount.toString(),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange.shade700,
+                            Flexible(
+                              child: Text(
+                                _activeJobsCount.toString(),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -1892,6 +1900,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             fontSize: 12,
                             color: Colors.grey[600],
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -1913,15 +1922,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
                             const SizedBox(width: 8),
-                            Text(
-                              _completedJobsCount.toString(),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green.shade700,
+                            Flexible(
+                              child: Text(
+                                _completedJobsCount.toString(),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green.shade700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -1934,6 +1947,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             fontSize: 12,
                             color: Colors.grey[600],
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -2530,6 +2544,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           senderName: currentUserName,
           content: messageText,
           timestamp: DateTime.now(),
+          parentMessageId: null, // Ensure it's a top-level post
         );
 
         await _chatService.sendMessage(message);
@@ -2547,6 +2562,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       },
       emptyStateMessage: 'No messages yet. Start the conversation!',
+      onLike: (messageId) async {
+        // Get familyId for like functionality
+        final authService = AuthService();
+        final userModel = await authService.getCurrentUserModel();
+        final familyId = userModel?.familyId;
+        if (familyId == null) {
+          throw Exception('User not part of a family');
+        }
+        await _feedService.toggleLike(messageId: messageId, familyId: familyId);
+      },
     );
   }
 }

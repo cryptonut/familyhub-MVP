@@ -3,8 +3,10 @@ import '../../core/services/logger_service.dart';
 import 'package:flutter/foundation.dart';
 import '../../models/chat_message.dart';
 import '../../services/chat_service.dart';
+import '../../services/auth_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../../widgets/linkable_text.dart';
+import '../../widgets/message_reaction_widget.dart';
 import 'package:uuid/uuid.dart';
 
 class PrivateChatScreen extends StatefulWidget {
@@ -23,14 +25,37 @@ class PrivateChatScreen extends StatefulWidget {
 
 class _PrivateChatScreenState extends State<PrivateChatScreen> {
   final ChatService _chatService = ChatService();
+  final AuthService _authService = AuthService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  String? _familyId;
+  String? _chatId;
 
   @override
   void initState() {
     super.initState();
+    _loadFamilyAndChatId();
     // Mark messages as read when the chat screen is opened
     _markMessagesAsRead();
+  }
+
+  Future<void> _loadFamilyAndChatId() async {
+    try {
+      final userModel = await _authService.getCurrentUserModel();
+      if (userModel?.familyId != null) {
+        setState(() {
+          _familyId = userModel!.familyId;
+          // For private messages, chatId is typically the sorted participant IDs
+          final currentUserId = _chatService.currentUserId;
+          if (currentUserId != null) {
+            final participants = [currentUserId, widget.recipientId]..sort();
+            _chatId = participants.join('_');
+          }
+        });
+      }
+    } catch (e) {
+      Logger.warning('Error loading family/chat ID', error: e, tag: 'PrivateChatScreen');
+    }
   }
   
   Future<void> _markMessagesAsRead() async {
@@ -274,6 +299,15 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         : Colors.black54,
                   ),
                 ),
+                if (_familyId != null && _chatId != null) ...[
+                  const SizedBox(height: 4),
+                  MessageReactionWidget(
+                    messageId: message.id,
+                    familyId: _familyId!,
+                    chatId: _chatId,
+                    isCurrentUser: isCurrentUser,
+                  ),
+                ],
               ],
             ),
           ),

@@ -88,11 +88,20 @@
 
 **4. Validate & Verify**
 ```
-✅ Always verify:
+✅ Always verify BEFORE asking user to test:
    - Does it compile? (check lints)
-   - Does it work? (test logic)
+   - Does the logic make sense? (review the code)
+   - Have I tested edge cases mentally?
    - Does it break existing functionality? (search for usages)
    - Is it consistent with codebase style?
+   - For UI fixes: Will it actually prevent overflow/errors?
+   - For permission fixes: Are rules deployed?
+
+❌ NEVER ask user to test code that:
+   - Has obvious issues you haven't addressed
+   - You haven't verified will compile
+   - You haven't mentally walked through
+   - Has placeholder code or TODOs that block functionality
 ```
 
 ### 📋 The Todo Pattern
@@ -192,6 +201,33 @@ codebase_search("How does pagination work in the app?")
 ✅ Match naming conventions
 ✅ Use the same error handling patterns
 ✅ Follow the same architectural decisions
+✅ CRITICAL: When implementing similar components, match the EXACT structure of working code
+✅ DO NOT create vastly different code for same/similar components unless absolutely necessary
+✅ DO NOT add unnecessary complexity (wrappers, builders, try-catch blocks) unless there's a clear need
+✅ If a similar screen/component exists and works, use it as a template - don't reinvent the wheel
+```
+
+**Example:**
+```dart
+// ❌ BAD: Adding unnecessary Builder wrapper when working screens don't use it
+body: Builder(
+  builder: (context) {
+    try {
+      return SingleChildScrollView(...);
+    } catch (e) {
+      return ErrorWidget(...);
+    }
+  },
+)
+
+// ✅ GOOD: Match the working screen structure exactly
+body: RefreshIndicator(
+  onRefresh: _loadHubData,
+  child: SingleChildScrollView(
+    padding: const EdgeInsets.all(AppTheme.spacingMD),
+    child: Column(...),
+  ),
+)
 ```
 
 **2. Write Self-Documenting Code**
@@ -464,16 +500,82 @@ Future<List<T>> getItems({required String familyId}) async {
 
 **3. Firebase Rules**
 ```dart
-// ✅ Deploy rules with:
+// ✅ CRITICAL: When fixing permissions, ALWAYS deploy immediately
+// Permission fixes don't work until rules are deployed!
 firebase deploy --only firestore:rules,storage:rules
 
 // ✅ Test rules after deployment
 // ✅ Document rule changes
+// ✅ Never ask user to test permission fixes until rules are deployed
 ```
 
 ---
 
 ## Common Pitfalls & Solutions {#common-pitfalls}
+
+### 🚫 Unnecessary Complexity
+
+**Problem:** Adding wrappers, builders, or error handling that working code doesn't use
+
+**Solution:**
+```
+✅ Before adding complexity, check if similar working code uses it
+✅ Match the structure of working screens/components exactly
+✅ Only add complexity if there's a clear, documented need
+✅ If a screen is empty/broken, compare structure with working screens line-by-line
+✅ Strip down to minimal working version, then add features incrementally
+```
+
+**Example:**
+```dart
+// ❌ BAD: Adding SafeArea, Builder, try-catch when working screens don't
+body: SafeArea(
+  child: Builder(
+    builder: (context) {
+      try {
+        return RefreshIndicator(...);
+      } catch (e) {
+        return ErrorWidget(...);
+      }
+    },
+  ),
+)
+
+// ✅ GOOD: Match working screen structure
+body: RefreshIndicator(
+  onRefresh: _loadHubData,
+  child: SingleChildScrollView(...),
+)
+```
+
+### 🎨 UI Overflow & Layout Issues
+
+**Problem:** UI elements overflow or break layout
+
+**Solution:**
+```dart
+// ✅ For DropdownButtonFormField:
+- Always use isExpanded: true
+- Use selectedItemBuilder to control selected value display
+- Apply overflow: TextOverflow.ellipsis and maxLines: 1 to text
+- Wrap in Flexible/Expanded if in Row
+
+// ✅ For Row widgets:
+- Use Expanded or Flexible for children
+- Add overflow: TextOverflow.ellipsis to Text widgets
+- Use mainAxisSize: MainAxisSize.min when appropriate
+
+// ✅ Always verify:
+- Does the widget have proper constraints?
+- Will long text truncate properly?
+- Are there any hardcoded widths that could overflow?
+```
+
+**Prevention:**
+- Test UI changes mentally before asking user to test
+- Check for overflow warnings in Flutter
+- Use semantic search to find similar UI patterns
+- Verify constraints are properly applied
 
 ### 🚨 File Path Issues
 
@@ -584,6 +686,9 @@ Get-Process -Name "java","gradle" | Stop-Process -Force
 - Try the simplest fix first
 - Test after each change
 - Don't make multiple changes simultaneously
+- When debugging empty/broken UI: Strip down to minimal content first, then add back components one by one
+- Compare with working code side-by-side to find structural differences
+- Use working screens as reference templates
 ```
 
 **4. Verify the Fix**
@@ -812,21 +917,32 @@ git commit -m "Descriptive message"
 ### During Implementation
 - [ ] Make small, testable changes
 - [ ] Test after each change
-- [ ] Follow existing patterns
+- [ ] Follow existing patterns - match working code structure exactly
+- [ ] **CRITICAL: For similar components, use working code as template - don't reinvent**
+- [ ] **CRITICAL: Don't add wrappers/builders/complexity unless working code uses it**
 - [ ] Handle errors gracefully
 - [ ] Update todos as you go
 
 ### Before Finishing
 - [ ] Verify it compiles (check lints)
-- [ ] Verify it works
+- [ ] Verify it works (mentally walk through the code)
+- [ ] **Compare structure with similar working code - ensure it matches**
+- [ ] **For UI screens: Verify structure matches working screens (no unnecessary wrappers)**
+- [ ] For permission fixes: Deploy Firestore rules immediately
+- [ ] For UI fixes: Verify overflow/constraints are properly handled
+- [ ] Remove any placeholder code or TODOs that block functionality
 - [ ] Update documentation
 - [ ] Commit logical units
 - [ ] Update progress tracker
+- [ ] **Run with logcat monitoring when testing on dev phone**
+- [ ] Only then ask user to test
 
 ### When Stuck
 - [ ] Gather all available information
 - [ ] Form hypotheses
 - [ ] Test one thing at a time
+- [ ] **Compare with working code side-by-side to find differences**
+- [ ] **For empty/broken UI: Strip to minimal content, add back incrementally**
 - [ ] Search codebase semantically
 - [ ] Ask for help with context
 

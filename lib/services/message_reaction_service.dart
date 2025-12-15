@@ -12,6 +12,7 @@ class MessageReactionService {
   final AuthService _authService = AuthService();
 
   /// Add a reaction to a message
+  /// chatId can be a hubId (for hub messages) or a private chat ID
   Future<void> addReaction(String messageId, String emoji, String familyId, {String? chatId}) async {
     try {
       final userId = _auth.currentUser?.uid;
@@ -19,30 +20,117 @@ class MessageReactionService {
         throw Exception('User not authenticated');
       }
 
+      // Determine if this is a hub message
+      // Hub IDs are typically UUIDs without underscores, private chat IDs have format like "userId1_userId2"
+      final isHubMessage = chatId != null && !chatId.contains('_') && chatId.length > 20;
+      
+      String collectionPath;
+      String docPath;
+      String reactionsPath;
+      String reactionDocId;
+
+      if (isHubMessage) {
+        // Hub message: hubs/{hubId}/messages/{messageId}/reactions/{userId}_{emoji}
+        collectionPath = FirestorePathUtils.getHubSubcollectionPath(chatId!, 'messages');
+        docPath = messageId;
+        reactionsPath = 'reactions';
+        reactionDocId = '${userId}_$emoji';
+      } else if (chatId != null) {
+        // Private message: families/{familyId}/privateMessages/{chatId}/messages/{messageId}/reactions
+        collectionPath = FirestorePathUtils.getFamilySubcollectionPath(familyId, 'privateMessages');
+        docPath = chatId;
+        reactionsPath = 'messages';
+        reactionDocId = messageId;
+        // For private messages, reactions are stored differently
+        final privateMsgPath = FirestorePathUtils.getFamilySubcollectionPath(familyId, 'privateMessages/$chatId/messages');
+        final existingReaction = await _firestore
+            .collection(privateMsgPath)
+            .doc(messageId)
+            .collection('reactions')
+            .doc('${userId}_$emoji')
+            .get();
+        
+        if (existingReaction.exists) {
+          await existingReaction.reference.delete();
+          
+          // Update likeCount on the message document
+          if (emoji == '❤️') {
+            await _firestore
+                .collection(privateMsgPath)
+                .doc(messageId)
+                .update({
+              'likeCount': FieldValue.increment(-1),
+            });
+          }
+          
+          Logger.info('Reaction removed: $emoji', tag: 'MessageReactionService');
+          return;
+        }
+        
+        final reaction = MessageReaction(
+          id: '${userId}_$emoji',
+          messageId: messageId,
+          emoji: emoji,
+          userId: userId,
+          createdAt: DateTime.now(),
+        );
+        
+        await _firestore
+            .collection(privateMsgPath)
+            .doc(messageId)
+            .collection('reactions')
+            .doc('${userId}_$emoji')
+            .set(reaction.toJson());
+        
+        // Update likeCount on the message document
+        if (emoji == '❤️') {
+          await _firestore
+              .collection(privateMsgPath)
+              .doc(messageId)
+              .update({
+            'likeCount': FieldValue.increment(1),
+          });
+        }
+        
+        Logger.info('Reaction added: $emoji', tag: 'MessageReactionService');
+        return;
+      } else {
+        // Family message: families/{familyId}/messages/{messageId}/reactions/{userId}_{emoji}
+        collectionPath = FirestorePathUtils.getFamilySubcollectionPath(familyId, 'messages');
+        docPath = messageId;
+        reactionsPath = 'reactions';
+        reactionDocId = '${userId}_$emoji';
+      }
+
       // Check if user already reacted with this emoji
       final existingReaction = await _firestore
-          .collection(FirestorePathUtils.getFamiliesCollection())
-          .doc(familyId)
-          .collection(chatId != null ? 'privateMessages' : 'messages')
-          .doc(chatId ?? messageId)
-          .collection(chatId != null ? 'messages' : 'reactions')
-          .doc(chatId != null ? messageId : '${userId}_$emoji')
+          .collection(collectionPath)
+          .doc(docPath)
+          .collection(reactionsPath)
+          .doc(reactionDocId)
           .get();
 
       if (existingReaction.exists) {
         // Remove existing reaction (toggle off)
         await existingReaction.reference.delete();
+        
+        // Update likeCount on the message document
+        if (emoji == '❤️') {
+          await _firestore
+              .collection(collectionPath)
+              .doc(docPath)
+              .update({
+            'likeCount': FieldValue.increment(-1),
+          });
+        }
+        
         Logger.info('Reaction removed: $emoji', tag: 'MessageReactionService');
         return;
       }
 
       // Add new reaction
-      final reactionId = chatId != null
-          ? const Uuid().v4()
-          : '${userId}_$emoji';
-
       final reaction = MessageReaction(
-        id: reactionId,
+        id: reactionDocId,
         messageId: messageId,
         emoji: emoji,
         userId: userId,
@@ -50,13 +138,21 @@ class MessageReactionService {
       );
 
       await _firestore
-          .collection(FirestorePathUtils.getFamiliesCollection())
-          .doc(familyId)
-          .collection(chatId != null ? 'privateMessages' : 'messages')
-          .doc(chatId ?? messageId)
-          .collection(chatId != null ? 'messages' : 'reactions')
-          .doc(chatId != null ? reactionId : '${userId}_$emoji')
+          .collection(collectionPath)
+          .doc(docPath)
+          .collection(reactionsPath)
+          .doc(reactionDocId)
           .set(reaction.toJson());
+
+      // Update likeCount on the message document
+      if (emoji == '❤️') {
+        await _firestore
+            .collection(collectionPath)
+            .doc(docPath)
+            .update({
+          'likeCount': FieldValue.increment(1),
+        });
+      }
 
       Logger.info('Reaction added: $emoji', tag: 'MessageReactionService');
     } catch (e, st) {

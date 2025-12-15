@@ -1198,6 +1198,36 @@ class AuthService {
     }
   }
 
+  /// Find a user by email address
+  /// Returns UserModel if found, null otherwise
+  Future<UserModel?> findUserByEmail(String email) async {
+    try {
+      Logger.debug('findUserByEmail: Looking for user with email: $email', tag: 'AuthService');
+      
+      // Query users by email (case-insensitive search)
+      final query = await _firestore
+            .collection(FirestorePathUtils.getUsersCollection())
+            .where('email', isEqualTo: email.trim().toLowerCase())
+            .limit(1)
+          .get(GetOptions(source: Source.server));
+
+      if (query.docs.isEmpty) {
+        Logger.debug('findUserByEmail: No user found with email: $email', tag: 'AuthService');
+        return null;
+      }
+
+      final doc = query.docs.first;
+      final userData = doc.data();
+      final userModel = UserModel.fromJson({'uid': doc.id, ...userData});
+      
+      Logger.debug('findUserByEmail: Found user: ${userModel.displayName} (${userModel.uid})', tag: 'AuthService');
+      return userModel;
+    } catch (e, st) {
+      Logger.error('findUserByEmail: Error finding user by email', error: e, stackTrace: st, tag: 'AuthService');
+      return null;
+    }
+  }
+
   /// Get familyId for a specific user by email (useful for finding Kate's familyId)
   /// Returns null if user not found
   Future<String?> getFamilyIdByEmail(String email) async {

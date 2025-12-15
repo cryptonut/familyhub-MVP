@@ -86,5 +86,14 @@ class FirestorePathUtils {
   static String getUserSubcollectionPath(String userId, String subcollection) {
     return getCollectionPath('users/$userId/$subcollection');
   }
+  
+  /// Get a hub subcollection path with prefix
+  /// 
+  /// [hubId] - The hub ID
+  /// [subcollection] - The subcollection name (e.g., 'messages', 'assignments', 'expenses')
+  /// Returns: 'dev_hubs/$hubId/messages' or 'hubs/$hubId/messages' (prod)
+  static String getHubSubcollectionPath(String hubId, String subcollection) {
+    return getCollectionPath('hubs/$hubId/$subcollection');
+  }
 }
 

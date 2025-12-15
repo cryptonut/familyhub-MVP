@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/services/logger_service.dart';
 import '../models/widget_config.dart';
@@ -8,6 +9,7 @@ import 'calendar_service.dart';
 import 'chat_service.dart';
 import 'task_service.dart';
 import 'hub_service.dart';
+import 'ios_widget_data_service.dart';
 
 /// Data model for widget display
 class WidgetData {
@@ -70,7 +72,7 @@ class WidgetDataService {
           ? await _getPendingTasksCount(hubId, config.hubType, hub: hub)
           : 0;
 
-      return WidgetData(
+      final widgetData = WidgetData(
         hubId: hubId,
         hubName: hubName,
         upcomingEvents: upcomingEvents,
@@ -78,6 +80,13 @@ class WidgetDataService {
         pendingTasksCount: pendingTasksCount,
         lastUpdated: DateTime.now(),
       );
+
+      // Write to iOS App Group if on iOS
+      if (Platform.isIOS) {
+        IOSWidgetDataService.writeWidgetDataToAppGroup(hubId, widgetData);
+      }
+
+      return widgetData;
     } catch (e, st) {
       Logger.error('Error getting widget data', error: e, stackTrace: st, tag: 'WidgetDataService');
       // Return empty data on error

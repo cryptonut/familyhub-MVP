@@ -23,7 +23,7 @@ import 'widgets/error_handler.dart';
 import 'utils/app_theme.dart';
 import 'services/cache_service.dart';
 import 'services/subscription_service.dart';
-import 'services/deep_link_service.dart';
+import 'services/widget_method_channel_service.dart';
 import 'core/di/service_locator.dart';
 import 'games/chess/services/chess_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -284,6 +284,9 @@ void main() async {
   
   // Initialize subscription service (non-blocking)
   _initializeSubscriptionService();
+  
+  // Initialize widget method channel (non-blocking)
+  WidgetMethodChannelService.initialize();
   
   runApp(const FamilyHubApp());
 }

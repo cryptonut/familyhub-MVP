@@ -1,5 +1,15 @@
 import 'package:flutter/material.dart';
 import '../core/services/logger_service.dart';
+import '../services/hub_service.dart';
+import '../models/hub.dart';
+import '../screens/hubs/my_hubs_screen.dart';
+import '../screens/homeschooling/homeschooling_hub_screen.dart';
+import '../screens/extended_family/extended_family_hub_screen.dart';
+import '../screens/coparenting/coparenting_hub_screen.dart';
+import '../screens/hubs/my_friends_hub_screen.dart';
+import '../screens/calendar/calendar_screen.dart';
+import '../screens/tasks/tasks_screen.dart';
+import '../screens/chat/chat_tabs_screen.dart';
 
 /// Service for handling deep links from widgets and other sources
 class DeepLinkService {
@@ -41,8 +51,10 @@ class DeepLinkService {
         case 'message':
           await _handleMessageDeepLink(context, pathSegments);
           break;
-        default:
-          Logger.warning('Unknown deep link route: $route', tag: 'DeepLinkService');
+        case 'widget':
+          // Widget deep links handled separately
+          Logger.warning('Widget deep links should use hub route', tag: 'DeepLinkService');
+          break;
       }
     } catch (e, st) {
       Logger.error('Error handling deep link', error: e, stackTrace: st, tag: 'DeepLinkService');
@@ -66,14 +78,54 @@ class DeepLinkService {
     }
 
     // Navigate to hub
-    if (context.mounted) {
-      // TODO: Implement navigation to hub screen
-      // For now, navigate to home and pass hubId as parameter
-      // This will be updated when hub navigation is implemented
-      Logger.debug('Navigating to hub: $hubId, screen: $screenName', tag: 'DeepLinkService');
+    if (!context.mounted) return;
+
+    try {
+      final hubService = HubService();
+      final hub = await hubService.getHub(hubId);
       
-      // Example navigation (will be updated with actual routes):
-      // GoRouter.of(context).go('/hubs/$hubId${screenName != null ? '/$screenName' : ''}');
+      if (hub == null) {
+        Logger.warning('Hub not found: $hubId', tag: 'DeepLinkService');
+        // Navigate to My Hubs screen as fallback
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const MyHubsScreen()),
+        );
+        return;
+      }
+
+      Logger.debug('Navigating to hub: $hubId (${hub.hubType.value}), screen: $screenName', tag: 'DeepLinkService');
+
+      // Navigate to appropriate hub screen based on hub type
+      Widget? targetScreen;
+      switch (hub.hubType) {
+        case HubType.homeschooling:
+          targetScreen = HomeschoolingHubScreen(hubId: hubId);
+          break;
+        case HubType.extendedFamily:
+          targetScreen = ExtendedFamilyHubScreen(hubId: hubId);
+          break;
+        case HubType.coparenting:
+          targetScreen = CoparentingHubScreen(hubId: hubId);
+          break;
+        case HubType.family:
+        default:
+          targetScreen = MyFriendsHubScreen(hub: hub);
+          break;
+      }
+
+      if (targetScreen != null && context.mounted) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => targetScreen!),
+        );
+      }
+    } catch (e, st) {
+      Logger.error('Error navigating to hub', error: e, stackTrace: st, tag: 'DeepLinkService');
+      // Fallback to My Hubs screen
+      if (context.mounted) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const MyHubsScreen()),
+        );
+      }
     }
   }
 
@@ -87,10 +139,18 @@ class DeepLinkService {
 
     final eventId = pathSegments[1];
 
+    if (!context.mounted) return;
+
+    Logger.debug('Navigating to event: $eventId', tag: 'DeepLinkService');
+    
+    // Navigate to calendar screen - event detail can be shown via a dialog or parameter
     if (context.mounted) {
-      // TODO: Implement navigation to event detail screen
-      Logger.debug('Navigating to event: $eventId', tag: 'DeepLinkService');
-      // GoRouter.of(context).go('/calendar/events/$eventId');
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const CalendarScreen(),
+          settings: RouteSettings(arguments: {'eventId': eventId}),
+        ),
+      );
     }
   }
 
@@ -104,10 +164,18 @@ class DeepLinkService {
 
     final taskId = pathSegments[1];
 
+    if (!context.mounted) return;
+
+    Logger.debug('Navigating to task: $taskId', tag: 'DeepLinkService');
+    
+    // Navigate to tasks screen - task detail can be shown via a dialog or parameter
     if (context.mounted) {
-      // TODO: Implement navigation to task detail screen
-      Logger.debug('Navigating to task: $taskId', tag: 'DeepLinkService');
-      // GoRouter.of(context).go('/tasks/$taskId');
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const TasksScreen(),
+          settings: RouteSettings(arguments: {'taskId': taskId}),
+        ),
+      );
     }
   }
 
@@ -121,10 +189,18 @@ class DeepLinkService {
 
     final messageId = pathSegments[1];
 
+    if (!context.mounted) return;
+
+    Logger.debug('Navigating to message: $messageId', tag: 'DeepLinkService');
+    
+    // Navigate to chat screen - message can be highlighted via parameter
     if (context.mounted) {
-      // TODO: Implement navigation to message/chat screen
-      Logger.debug('Navigating to message: $messageId', tag: 'DeepLinkService');
-      // GoRouter.of(context).go('/chat?messageId=$messageId');
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const ChatTabsScreen(),
+          settings: RouteSettings(arguments: {'messageId': messageId}),
+        ),
+      );
     }
   }
 
@@ -151,4 +227,5 @@ class DeepLinkService {
     return Uri.parse('familyhub://message/$messageId');
   }
 }
+
 

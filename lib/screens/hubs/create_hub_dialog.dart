@@ -89,7 +89,14 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
         String errorMessage = 'Error creating hub: $e';
         if (e.toString().contains('premium-required') || 
             e.toString().contains('Premium hub access required')) {
-          errorMessage = 'Premium subscription required for Extended Family Hubs. Would you like to view subscription options?';
+          final hubTypeName = _selectedHubType == HubType.extendedFamily 
+              ? 'Extended Family Hubs'
+              : _selectedHubType == HubType.homeschooling
+                  ? 'Homeschooling Hubs'
+                  : _selectedHubType == HubType.coparenting
+                      ? 'Co-Parenting Hubs'
+                      : 'Premium Hubs';
+          errorMessage = 'Premium subscription required for $hubTypeName. Would you like to view subscription options?';
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -262,6 +269,24 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
           'Connect with grandparents, aunts, uncles, cousins (premium)',
           Icons.people_outline,
           Colors.purple,
+          isPremium: true,
+        ),
+        const SizedBox(height: 8),
+        _buildHubTypeOption(
+          HubType.homeschooling,
+          'Homeschooling Hub',
+          'Manage students, assignments, and lesson plans (premium)',
+          Icons.school,
+          Colors.green,
+          isPremium: true,
+        ),
+        const SizedBox(height: 8),
+        _buildHubTypeOption(
+          HubType.coparenting,
+          'Co-Parenting Hub',
+          'Coordinate custody schedules and shared expenses (premium)',
+          Icons.family_restroom,
+          Colors.orange,
           isPremium: true,
         ),
       ],

@@ -465,65 +465,92 @@ class _HomeScreenState extends State<HomeScreen> {
         child: DropdownButton<Hub>(
           value: selectedHub,
           isDense: true,
-          isExpanded: false,
-        underline: const SizedBox.shrink(),
-        icon: Icon(
-          Icons.arrow_drop_down,
-          color: theme.colorScheme.onSurface,
-          size: 20,
-        ),
-        dropdownColor: isDark ? Colors.grey[900] : Colors.white,
-        menuMaxHeight: 300,
-        style: TextStyle(
-          color: theme.colorScheme.onSurface,
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-        items: [
-          // Add "Add New Hub" option at the top
-          DropdownMenuItem<Hub>(
-            value: null, // Special value to indicate "Add New Hub"
-            child: Row(
-              children: [
-                Icon(
-                  Icons.add,
-                  size: 18,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Add New Hub',
+          isExpanded: true,
+          underline: const SizedBox.shrink(),
+          icon: Icon(
+            Icons.arrow_drop_down,
+            color: theme.colorScheme.onSurface,
+            size: 20,
+          ),
+          dropdownColor: isDark ? Colors.grey[900] : Colors.white,
+          menuMaxHeight: 300,
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+          selectedItemBuilder: (BuildContext context) {
+            return [
+              // Placeholder for "Add New Hub" (won't be selected)
+              const SizedBox.shrink(),
+              // Placeholder for divider (won't be selected)
+              const SizedBox.shrink(),
+              // Selected hub display
+              ..._availableHubs.map((hub) {
+                return Text(
+                  hub.name,
                   style: TextStyle(
                     color: theme.colorScheme.onSurface,
+                    fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
-                ),
-              ],
-            ),
-          ),
-          // Divider - use a disabled item that won't interfere with selection
-          DropdownMenuItem<Hub>(
-            value: null,
-            enabled: false,
-            child: Container(
-              height: 1,
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              color: isDark ? Colors.grey[700] : Colors.grey[400],
-            ),
-          ),
-          // Existing hubs
-          ..._availableHubs.map((hub) {
-            return DropdownMenuItem<Hub>(
-              value: hub,
-              child: Text(
-                hub.name,
-                style: TextStyle(
-                  color: theme.colorScheme.onSurface,
-                ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                );
+              }),
+            ];
+          },
+          items: [
+            // Add "Add New Hub" option at the top
+            DropdownMenuItem<Hub>(
+              value: null, // Special value to indicate "Add New Hub"
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.add,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Add New Hub',
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
               ),
-            );
-          }).toList(),
-        ],
+            ),
+            // Divider - use a disabled item that won't interfere with selection
+            DropdownMenuItem<Hub>(
+              value: null,
+              enabled: false,
+              child: Container(
+                height: 1,
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                color: isDark ? Colors.grey[700] : Colors.grey[400],
+              ),
+            ),
+            // Existing hubs
+            ..._availableHubs.map((hub) {
+              return DropdownMenuItem<Hub>(
+                value: hub,
+                child: Text(
+                  hub.name,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              );
+            }).toList(),
+          ],
         onChanged: (Hub? newHub) {
           if (newHub == null) {
             // "Add New Hub" was selected - navigate to hubs screen

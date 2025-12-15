@@ -422,6 +422,7 @@ class _UATScreenState extends State<UATScreen> {
                       ),
                       child: DropdownButtonFormField<String>(
                         value: _selectedRoundId,
+                        isExpanded: true,
                         decoration: InputDecoration(
                           labelText: 'Test Round',
                           labelStyle: TextStyle(
@@ -454,11 +455,22 @@ class _UATScreenState extends State<UATScreen> {
                             vertical: AppTheme.spacingMD,
                           ),
                         ),
+                        selectedItemBuilder: (BuildContext context) {
+                          return _testRounds.map((round) {
+                            return Text(
+                              round.name,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            );
+                          }).toList();
+                        },
                         items: _testRounds.map((round) {
                           return DropdownMenuItem(
                             value: round.id,
                             child: Text(
                               round.name,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                               style: const TextStyle(fontWeight: FontWeight.w500),
                             ),
                           );

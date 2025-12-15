@@ -424,19 +424,14 @@ class _ChatScreenState extends State<ChatScreen> {
                             : theme.colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
-                    if (_familyId != null)
-                      MessageReactionButton(
-                        messageId: message.id,
-                        familyId: _familyId!,
-                      ),
                   ],
                 ),
-                if (message.reactions.isNotEmpty && _familyId != null) ...[
+                if (_familyId != null) ...[
                   const SizedBox(height: AppTheme.spacingXS),
                   MessageReactionWidget(
                     messageId: message.id,
                     familyId: _familyId!,
-                    reactions: message.reactions,
+                    isCurrentUser: isCurrentUser,
                   ),
                 ],
                 // Reply button and thread indicator

@@ -6,6 +6,7 @@ import '../../providers/user_data_provider.dart';
 import '../../models/user_model.dart';
 import 'chat_screen.dart';
 import 'private_chat_screen.dart';
+import '../feed/feed_screen.dart';
 import '../../utils/app_theme.dart';
 
 class ChatTabsScreen extends StatefulWidget {
@@ -184,8 +185,8 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
       body: TabBarView(
         controller: _tabController,
         children: [
-          // "All" tab - shows group chat
-          const ChatScreen(),
+          // "All" tab - shows new social feed
+          const FeedScreen(),
           // Individual member tabs - shows private chat
           ..._familyMembers.map((member) {
             return PrivateChatScreen(
