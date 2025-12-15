@@ -24,11 +24,13 @@ import '../../models/hub.dart';
 class AddEditEventScreen extends StatefulWidget {
   final CalendarEvent? event;
   final DateTime? selectedDate;
+  final List<String>? initialHubIds;
 
   const AddEditEventScreen({
     super.key,
     this.event,
     this.selectedDate,
+    this.initialHubIds,
   });
 
   @override
@@ -127,6 +129,10 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
           // Backward compatibility: if hubId is set, add it to hubIds
           _selectedHubIds = {widget.event!.hubId!};
           // Reset flag when loading existing event
+          _familyCalendarExplicitlyDeselected = false;
+        } else if (widget.initialHubIds != null && widget.initialHubIds!.isNotEmpty) {
+          // New event with initial hub IDs (e.g., from hub screen)
+          _selectedHubIds = Set<String>.from(widget.initialHubIds!);
           _familyCalendarExplicitlyDeselected = false;
         } else {
           // New event: default to family calendar selected

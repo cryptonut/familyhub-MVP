@@ -283,6 +283,70 @@ class HubService {
     }
   }
 
+  /// Transfer hub ownership to another member
+  Future<void> transferOwnership(String hubId, String newOwnerId) async {
+    final userId = currentUserId;
+    if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
+
+    final hub = await getHub(hubId);
+    if (hub == null) throw FirestoreException('Hub not found', code: 'not-found');
+    if (hub.creatorId != userId) {
+      throw PermissionException('Only the hub creator can transfer ownership', code: 'insufficient-permissions');
+    }
+    if (!hub.memberIds.contains(newOwnerId)) {
+      throw ValidationException('New owner must be a member of the hub', code: 'not-a-member');
+    }
+    if (newOwnerId == userId) {
+      throw ValidationException('Cannot transfer ownership to yourself', code: 'invalid-owner');
+    }
+
+    try {
+      // Update creatorId and ensure new owner is in memberIds (should already be)
+      await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubs'))
+          .doc(hubId)
+          .update({
+        'creatorId': newOwnerId,
+      });
+      
+      Logger.info('Hub ownership transferred: $hubId -> $newOwnerId', tag: 'HubService');
+    } catch (e) {
+      Logger.error('Error transferring hub ownership', error: e, tag: 'HubService');
+      rethrow;
+    }
+  }
+
+  /// Leave a hub (remove current user from members)
+  Future<void> leaveHub(String hubId) async {
+    final userId = currentUserId;
+    if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
+
+    final hub = await getHub(hubId);
+    if (hub == null) throw FirestoreException('Hub not found', code: 'not-found');
+    if (hub.creatorId == userId) {
+      throw ValidationException('Hub creator cannot leave. Transfer ownership or delete the hub instead.', code: 'creator-cannot-leave');
+    }
+    if (!hub.memberIds.contains(userId)) {
+      throw ValidationException('User is not a member of this hub', code: 'not-a-member');
+    }
+
+    try {
+      // Remove user from memberIds
+      final updatedMemberIds = List<String>.from(hub.memberIds)..remove(userId);
+      await _firestore
+          .collection(FirestorePathUtils.getCollectionPath('hubs'))
+          .doc(hubId)
+          .update({
+        'memberIds': updatedMemberIds,
+      });
+      
+      Logger.info('User left hub: $hubId', tag: 'HubService');
+    } catch (e) {
+      Logger.error('Error leaving hub', error: e, tag: 'HubService');
+      rethrow;
+    }
+  }
+
   /// Delete a hub
   Future<void> deleteHub(String hubId) async {
     final userId = currentUserId;
@@ -299,6 +363,8 @@ class HubService {
           .collection(FirestorePathUtils.getCollectionPath('hubs'))
           .doc(hubId)
           .delete();
+      
+      Logger.info('Hub deleted: $hubId', tag: 'HubService');
     } catch (e) {
       Logger.error('Error deleting hub', error: e, tag: 'HubService');
       rethrow;

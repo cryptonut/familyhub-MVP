@@ -761,6 +761,45 @@ service cloud.firestore {
           resource.data.hubId == hubId;
       }
       
+      // Educational resources (homeschooling)
+      match /educational_resources/{resourceId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Progress reports (homeschooling)
+      match /progress_reports/{reportId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Learning milestones (homeschooling)
+      match /learning_milestones/{milestoneId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          resource.data.hubId == hubId;
+      }
+      
       // Custody schedules (co-parenting)
       match /custodySchedules/{scheduleId} {
         allow read: if isHubMember();
@@ -848,6 +887,45 @@ service cloud.firestore {
           resource.data.hubId == hubId;
       }
       
+      // Educational resources (homeschooling)
+      match /educational_resources/{resourceId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Progress reports (homeschooling)
+      match /progress_reports/{reportId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Learning milestones (homeschooling)
+      match /learning_milestones/{milestoneId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          resource.data.hubId == hubId;
+      }
+      
       // Custody schedules (co-parenting)
       match /custodySchedules/{scheduleId} {
         allow read: if isHubMember();
@@ -932,6 +1010,45 @@ service cloud.firestore {
           resource.data.hubId == hubId;
         allow delete: if isHubMember() && 
           request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Educational resources (homeschooling)
+      match /educational_resources/{resourceId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Progress reports (homeschooling)
+      match /progress_reports/{reportId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Learning milestones (homeschooling)
+      match /learning_milestones/{milestoneId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
           resource.data.hubId == hubId;
       }
       
