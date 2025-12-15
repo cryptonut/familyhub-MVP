@@ -51,19 +51,19 @@ class UrlPreviewService {
       String? imageUrl;
       String? siteName;
 
-      // Extract Open Graph tags
-      final ogTitleMatch = RegExp(r'<meta\s+property=["\']og:title["\']\s+content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html);
-      if (ogTitleMatch != null) {
-        title = _decodeHtml(ogTitleMatch.group(1));
+      // Extract Open Graph tags - match either double or single quotes
+      final ogTitleMatch = RegExp("<meta\\s+property=[\"']og:title[\"']\\s+content=[\"']([^\"']+)[\"']", caseSensitive: false).firstMatch(html);
+      if (ogTitleMatch != null && ogTitleMatch.group(1) != null) {
+        title = _decodeHtml(ogTitleMatch.group(1)!);
       }
 
-      final ogDescriptionMatch = RegExp(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html);
-      if (ogDescriptionMatch != null) {
-        description = _decodeHtml(ogDescriptionMatch.group(1));
+      final ogDescriptionMatch = RegExp("<meta\\s+property=[\"']og:description[\"']\\s+content=[\"']([^\"']+)[\"']", caseSensitive: false).firstMatch(html);
+      if (ogDescriptionMatch != null && ogDescriptionMatch.group(1) != null) {
+        description = _decodeHtml(ogDescriptionMatch.group(1)!);
       }
 
-      final ogImageMatch = RegExp(r'<meta\s+property=["\']og:image["\']\s+content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html);
-      if (ogImageMatch != null) {
+      final ogImageMatch = RegExp("<meta\\s+property=[\"']og:image[\"']\\s+content=[\"']([^\"']+)[\"']", caseSensitive: false).firstMatch(html);
+      if (ogImageMatch != null && ogImageMatch.group(1) != null) {
         imageUrl = ogImageMatch.group(1);
         // Make relative URLs absolute
         if (imageUrl != null && !imageUrl!.startsWith('http')) {
@@ -72,29 +72,29 @@ class UrlPreviewService {
         }
       }
 
-      final ogSiteNameMatch = RegExp(r'<meta\s+property=["\']og:site_name["\']\s+content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html);
-      if (ogSiteNameMatch != null) {
-        siteName = _decodeHtml(ogSiteNameMatch.group(1));
+      final ogSiteNameMatch = RegExp("<meta\\s+property=[\"']og:site_name[\"']\\s+content=[\"']([^\"']+)[\"']", caseSensitive: false).firstMatch(html);
+      if (ogSiteNameMatch != null && ogSiteNameMatch.group(1) != null) {
+        siteName = _decodeHtml(ogSiteNameMatch.group(1)!);
       }
 
       // Fallback to Twitter Card tags if Open Graph not found
       if (title == null) {
-        final twitterTitleMatch = RegExp(r'<meta\s+name=["\']twitter:title["\']\s+content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html);
-        if (twitterTitleMatch != null) {
-          title = _decodeHtml(twitterTitleMatch.group(1));
+        final twitterTitleMatch = RegExp("<meta\\s+name=[\"']twitter:title[\"']\\s+content=[\"']([^\"']+)[\"']", caseSensitive: false).firstMatch(html);
+        if (twitterTitleMatch != null && twitterTitleMatch.group(1) != null) {
+          title = _decodeHtml(twitterTitleMatch.group(1)!);
         }
       }
 
       if (description == null) {
-        final twitterDescriptionMatch = RegExp(r'<meta\s+name=["\']twitter:description["\']\s+content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html);
-        if (twitterDescriptionMatch != null) {
-          description = _decodeHtml(twitterDescriptionMatch.group(1));
+        final twitterDescriptionMatch = RegExp("<meta\\s+name=[\"']twitter:description[\"']\\s+content=[\"']([^\"']+)[\"']", caseSensitive: false).firstMatch(html);
+        if (twitterDescriptionMatch != null && twitterDescriptionMatch.group(1) != null) {
+          description = _decodeHtml(twitterDescriptionMatch.group(1)!);
         }
       }
 
       if (imageUrl == null) {
-        final twitterImageMatch = RegExp(r'<meta\s+name=["\']twitter:image["\']\s+content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html);
-        if (twitterImageMatch != null) {
+        final twitterImageMatch = RegExp("<meta\\s+name=[\"']twitter:image[\"']\\s+content=[\"']([^\"']+)[\"']", caseSensitive: false).firstMatch(html);
+        if (twitterImageMatch != null && twitterImageMatch.group(1) != null) {
           imageUrl = twitterImageMatch.group(1);
         }
       }
@@ -102,15 +102,15 @@ class UrlPreviewService {
       // Fallback to standard HTML meta tags
       if (title == null) {
         final titleMatch = RegExp(r'<title>([^<]+)</title>', caseSensitive: false).firstMatch(html);
-        if (titleMatch != null) {
-          title = _decodeHtml(titleMatch.group(1));
+        if (titleMatch != null && titleMatch.group(1) != null) {
+          title = _decodeHtml(titleMatch.group(1)!);
         }
       }
 
       if (description == null) {
-        final metaDescriptionMatch = RegExp(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', caseSensitive: false).firstMatch(html);
-        if (metaDescriptionMatch != null) {
-          description = _decodeHtml(metaDescriptionMatch.group(1));
+        final metaDescriptionMatch = RegExp("<meta\\s+name=[\"']description[\"']\\s+content=[\"']([^\"']+)[\"']", caseSensitive: false).firstMatch(html);
+        if (metaDescriptionMatch != null && metaDescriptionMatch.group(1) != null) {
+          description = _decodeHtml(metaDescriptionMatch.group(1)!);
         }
       }
 
@@ -164,5 +164,3 @@ class UrlPreviewService {
     return _cache[url];
   }
 }
-
-

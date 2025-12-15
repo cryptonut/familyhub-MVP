@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+
 import '../../models/chat_message.dart';
 import '../../services/feed_service.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/date_utils.dart' as date_utils;
 import '../../widgets/ui_components.dart';
-import 'post_card.dart';
 import 'poll_card.dart';
+import 'post_card.dart';
 
 /// Screen for viewing a post with its full thread of comments
 class PostDetailScreen extends StatefulWidget {
-  final ChatMessage post;
-  final String? hubId;
-
   const PostDetailScreen({
     super.key,
     required this.post,
     this.hubId,
   });
+
+  final ChatMessage post;
+  final String? hubId;
 
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
@@ -46,33 +47,145 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     });
   }
 
-  Future<void> _postComment() async {
+  Future<void> _postComment({String? parentCommentId}) async {
     final text = _commentController.text.trim();
     if (text.isEmpty) return;
 
     try {
-      final comment = ChatMessage(
-        id: const Uuid().v4(),
-        senderId: _currentUserId ?? '',
-        senderName: _feedService.currentUserName ?? 'You',
+      await _feedService.replyToPost(
+        parentMessageId: parentCommentId ?? widget.post.id,
         content: text,
-        timestamp: DateTime.now(),
-        parentMessageId: widget.post.id,
+        hubId: widget.hubId,
         threadId: widget.post.threadId ?? widget.post.id,
       );
-
-      await _feedService.sendMessage(comment);
       _commentController.clear();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error posting comment: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } on Exception catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error posting comment: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
+
+  Widget _buildCommentCard(
+    ChatMessage comment,
+    List<ChatMessage> allComments,
+    int depth,
+  ) {
+    final nestedReplies = allComments
+        .where((c) => c.parentMessageId == comment.id)
+        .toList();
+
+    return Container(
+      margin: EdgeInsets.only(
+        left: depth * AppTheme.spacingMD,
+        bottom: AppTheme.spacingSM,
+      ),
+      child: ModernCard(
+        padding: const EdgeInsets.all(AppTheme.spacingMD),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundImage: comment.senderPhotoUrl != null
+                      ? NetworkImage(comment.senderPhotoUrl!)
+                      : null,
+                  child: comment.senderPhotoUrl == null
+                      ? Text(comment.senderName[0].toUpperCase())
+                      : null,
+                ),
+                const SizedBox(width: AppTheme.spacingSM),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        comment.senderName,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      Text(
+                        date_utils.AppDateUtils.getRelativeTime(comment.timestamp),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.6),
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spacingSM),
+            Text(
+              comment.content,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppTheme.spacingSM),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => _showReplyDialog(comment),
+                  icon: const Icon(Icons.reply, size: 16),
+                  label: const Text('Reply'),
+                ),
+                if (nestedReplies.isNotEmpty)
+                  Text(
+                    '${nestedReplies.length} ${nestedReplies.length == 1 ? 'reply' : 'replies'}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                  ),
+              ],
+            ),
+            // Nested replies
+            if (nestedReplies.isNotEmpty && depth < 2) ...[
+              const SizedBox(height: AppTheme.spacingSM),
+              ...nestedReplies.map((reply) => _buildCommentCard(reply, allComments, depth + 1)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showReplyDialog(ChatMessage parentComment) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Reply to ${parentComment.senderName}'),
+        content: TextField(
+          controller: _commentController,
+          decoration: const InputDecoration(
+            hintText: 'Write a reply...',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _postComment(parentCommentId: parentComment.id);
+            },
+            child: const Text('Reply'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -101,16 +214,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             optionId: optionId,
                             hubId: widget.hubId,
                           );
+                          if (!mounted) return;
                           setState(() {});
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error voting: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
+                        } on Exception catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error voting: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
                         }
                       },
                     )
@@ -125,12 +238,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             hubId: widget.hubId,
                           );
                           setState(() {});
-                        } catch (e) {
+                        } on Exception {
                           // Error handling
                         }
                       },
                       onComment: () {},
-                      onShare: () {},
                     ),
                   const SizedBox(height: AppTheme.spacingLG),
                   // Comments section
@@ -141,12 +253,45 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         ),
                   ),
                   const SizedBox(height: AppTheme.spacingMD),
-                  // TODO: Load and display comments
-                  Text(
-                    'Comments will be displayed here',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                        ),
+                  // Comments stream
+                  StreamBuilder<List<ChatMessage>>(
+                    stream: _feedService.getPostComments(
+                      postId: widget.post.id,
+                      hubId: widget.hubId,
+                      maxDepth: 3,
+                    ),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      if (snapshot.hasError) {
+                        return Text(
+                          'Error loading comments: ${snapshot.error}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                        );
+                      }
+
+                      final comments = snapshot.data ?? [];
+                      
+                      if (comments.isEmpty) {
+                        return Text(
+                          'No comments yet. Be the first to comment!',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                              ),
+                        );
+                      }
+
+                      return Column(
+                        children: comments
+                            .where((c) => c.parentMessageId == widget.post.id) // Top-level only
+                            .map((comment) => _buildCommentCard(comment, comments, 0))
+                            .toList(),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -159,7 +304,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               color: Theme.of(context).colorScheme.surface,
               border: Border(
                 top: BorderSide(
-                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
                 ),
               ),
             ),

@@ -825,6 +825,32 @@ service cloud.firestore {
           (request.auth.uid == resource.data.createdBy || 
            request.auth.uid == resource.data.paidBy);
       }
+      
+      // Message templates (co-parenting)
+      match /message_templates/{templateId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Child profiles (co-parenting)
+      match /child_profiles/{profileId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.resource.data.hubId == hubId;
+      }
     }
     
     // Dev hubs collection (for dev environment)
@@ -837,11 +863,18 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
       
       // Helper function to check if user is a hub member
+      // Checks both prefixed (dev_hubs) and unprefixed (hubs) collections
       function isHubMember() {
-        return isAuthenticated() && 
+        return isAuthenticated() && (
+          // Check dev_hubs collection
           (exists(/databases/$(database)/documents/dev_hubs/$(hubId)) &&
            (get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.creatorId == request.auth.uid ||
-            request.auth.uid in get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.memberIds));
+            request.auth.uid in get(/databases/$(database)/documents/dev_hubs/$(hubId)).data.memberIds)) ||
+          // Fallback to hubs collection (for backwards compatibility)
+          (exists(/databases/$(database)/documents/hubs/$(hubId)) &&
+           (get(/databases/$(database)/documents/hubs/$(hubId)).data.creatorId == request.auth.uid ||
+            request.auth.uid in get(/databases/$(database)/documents/hubs/$(hubId)).data.memberIds))
+        );
       }
       
       // Hub messages subcollection
@@ -950,6 +983,32 @@ service cloud.firestore {
         allow update: if isHubMember() && 
           (request.auth.uid == resource.data.createdBy || 
            request.auth.uid == resource.data.paidBy);
+      }
+      
+      // Message templates (co-parenting)
+      match /message_templates/{templateId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Child profiles (co-parenting)
+      match /child_profiles/{profileId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.resource.data.hubId == hubId;
       }
     }
     
@@ -1076,6 +1135,32 @@ service cloud.firestore {
         allow update: if isHubMember() && 
           (request.auth.uid == resource.data.createdBy || 
            request.auth.uid == resource.data.paidBy);
+      }
+      
+      // Message templates (co-parenting)
+      match /message_templates/{templateId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.auth.uid == resource.data.createdBy &&
+          resource.data.hubId == hubId;
+      }
+      
+      // Child profiles (co-parenting)
+      match /child_profiles/{profileId} {
+        allow read: if isHubMember();
+        allow create: if isHubMember() &&
+          request.auth.uid == request.resource.data.createdBy &&
+          request.resource.data.hubId == hubId;
+        allow update: if isHubMember() &&
+          request.resource.data.hubId == hubId;
+        allow delete: if isHubMember() &&
+          request.resource.data.hubId == hubId;
       }
     }
     

@@ -2,154 +2,163 @@ import 'package:flutter/material.dart';
 import '../../models/chat_message.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/date_utils.dart' as date_utils;
-import '../../widgets/message_reaction_widget.dart';
-import '../../widgets/message_reaction_button.dart';
 
 /// Card widget for displaying a feed post (X/Twitter-style)
 class PostCard extends StatelessWidget {
+  const PostCard({
+    super.key,
+    required this.post,
+    required this.onLike,
+    required this.onComment,
+    this.currentUserId,
+    this.onTap,
+  });
+
   final ChatMessage post;
   final String? currentUserId;
   final VoidCallback onLike;
   final VoidCallback onComment;
-  final VoidCallback onShare;
   final VoidCallback? onTap;
-
-  const PostCard({
-    super.key,
-    required this.post,
-    this.currentUserId,
-    required this.onLike,
-    required this.onComment,
-    required this.onShare,
-    this.onTap,
-  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isLiked = post.reactions.any((r) => r.userId == currentUserId && r.emoji == '❤️');
+    final likeCount = post.likeCount > 0 ? post.likeCount : (isLiked ? 1 : 0);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spacingMD,
-        vertical: AppTheme.spacingSM,
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.spacingMD),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Author info
-              Row(
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: theme.colorScheme.outline.withValues(alpha: 0.1),
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 23,
+              backgroundImage: post.senderPhotoUrl != null
+                  ? NetworkImage(post.senderPhotoUrl!)
+                  : null,
+              backgroundColor: theme.colorScheme.primary,
+              child: post.senderPhotoUrl == null
+                  ? Text(
+                      post.senderName.isNotEmpty
+                          ? post.senderName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundImage: post.senderPhotoUrl != null
-                        ? NetworkImage(post.senderPhotoUrl!)
-                        : null,
-                    child: post.senderPhotoUrl == null
-                        ? Text(post.senderName[0].toUpperCase())
-                        : null,
+                  // Author info row
+                  Row(
+                    children: [
+                      Text(
+                        post.senderName,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        date_utils.AppDateUtils.getRelativeTime(post.timestamp),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: AppTheme.spacingSM),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          post.senderName,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          date_utils.formatRelativeTime(post.timestamp),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 4),
+                  // Post content
+                  Text(
+                    post.content,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: 15,
+                      height: 1.4,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: AppTheme.spacingMD),
-              // Content
-              Text(
-                post.content,
-                style: theme.textTheme.bodyLarge,
-              ),
-              // URL Preview
-              if (post.urlPreview != null) ...[
-                const SizedBox(height: AppTheme.spacingMD),
-                _buildUrlPreview(post.urlPreview!, theme),
-              ],
-              // Reactions
-              if (post.reactions.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.spacingSM),
-                MessageReactionWidget(
-                  messageId: post.id,
-                  reactions: post.reactions,
-                  currentUserId: currentUserId,
-                ),
-              ],
-              const SizedBox(height: AppTheme.spacingMD),
-              // Engagement metrics and actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildActionButton(
-                    icon: isLiked ? Icons.favorite : Icons.favorite_border,
-                    label: post.likeCount > 0 ? post.likeCount.toString() : null,
-                    color: isLiked ? Colors.red : null,
-                    onTap: onLike,
-                  ),
-                  _buildActionButton(
-                    icon: Icons.comment_outlined,
-                    label: post.commentCount > 0 ? post.commentCount.toString() : null,
-                    onTap: onComment,
-                  ),
-                  _buildActionButton(
-                    icon: Icons.share_outlined,
-                    label: post.shareCount > 0 ? post.shareCount.toString() : null,
-                    onTap: onShare,
+                  // URL Preview
+                  if (post.urlPreview != null) ...[
+                    const SizedBox(height: 12),
+                    _buildUrlPreview(post.urlPreview!, theme),
+                  ],
+                  const SizedBox(height: 12),
+                  // Engagement row (X-style)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Comment
+                      _buildEngagementButton(
+                        icon: Icons.chat_bubble_outline,
+                        count: post.commentCount,
+                        onTap: onComment,
+                        theme: theme,
+                      ),
+                      // Like
+                      _buildEngagementButton(
+                        icon: isLiked ? Icons.favorite : Icons.favorite_border,
+                        count: likeCount,
+                        onTap: onLike,
+                        theme: theme,
+                        color: isLiked ? Colors.red : null,
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildEngagementButton({
     required IconData icon,
-    String? label,
-    Color? color,
+    required int count,
     required VoidCallback onTap,
+    required ThemeData theme,
+    Color? color,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTheme.spacingSM,
-          vertical: AppTheme.spacingXS,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 20, color: color),
-            if (label != null) ...[
+            Icon(
+              icon,
+              size: 18.75,
+              color: color ?? theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+            if (count > 0) ...[
               const SizedBox(width: 4),
               Text(
-                label,
+                _formatCount(count),
                 style: TextStyle(
-                  fontSize: 12,
-                  color: color,
+                  fontSize: 13,
+                  color: color ?? theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -159,28 +168,40 @@ class PostCard extends StatelessWidget {
     );
   }
 
+  String _formatCount(int count) {
+    if (count < 1000) {
+      return count.toString();
+    } else if (count < 1000000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    } else {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    }
+  }
+
   Widget _buildUrlPreview(UrlPreview preview, ThemeData theme) {
     return Container(
+      margin: const EdgeInsets.only(top: 8),
       decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        borderRadius: BorderRadius.circular(12),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (preview.imageUrl != null)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-              child: Image.network(
-                preview.imageUrl!,
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-              ),
+            Image.network(
+              preview.imageUrl!,
+              height: 200,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
             ),
           Padding(
-            padding: const EdgeInsets.all(AppTheme.spacingSM),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -188,7 +209,8 @@ class PostCard extends StatelessWidget {
                   Text(
                     preview.siteName!,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.primary,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      fontSize: 13,
                     ),
                   ),
                 if (preview.title != null) ...[
@@ -197,6 +219,7 @@ class PostCard extends StatelessWidget {
                     preview.title!,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -206,7 +229,10 @@ class PostCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     preview.description!,
-                    style: theme.textTheme.bodySmall,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                      fontSize: 13,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -219,4 +245,3 @@ class PostCard extends StatelessWidget {
     );
   }
 }
-

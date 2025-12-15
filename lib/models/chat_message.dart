@@ -135,7 +135,8 @@ class ChatMessage {
         if (audioUrl != null) 'audioUrl': audioUrl,
         'reactions': reactions.map((r) => r.toJson()).toList(),
         if (threadId != null) 'threadId': threadId,
-        if (parentMessageId != null) 'parentMessageId': parentMessageId,
+        // Always include parentMessageId (null for top-level posts) so queries can filter correctly
+        'parentMessageId': parentMessageId,
         'replyCount': replyCount,
         'postType': postType.name,
         if (pollOptions != null) 'pollOptions': pollOptions!.map((o) => o.toJson()).toList(),

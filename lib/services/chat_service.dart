@@ -544,7 +544,7 @@ class ChatService {
   /// Get hub messages stream
   Stream<List<ChatMessage>> getHubMessagesStream(String hubId) {
     return _firestore
-        .collection(FirestorePathUtils.getCollectionPath('hubs/$hubId/messages'))
+        .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'messages'))
         .orderBy('timestamp', descending: false)
         .snapshots()
         .asyncMap((snapshot) async {
@@ -647,7 +647,10 @@ class ChatService {
   /// Send a message to a hub
   Future<void> sendHubMessage(String hubId, ChatMessage message) async {
     try {
-      await _firestore.collection(FirestorePathUtils.getCollectionPath('hubs/$hubId/messages')).add(message.toJson());
+      // Use getHubSubcollectionPath to match Firestore rules and other services
+      final collectionPath = FirestorePathUtils.getHubSubcollectionPath(hubId, 'messages');
+      // Use doc().set() with message.id to preserve the ID (like FeedService does)
+      await _firestore.collection(collectionPath).doc(message.id).set(message.toJson());
     } catch (e) {
       Logger.error('sendHubMessage error', error: e, tag: 'ChatService');
       rethrow;

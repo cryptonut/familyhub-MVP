@@ -5,18 +5,18 @@ import '../../utils/date_utils.dart' as date_utils;
 
 /// Card widget for displaying a poll post
 class PollCard extends StatelessWidget {
+  const PollCard({
+    super.key,
+    required this.post,
+    required this.onVote,
+    this.currentUserId,
+    this.onTap,
+  });
+
   final ChatMessage post;
   final String? currentUserId;
   final Function(String optionId) onVote;
   final VoidCallback? onTap;
-
-  const PollCard({
-    super.key,
-    required this.post,
-    this.currentUserId,
-    required this.onVote,
-    this.onTap,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -62,9 +62,9 @@ class PollCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          date_utils.formatRelativeTime(post.timestamp),
+                          date_utils.AppDateUtils.getRelativeTime(post.timestamp),
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -94,7 +94,7 @@ class PollCard extends StatelessWidget {
                         onVote(option.id);
                       }
                     },
-                  )),
+                  ),),
               const SizedBox(height: AppTheme.spacingSM),
               // Poll metadata
               Row(
@@ -102,7 +102,7 @@ class PollCard extends StatelessWidget {
                   Text(
                     '$totalVotes ${totalVotes == 1 ? 'vote' : 'votes'}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   if (post.pollExpiresAt != null) ...[
@@ -110,9 +110,9 @@ class PollCard extends StatelessWidget {
                     Text(
                       isExpired
                           ? 'Poll ended'
-                          : 'Ends ${date_utils.formatRelativeTime(post.pollExpiresAt!)}',
+                          : 'Ends ${date_utils.AppDateUtils.getRelativeTime(post.pollExpiresAt!)}',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -147,12 +147,12 @@ class PollCard extends StatelessWidget {
             border: Border.all(
               color: isSelected
                   ? theme.colorScheme.primary
-                  : theme.colorScheme.outline.withOpacity(0.3),
+                  : theme.colorScheme.outline.withValues(alpha: 0.3),
               width: isSelected ? 2 : 1,
             ),
             borderRadius: BorderRadius.circular(8),
             color: isSelected
-                ? theme.colorScheme.primaryContainer.withOpacity(0.3)
+                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
                 : null,
           ),
           child: Column(

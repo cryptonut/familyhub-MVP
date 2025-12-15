@@ -14,9 +14,13 @@ import '../../services/chat_service.dart';
 import '../hubs/hub_settings_screen.dart';
 import '../hubs/invite_members_dialog.dart';
 import '../hubs/hub_chat_screen.dart';
+import 'coparenting_chat_screen.dart';
 import 'custody_schedules_screen.dart';
 import 'schedule_change_requests_screen.dart';
 import 'expenses_screen.dart';
+import 'message_templates_screen.dart';
+import 'child_profiles_screen.dart';
+import 'mediation_support_screen.dart';
 
 /// Main screen for co-parenting hub management
 class CoparentingHubScreen extends StatefulWidget {
@@ -542,6 +546,141 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
             ],
           ),
         ),
+        const SizedBox(height: AppTheme.spacingMD),
+        ModernCard(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MessageTemplatesScreen(hubId: widget.hubId),
+              ),
+            );
+          },
+          padding: const EdgeInsets.all(AppTheme.spacingMD),
+          child: Row(
+            children: [
+              Icon(
+                Icons.message,
+                size: 32,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: AppTheme.spacingMD),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Message Templates',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Structured communication templates',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey[600],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppTheme.spacingMD),
+        ModernCard(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChildProfilesScreen(hubId: widget.hubId),
+              ),
+            );
+          },
+          padding: const EdgeInsets.all(AppTheme.spacingMD),
+          child: Row(
+            children: [
+              Icon(
+                Icons.child_care,
+                size: 32,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: AppTheme.spacingMD),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Child Profiles',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Shared child information and documents',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey[600],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppTheme.spacingMD),
+        ModernCard(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MediationSupportScreen(hubId: widget.hubId),
+              ),
+            );
+          },
+          padding: const EdgeInsets.all(AppTheme.spacingMD),
+          child: Row(
+            children: [
+              Icon(
+                Icons.gavel,
+                size: 32,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: AppTheme.spacingMD),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mediation Support',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Export records and documentation',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.grey[600],
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -585,7 +724,7 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => HubChatScreen(
+                builder: (context) => CoparentingChatScreen(
                   hubId: widget.hubId,
                   hubName: _hub?.name ?? 'Co-Parenting Hub',
                 ),

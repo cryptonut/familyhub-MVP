@@ -6,6 +6,8 @@ import '../core/errors/app_exceptions.dart';
 import '../models/coparenting_schedule.dart';
 import '../models/schedule_change_request.dart' show ScheduleChangeRequest, ScheduleChangeStatus;
 import '../models/coparenting_expense.dart' show CoparentingExpense, ExpenseStatus;
+import '../models/coparenting_message_template.dart';
+import '../models/child_profile.dart';
 import '../models/hub.dart';
 import '../utils/firestore_path_utils.dart';
 import 'auth_service.dart';
@@ -551,5 +553,224 @@ class CoparentingService {
       rethrow;
     }
   }
+
+  // ========== Message Templates ==========
+
+  /// Create message template
+  Future<CoparentingMessageTemplate> createMessageTemplate({
+    required String hubId,
+    required String title,
+    required String content,
+    required MessageCategory category,
+  }) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      final template = CoparentingMessageTemplate(
+        id: _uuid.v4(),
+        hubId: hubId,
+        title: title,
+        content: content,
+        category: category,
+        createdAt: DateTime.now(),
+        createdBy: currentUserId,
+      );
+
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'message_templates'))
+          .doc(template.id)
+          .set(template.toJson());
+
+      Logger.info('Message template created: ${template.id}', tag: 'CoparentingService');
+      return template;
+    } catch (e) {
+      Logger.error('Error creating message template', error: e, tag: 'CoparentingService');
+      rethrow;
+    }
+  }
+
+  /// Get message templates for a hub
+  Future<List<CoparentingMessageTemplate>> getMessageTemplates({
+    required String hubId,
+    MessageCategory? category,
+  }) async {
+    try {
+      var query = _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'message_templates'))
+          .orderBy('createdAt', descending: true);
+
+      if (category != null) {
+        query = query.where('category', isEqualTo: category.name);
+      }
+
+      final snapshot = await query.get();
+
+      return snapshot.docs
+          .map((doc) => CoparentingMessageTemplate.fromJson({
+                'id': doc.id,
+                ...doc.data(),
+              }))
+          .toList();
+    } catch (e) {
+      Logger.error('Error getting message templates', error: e, tag: 'CoparentingService');
+      return [];
+    }
+  }
+
+  /// Delete message template
+  Future<void> deleteMessageTemplate({
+    required String hubId,
+    required String templateId,
+  }) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'message_templates'))
+          .doc(templateId)
+          .delete();
+
+      Logger.info('Message template deleted: $templateId', tag: 'CoparentingService');
+    } catch (e) {
+      Logger.error('Error deleting message template', error: e, tag: 'CoparentingService');
+      rethrow;
+    }
+  }
+
+  // ========== Child Profiles ==========
+
+  /// Create child profile
+  Future<ChildProfile> createChildProfile({
+    required String hubId,
+    required String name,
+    DateTime? dateOfBirth,
+    String? medicalInfo,
+    String? schoolName,
+    String? schoolGrade,
+    String? schoolContact,
+    List<String>? activitySchedules,
+  }) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      final profile = ChildProfile(
+        id: _uuid.v4(),
+        hubId: hubId,
+        name: name,
+        dateOfBirth: dateOfBirth,
+        medicalInfo: medicalInfo,
+        schoolName: schoolName,
+        schoolGrade: schoolGrade,
+        schoolContact: schoolContact,
+        activitySchedules: activitySchedules ?? [],
+        createdAt: DateTime.now(),
+        createdBy: currentUserId,
+      );
+
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'child_profiles'))
+          .doc(profile.id)
+          .set(profile.toJson());
+
+      Logger.info('Child profile created: ${profile.id}', tag: 'CoparentingService');
+      return profile;
+    } catch (e) {
+      Logger.error('Error creating child profile', error: e, tag: 'CoparentingService');
+      rethrow;
+    }
+  }
+
+  /// Get child profiles for a hub
+  Future<List<ChildProfile>> getChildProfiles(String hubId) async {
+    try {
+      final snapshot = await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'child_profiles'))
+          .orderBy('name')
+          .get();
+
+      return snapshot.docs
+          .map((doc) => ChildProfile.fromJson({
+                'id': doc.id,
+                ...doc.data(),
+              }))
+          .toList();
+    } catch (e) {
+      Logger.error('Error getting child profiles', error: e, tag: 'CoparentingService');
+      return [];
+    }
+  }
+
+  /// Update child profile
+  Future<void> updateChildProfile({
+    required String hubId,
+    required String profileId,
+    String? name,
+    DateTime? dateOfBirth,
+    String? medicalInfo,
+    String? schoolName,
+    String? schoolGrade,
+    String? schoolContact,
+    List<String>? activitySchedules,
+    List<String>? documentUrls,
+  }) async {
+    final currentUserId = this.currentUserId;
+    if (currentUserId == null) {
+      throw AuthException('User not authenticated', code: 'not-authenticated');
+    }
+
+    try {
+      final updates = <String, dynamic>{
+        'updatedAt': DateTime.now().toIso8601String(),
+        'updatedBy': currentUserId,
+      };
+
+      if (name != null) updates['name'] = name;
+      if (dateOfBirth != null) updates['dateOfBirth'] = dateOfBirth.toIso8601String();
+      if (medicalInfo != null) updates['medicalInfo'] = medicalInfo;
+      if (schoolName != null) updates['schoolName'] = schoolName;
+      if (schoolGrade != null) updates['schoolGrade'] = schoolGrade;
+      if (schoolContact != null) updates['schoolContact'] = schoolContact;
+      if (activitySchedules != null) updates['activitySchedules'] = activitySchedules;
+      if (documentUrls != null) updates['documentUrls'] = documentUrls;
+
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'child_profiles'))
+          .doc(profileId)
+          .update(updates);
+
+      Logger.info('Child profile updated: $profileId', tag: 'CoparentingService');
+    } catch (e) {
+      Logger.error('Error updating child profile', error: e, tag: 'CoparentingService');
+      rethrow;
+    }
+  }
+
+  /// Delete child profile
+  Future<void> deleteChildProfile({
+    required String hubId,
+    required String profileId,
+  }) async {
+    try {
+      await _firestore
+          .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'child_profiles'))
+          .doc(profileId)
+          .delete();
+
+      Logger.info('Child profile deleted: $profileId', tag: 'CoparentingService');
+    } catch (e) {
+      Logger.error('Error deleting child profile', error: e, tag: 'CoparentingService');
+      rethrow;
+    }
+  }
 }
+
 

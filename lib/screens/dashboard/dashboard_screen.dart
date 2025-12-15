@@ -39,6 +39,7 @@ import '../../services/profile_photo_service.dart';
 import '../../screens/profile/edit_profile_screen.dart';
 import '../../widgets/chat_widget.dart';
 import '../../models/chat_message.dart';
+import '../../services/feed_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -62,6 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final BirthdayService _birthdayService = BirthdayService();
   final ProfilePhotoService _profilePhotoService = ProfilePhotoService();
   final ChatService _chatService = ChatService();
+  final FeedService _feedService = FeedService();
   final ImagePicker _imagePicker = ImagePicker();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -2542,6 +2544,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           senderName: currentUserName,
           content: messageText,
           timestamp: DateTime.now(),
+          parentMessageId: null, // Ensure it's a top-level post
         );
 
         await _chatService.sendMessage(message);
@@ -2559,6 +2562,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       },
       emptyStateMessage: 'No messages yet. Start the conversation!',
+      onLike: (messageId) async {
+        // Get familyId for like functionality
+        final authService = AuthService();
+        final userModel = await authService.getCurrentUserModel();
+        final familyId = userModel?.familyId;
+        if (familyId == null) {
+          throw Exception('User not part of a family');
+        }
+        await _feedService.toggleLike(messageId: messageId, familyId: familyId);
+      },
     );
   }
 }

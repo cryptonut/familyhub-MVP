@@ -15,6 +15,8 @@ class ChatWidget extends StatefulWidget {
   final double? maxHeight; // Max height when embedded (null = full height)
   final VoidCallback? onViewFullChat; // Callback to navigate to full chat screen
   final String emptyStateMessage;
+  final String? hubId; // For like functionality
+  final Future<void> Function(String messageId)? onLike; // Like callback
 
   const ChatWidget({
     super.key,
@@ -25,6 +27,8 @@ class ChatWidget extends StatefulWidget {
     this.maxHeight,
     this.onViewFullChat,
     this.emptyStateMessage = 'No messages yet. Start the conversation!',
+    this.hubId,
+    this.onLike,
   });
 
   @override
@@ -123,86 +127,155 @@ class _ChatWidgetState extends State<ChatWidget> {
   }
 
   Widget _buildMessageBubble(ChatMessage message, bool isMe) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isMe) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Theme.of(context).primaryColor,
-              child: Text(
-                message.senderName.isNotEmpty
-                    ? message.senderName[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-              ),
+    final theme = Theme.of(context);
+    
+    // X-style feed layout (no chat bubbles)
+    return InkWell(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: theme.colorScheme.outline.withValues(alpha: 0.1),
+              width: 0.5,
             ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
-              decoration: BoxDecoration(
-                color: isMe
-                    ? Theme.of(context).primaryColor
-                    : Colors.grey[300],
-                borderRadius: BorderRadius.circular(16),
-              ),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Avatar (always on left, X-style)
+            CircleAvatar(
+              radius: 23,
+              backgroundImage: message.senderPhotoUrl != null
+                  ? NetworkImage(message.senderPhotoUrl!)
+                  : null,
+              backgroundColor: theme.colorScheme.primary,
+              child: message.senderPhotoUrl == null
+                  ? Text(
+                      message.senderName.isNotEmpty
+                          ? message.senderName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (!isMe)
-                    Text(
-                      message.senderName,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: isMe ? Colors.white : Colors.black87,
+                  // Author info row
+                  Row(
+                    children: [
+                      Text(
+                        message.senderName,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
-                    ),
-                  if (!isMe) const SizedBox(height: 4),
-                  LinkableText(
-                    text: message.content,
-                    style: TextStyle(
-                      color: isMe ? Colors.white : Colors.black87,
-                    ),
+                      const SizedBox(width: 4),
+                      Text(
+                        app_date_utils.AppDateUtils.getRelativeTime(message.timestamp),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    app_date_utils.AppDateUtils.formatTime(message.timestamp),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isMe
-                          ? Colors.white70
-                          : Colors.black54,
+                  // Message content
+                  LinkableText(
+                    text: message.content,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: 15,
+                      height: 1.4,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  // Engagement row (like button only for feed-style posts)
+                  if (widget.onLike != null && message.parentMessageId == null)
+                    Row(
+                      children: [
+                        _buildLikeButton(message, theme),
+                      ],
+                    ),
                 ],
               ),
             ),
-          ),
-          if (isMe) ...[
-            const SizedBox(width: 8),
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Theme.of(context).primaryColor,
-              child: Text(
-                message.senderName.isNotEmpty
-                    ? message.senderName[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
+  }
+
+  Widget _buildLikeButton(ChatMessage message, ThemeData theme) {
+    final isLiked = message.reactions.any((r) => r.userId == widget.currentUserId && r.emoji == '❤️');
+    final likeCount = message.likeCount > 0 ? message.likeCount : (isLiked ? 1 : 0);
+
+    return InkWell(
+      onTap: () async {
+        if (widget.onLike != null) {
+          try {
+            await widget.onLike!(message.id);
+            // Refresh UI by triggering rebuild
+            if (mounted) {
+              setState(() {});
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error liking: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        }
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isLiked ? Icons.favorite : Icons.favorite_border,
+              size: 18.75,
+              color: isLiked ? Colors.red : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+            if (likeCount > 0) ...[
+              const SizedBox(width: 4),
+              Text(
+                _formatCount(likeCount),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isLiked ? Colors.red : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatCount(int count) {
+    if (count < 1000) {
+      return count.toString();
+    } else if (count < 1000000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    } else {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    }
   }
 
   Widget _buildMessagesList() {
@@ -225,7 +298,7 @@ class _ChatWidgetState extends State<ChatWidget> {
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.zero,
       itemCount: _messages.length,
       itemBuilder: (context, index) {
         final message = _messages[index];
