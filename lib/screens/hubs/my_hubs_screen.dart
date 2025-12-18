@@ -128,7 +128,7 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
                     crossAxisCount: 2,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: 1.15,
+                    childAspectRatio: 1.0,
                   ),
                   itemCount: _hubs.length,
                   itemBuilder: (context, index) {
@@ -213,7 +213,6 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
       child: Stack(
         children: [
           Column(
-            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -223,7 +222,7 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
                 color: Theme.of(context).primaryColor,
               ),
               const SizedBox(height: 8),
-              Expanded(
+              Flexible(
                 child: Text(
                   hub.name,
                   style: const TextStyle(
