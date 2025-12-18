@@ -8,11 +8,13 @@ import '../utils/firestore_path_utils.dart';
 import '../config/config.dart';
 import 'auth_service.dart';
 import 'query_cache_service.dart';
+import 'sms_service.dart';
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final AuthService _authService = AuthService();
+  final SmsService _smsService = SmsService();
   
   String? _cachedFamilyId;
   Stream<List<ChatMessage>>? _cachedMessagesStream;
@@ -387,6 +389,16 @@ class ChatService {
   }
 
   Future<void> sendMessage(ChatMessage message) async {
+    // Check if this is an SMS message
+    if (message.isSms && message.phoneNumber != null) {
+      // If it's explicitly marked as local or isSms is true, send via SMS gateway
+      await _smsService.sendSms(message.phoneNumber!, message.content);
+      // We don't save to Firestore unless we implement a "save sent SMS" feature
+      // The SmsService stream should pick up the sent message eventually (on Android)
+      // or we can manually emit it if we want instant feedback in local stream
+      return;
+    }
+
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
@@ -401,6 +413,51 @@ class ChatService {
       Logger.error('sendMessage error', error: e, tag: 'ChatService');
       rethrow;
     }
+  }
+
+  /// Get unified stream of Firestore messages and Local SMS
+  Stream<List<ChatMessage>> getUnifiedMessagesStream() {
+    final firestoreStream = getMessagesStream();
+    
+    // If SMS is not enabled, just return Firestore stream
+    if (!_smsService.isSmsEnabled) {
+      return firestoreStream;
+    }
+
+    final smsStream = _smsService.getSmsStream();
+    
+    // Merge streams
+    final controller = StreamController<List<ChatMessage>>();
+    List<ChatMessage> lastFirestore = [];
+    List<ChatMessage> lastSms = [];
+    
+    // Helper to emit combined list
+    void emit() {
+      if (controller.isClosed) return;
+      
+      final combined = [...lastFirestore, ...lastSms];
+      // Sort by timestamp
+      combined.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      controller.add(combined);
+    }
+
+    final sub1 = firestoreStream.listen((data) {
+      lastFirestore = data;
+      emit();
+    });
+
+    final sub2 = smsStream.listen((data) {
+      lastSms = data;
+      emit();
+    });
+
+    controller.onCancel = () {
+      sub1.cancel();
+      sub2.cancel();
+      controller.close();
+    };
+
+    return controller.stream.asBroadcastStream();
   }
 
   String? get currentUserId => _auth.currentUser?.uid;

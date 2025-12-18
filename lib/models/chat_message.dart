@@ -94,6 +94,12 @@ class ChatMessage {
   final DateTime? expiresAt; // Auto-destruct expiration time
   final Map<String, dynamic>? encryptedContent; // Encrypted message data (EncryptedMessage JSON)
 
+  // SMS Support
+  final bool isSms;
+  final bool isLocal; // If true, not in Firestore
+  final String? phoneNumber;
+  final String? smsThreadId;
+
   ChatMessage({
     required this.id,
     required this.senderId,
@@ -121,6 +127,10 @@ class ChatMessage {
     this.isEncrypted = false,
     this.expiresAt,
     this.encryptedContent,
+    this.isSms = false,
+    this.isLocal = false,
+    this.phoneNumber,
+    this.smsThreadId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -151,6 +161,10 @@ class ChatMessage {
         'isEncrypted': isEncrypted,
         if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
         if (encryptedContent != null) 'encryptedContent': encryptedContent,
+        if (isSms) 'isSms': true,
+        // isLocal is purposely NOT in toJson because local messages shouldn't be uploaded unless promoted
+        if (phoneNumber != null) 'phoneNumber': phoneNumber,
+        if (smsThreadId != null) 'smsThreadId': smsThreadId,
       };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -210,6 +224,10 @@ class ChatMessage {
       encryptedContent: json['encryptedContent'] != null
           ? Map<String, dynamic>.from(json['encryptedContent'] as Map)
           : null,
+      isSms: json['isSms'] as bool? ?? false,
+      isLocal: false, // Messages from JSON (Firestore) are never local-only
+      phoneNumber: json['phoneNumber'] as String?,
+      smsThreadId: json['smsThreadId'] as String?,
     );
   }
 }

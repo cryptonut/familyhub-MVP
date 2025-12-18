@@ -17,6 +17,11 @@ class ChatWidget extends StatefulWidget {
   final String emptyStateMessage;
   final String? hubId; // For like functionality
   final Future<void> Function(String messageId)? onLike; // Like callback
+  
+  // SMS Integration
+  final bool enableSms;
+  final Function(String message, String recipient)? onSendSms;
+  final Function(ChatMessage message)? onShareSms;
 
   const ChatWidget({
     super.key,
@@ -29,6 +34,9 @@ class ChatWidget extends StatefulWidget {
     this.emptyStateMessage = 'No messages yet. Start the conversation!',
     this.hubId,
     this.onLike,
+    this.enableSms = false,
+    this.onSendSms,
+    this.onShareSms,
   });
 
   @override
@@ -37,11 +45,13 @@ class ChatWidget extends StatefulWidget {
 
 class _ChatWidgetState extends State<ChatWidget> {
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _recipientController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isExpanded = false;
   List<ChatMessage> _messages = [];
   StreamSubscription<List<ChatMessage>>? _messagesSubscription;
   bool _isLoading = true;
+  bool _isSmsMode = false; // Toggle for SMS sending
 
   @override
   void initState() {
@@ -75,6 +85,7 @@ class _ChatWidgetState extends State<ChatWidget> {
   void dispose() {
     _messagesSubscription?.cancel();
     _messageController.dispose();
+    _recipientController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -109,7 +120,21 @@ class _ChatWidgetState extends State<ChatWidget> {
     }
 
     try {
-      await widget.onSendMessage(text);
+      if (_isSmsMode && widget.onSendSms != null) {
+        final recipient = _recipientController.text.trim();
+        if (recipient.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please enter a recipient number')),
+            );
+          }
+          return;
+        }
+        await widget.onSendSms!(text, recipient);
+      } else {
+        await widget.onSendMessage(text);
+      }
+
       if (mounted) {
         _messageController.clear();
       }
@@ -134,6 +159,7 @@ class _ChatWidgetState extends State<ChatWidget> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
+          color: message.isSms ? theme.colorScheme.surfaceVariant.withOpacity(0.3) : null, // Highlight SMS
           border: Border(
             bottom: BorderSide(
               color: theme.colorScheme.outline.withValues(alpha: 0.1),
@@ -150,18 +176,20 @@ class _ChatWidgetState extends State<ChatWidget> {
               backgroundImage: message.senderPhotoUrl != null
                   ? NetworkImage(message.senderPhotoUrl!)
                   : null,
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: message.isSms ? Colors.green : theme.colorScheme.primary,
               child: message.senderPhotoUrl == null
-                  ? Text(
-                      message.senderName.isNotEmpty
-                          ? message.senderName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    )
+                  ? message.isSms 
+                      ? const Icon(Icons.sms, color: Colors.white, size: 20)
+                      : Text(
+                          message.senderName.isNotEmpty
+                              ? message.senderName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        )
                   : null,
             ),
             const SizedBox(width: 12),
@@ -201,12 +229,39 @@ class _ChatWidgetState extends State<ChatWidget> {
                   ),
                   const SizedBox(height: 12),
                   // Engagement row (like button only for feed-style posts)
-                  if (widget.onLike != null && message.parentMessageId == null)
-                    Row(
-                      children: [
+                  Row(
+                    children: [
+                      if (widget.onLike != null && message.parentMessageId == null && !message.isLocal)
                         _buildLikeButton(message, theme),
+                      
+                      // Share SMS button
+                      if (message.isSms && message.isLocal && widget.onShareSms != null) ...[
+                        const SizedBox(width: 16),
+                        InkWell(
+                          onTap: () => widget.onShareSms!(message),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.share, size: 18, color: theme.colorScheme.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Share to Family',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
-                    ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -435,13 +490,66 @@ class _ChatWidgetState extends State<ChatWidget> {
           // Last message preview - always show if messages exist
           _buildLastMessageRow(),
           const SizedBox(height: 8),
+          
+          // SMS Toggle Row
+          if (widget.enableSms && widget.onSendSms != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Switch(
+                    value: _isSmsMode,
+                    activeColor: Colors.green,
+                    onChanged: (value) {
+                      setState(() {
+                        _isSmsMode = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isSmsMode ? 'SMS Mode' : 'Family Chat',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: _isSmsMode ? Colors.green : Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  if (_isSmsMode) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _recipientController,
+                        decoration: InputDecoration(
+                          hintText: 'Recipient Number...',
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          isDense: true,
+                        ),
+                        keyboardType: TextInputType.phone,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.contacts),
+                      onPressed: () {
+                        // TODO: Open contact picker
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Contact picker implemented in full version')),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
           Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: _messageController,
                   decoration: InputDecoration(
-                    hintText: 'Type a message...',
+                    hintText: _isSmsMode ? 'Type SMS...' : 'Type a message...',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
                       borderSide: BorderSide(
@@ -461,7 +569,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
                       borderSide: BorderSide(
-                        color: Theme.of(context).primaryColor,
+                        color: _isSmsMode ? Colors.green : Theme.of(context).primaryColor,
                         width: 2,
                       ),
                     ),
@@ -476,7 +584,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                     suffixIcon: IconButton(
                       icon: Icon(
                         Icons.send,
-                        color: Theme.of(context).primaryColor,
+                        color: _isSmsMode ? Colors.green : Theme.of(context).primaryColor,
                       ),
                       onPressed: _sendMessage,
                       tooltip: 'Send message',

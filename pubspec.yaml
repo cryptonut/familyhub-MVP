@@ -103,6 +103,11 @@ dependencies:
   pdf: ^3.11.1
   csv: ^6.0.0
 
+  # SMS & Contacts Integration
+  telephony: ^0.2.0
+  flutter_contacts: ^1.1.9+1
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
