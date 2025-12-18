@@ -66,3 +66,10 @@ android/local.properties
 # Firebase service account keys (never commit these!)
 *service-account*.json
 scripts/firebase-service-account.json
+
+# Firebase configuration files (contains sensitive project data)
+**/google-services.json
+**/GoogleService-Info.plist
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+android/app/src/*/google-services.json

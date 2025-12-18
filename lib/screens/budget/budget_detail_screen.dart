@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../models/budget.dart';
 import '../../models/budget_item.dart';
 import '../../services/budget_item_service.dart';
 import '../../services/budget_analytics_service.dart';
 import '../../services/subscription_service.dart';
+import '../../core/services/logger_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
 import '../../widgets/budget_item_list.dart';
@@ -51,9 +53,11 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
     setState(() => _isLoading = true);
     try {
       final items = await _itemService.getItems(widget.budget.id);
-      print('DEBUG: Loaded ${items.length} items for budget ${widget.budget.id}');
-      for (var item in items) {
-        print('DEBUG: Item ${item.id}: ${item.name}, parentItemId: ${item.parentItemId}');
+      if (kDebugMode) {
+        Logger.debug('Loaded ${items.length} items for budget ${widget.budget.id}', tag: 'BudgetDetailScreen');
+        for (var item in items) {
+          Logger.debug('Item ${item.id}: ${item.name}, parentItemId: ${item.parentItemId}', tag: 'BudgetDetailScreen');
+        }
       }
       
       final progressMetrics = await _analyticsService.getProgressMetrics(
@@ -69,8 +73,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
         });
       }
     } catch (e, stackTrace) {
-      print('ERROR loading items: $e');
-      print('STACK: $stackTrace');
+      Logger.error('Error loading items', error: e, stackTrace: stackTrace, tag: 'BudgetDetailScreen');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
