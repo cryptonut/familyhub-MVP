@@ -110,6 +110,71 @@ Transform Family Hub into a multi-hub platform where families can manage not jus
   - Q2 2026: E2EE implementation
   - Q3 2026: Auto-destruct and advanced features
 
+- [ ] **SMS Integration**
+  - **Status:** 🚧 In Progress
+  - **Priority:** High - Premium communication feature
+  - **Objective:** Implement seamless SMS messaging as a premium feature for Android devices, allowing users to send/receive SMS from within the app with Google Messages-style interface
+  - **Related Document:** `sms_integration_implementation_a8e38932.plan.md` - Complete implementation plan with detailed phases
+  
+  **Key Features:**
+  - [ ] **SMS Notification Service**
+    - Send SMS via Cloud Functions (Twilio or similar service)
+    - SMS fallback when push notifications fail
+    - Rate limiting to prevent abuse
+    - Delivery status tracking
+    - Cost monitoring and alerts
+  
+  - [ ] **SMS Preferences**
+    - User opt-in/opt-out for SMS notifications
+    - Granular controls per notification type:
+      - Event reminders (15 min, 1 hour, 1 day before)
+      - Task deadlines and approvals
+      - New messages (when app is closed)
+      - Location sharing alerts
+      - Emergency notifications (always enabled)
+    - Quiet hours for SMS (respect DND settings)
+    - SMS frequency limits (max per day/hour)
+  
+  - [ ] **SMS Integration Points**
+    - Event reminders (when push notification fails)
+    - Task deadline alerts
+    - Message notifications (when recipient offline)
+    - Location sharing alerts
+    - Emergency notifications (always via SMS)
+    - Family member arrival/departure notifications
+  
+  - [ ] **User Experience**
+    - Clear opt-in flow with cost disclosure
+    - SMS preview before sending
+    - Delivery confirmation
+    - Unsubscribe option in every SMS
+    - Settings UI for SMS preferences
+  
+  - [ ] **Technical Requirements**
+    - Cloud Function for SMS sending (Twilio API integration)
+    - SMS service in Flutter app
+    - SMS preferences model and storage
+    - Integration with existing NotificationService
+    - Rate limiting and cost controls
+    - Phone number validation and formatting
+  
+  - [ ] **Monetization**
+    - Free tier: 10 SMS/month per user
+    - Premium tier: Unlimited SMS
+    - Cost tracking and user notifications when approaching limits
+    - Optional: SMS-only subscription tier for non-smartphone users
+  
+  **Success Metrics:**
+  - 40%+ of users opt-in to SMS notifications
+  - 90%+ SMS delivery success rate
+  - 30%+ reduction in missed notifications
+  - User satisfaction: 4.0+ stars for SMS feature
+  
+  **Estimated Timeline:**
+  - Q1 2026: SMS service and Cloud Function setup
+  - Q1 2026: Preferences UI and integration
+  - Q2 2026: Advanced features and optimization
+
 - [ ] **Hub Type System**
   - Extend hub model to support hub types
   - Create hub type registry

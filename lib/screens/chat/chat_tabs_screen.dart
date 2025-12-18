@@ -1,12 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/services/logger_service.dart';
 import '../../services/auth_service.dart';
 import '../../providers/user_data_provider.dart';
 import '../../models/user_model.dart';
+import '../../config/config.dart';
 import 'chat_screen.dart';
 import 'private_chat_screen.dart';
 import '../feed/feed_screen.dart';
+import '../sms/sms_conversations_screen.dart';
 import '../../utils/app_theme.dart';
 
 class ChatTabsScreen extends StatefulWidget {
@@ -40,9 +43,15 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
             .where((member) => member.uid != _currentUser?.uid)
             .toList();
         
-        // Initialize tab controller with "All" + other family members
+        // Calculate tab length: "All" + family members + SMS (if Android and enabled)
+        int tabLength = 1 + _familyMembers.length;
+        if (Platform.isAndroid && Config.current.enableSmsFeature) {
+          tabLength += 1; // Add SMS tab
+        }
+        
+        // Initialize tab controller
         _tabController = TabController(
-          length: 1 + _familyMembers.length,
+          length: tabLength,
           vsync: this,
           initialIndex: 0,
         );
@@ -179,6 +188,18 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
                 ),
               );
             }),
+            // SMS tab (Android only, if enabled)
+            if (Platform.isAndroid && Config.current.enableSmsFeature)
+              const Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.sms, size: 20),
+                    SizedBox(width: 8),
+                    Text('SMS'),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -196,6 +217,9 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
                   : member.email.split('@')[0],
             );
           }),
+          // SMS tab (Android only, if enabled)
+          if (Platform.isAndroid && Config.current.enableSmsFeature)
+            const SmsConversationsScreen(),
         ],
       ),
     );

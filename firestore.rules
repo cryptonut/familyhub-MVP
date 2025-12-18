@@ -122,6 +122,16 @@ service cloud.firestore {
       match /ignoredConflicts/{conflictKey} {
         allow read, write: if isAuthenticated() && request.auth.uid == userId;
       }
+      
+      // SMS conversations subcollection (premium feature)
+      match /sms_conversations/{phoneNumber} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+        
+        // Messages subcollection
+        match /messages/{messageId} {
+          allow read, write: if isAuthenticated() && request.auth.uid == userId;
+        }
+      }
     }
     
     // Dev users collection - same rules as users (for dev environment)
@@ -152,6 +162,16 @@ service cloud.firestore {
       // Ignored conflicts subcollection - users can manage their own ignored conflicts
       match /ignoredConflicts/{conflictKey} {
         allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+      
+      // SMS conversations subcollection (premium feature)
+      match /sms_conversations/{phoneNumber} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+        
+        // Messages subcollection
+        match /messages/{messageId} {
+          allow read, write: if isAuthenticated() && request.auth.uid == userId;
+        }
       }
     }
     

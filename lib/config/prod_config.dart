@@ -58,5 +58,11 @@ class ProdConfig implements AppConfig {
   
   @override
   bool get enableEncryptedChat => false; // Disable encrypted chat in prod until ready for launch
+  
+  @override
+  bool get enableSmsFeature => true; // Enable SMS feature in production
+  
+  @override
+  int get smsRateLimitPerMinute => 10; // Rate limit for SMS sending
 }
 

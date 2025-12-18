@@ -108,6 +108,11 @@ dependencies:
   # Book Reading
   flutter_epub_viewer: ^1.0.8
   flutter_pdfview: ^1.3.2
+  
+  # SMS Integration (Android only)
+  telephony: ^0.2.0
+  contacts_service: ^0.6.3
+  phone_numbers_parser: ^9.0.17
 
 dev_dependencies:
   flutter_test:

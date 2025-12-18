@@ -455,14 +455,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // My Family (Avatars)
+            // Family Member Avatars
             _buildMyFamily(
               currentUserModel: currentUserModel,
               familyMembers: familyMembers,
               familyCreator: familyCreator,
             ),
             const SizedBox(height: 16),
-
+            
             // Conflict Warning
             if (_conflictCount > 0) ...[
               _buildConflictWarning(),

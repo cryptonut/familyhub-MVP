@@ -38,5 +38,11 @@ abstract class AppConfig {
   
   /// Enable encrypted chat feature (premium)
   bool get enableEncryptedChat;
+  
+  /// Enable SMS feature (premium, Android only)
+  bool get enableSmsFeature;
+  
+  /// SMS rate limit per minute
+  int get smsRateLimitPerMinute;
 }
 

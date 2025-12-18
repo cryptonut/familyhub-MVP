@@ -20,6 +20,12 @@ class UserModel {
   final DateTime? lastSyncedAt; // Last successful sync timestamp
   final bool locationPermissionGranted; // Whether location sharing is enabled
   
+  // SMS Feature Settings
+  final bool smsEnabled; // Whether SMS feature is enabled (default: false)
+  final DateTime? smsLastSyncedAt; // Last SMS sync timestamp
+  final DateTime? smsRateLimitResetAt; // When SMS rate limit resets
+  final int smsRateLimitCount; // Current SMS count in rate limit window
+  
   // Subscription & Premium Features
   final SubscriptionTier? subscriptionTier; // Current subscription tier (null = free)
   final SubscriptionStatus? subscriptionStatus; // Current subscription status
@@ -45,6 +51,10 @@ class UserModel {
     this.googleCalendarId,
     this.lastSyncedAt,
     bool? locationPermissionGranted,
+    bool? smsEnabled,
+    this.smsLastSyncedAt,
+    this.smsRateLimitResetAt,
+    int? smsRateLimitCount,
     this.subscriptionTier,
     this.subscriptionStatus,
     this.subscriptionExpiresAt,
@@ -56,6 +66,8 @@ class UserModel {
        birthdayNotificationsEnabled = birthdayNotificationsEnabled ?? true,
        calendarSyncEnabled = calendarSyncEnabled ?? false,
        locationPermissionGranted = locationPermissionGranted ?? false,
+       smsEnabled = smsEnabled ?? false,
+       smsRateLimitCount = smsRateLimitCount ?? 0,
        premiumHubTypes = premiumHubTypes ?? [];
 
   Map<String, dynamic> toJson() => {
@@ -74,6 +86,10 @@ class UserModel {
         if (googleCalendarId != null) 'googleCalendarId': googleCalendarId,
         if (lastSyncedAt != null) 'lastSyncedAt': lastSyncedAt!.toIso8601String(),
         'locationPermissionGranted': locationPermissionGranted,
+        'smsEnabled': smsEnabled,
+        if (smsLastSyncedAt != null) 'smsLastSyncedAt': smsLastSyncedAt!.toIso8601String(),
+        if (smsRateLimitResetAt != null) 'smsRateLimitResetAt': smsRateLimitResetAt!.toIso8601String(),
+        'smsRateLimitCount': smsRateLimitCount,
         if (subscriptionTier != null) 'subscriptionTier': subscriptionTier!.name,
         if (subscriptionStatus != null) 'subscriptionStatus': subscriptionStatus!.name,
         if (subscriptionExpiresAt != null) 'subscriptionExpiresAt': subscriptionExpiresAt!.toIso8601String(),
@@ -221,6 +237,10 @@ class UserModel {
       googleCalendarId: json['googleCalendarId'] as String?,
       lastSyncedAt: parseLastSyncedAt(json['lastSyncedAt']),
       locationPermissionGranted: json['locationPermissionGranted'] as bool? ?? false,
+      smsEnabled: json['smsEnabled'] as bool? ?? false,
+      smsLastSyncedAt: parseDateTime(json['smsLastSyncedAt']),
+      smsRateLimitResetAt: parseDateTime(json['smsRateLimitResetAt']),
+      smsRateLimitCount: json['smsRateLimitCount'] as int? ?? 0,
       subscriptionTier: parseSubscriptionTier(json['subscriptionTier']),
       subscriptionStatus: parseSubscriptionStatus(json['subscriptionStatus']),
       subscriptionExpiresAt: parseDateTime(json['subscriptionExpiresAt']),
@@ -247,6 +267,10 @@ class UserModel {
     String? googleCalendarId,
     DateTime? lastSyncedAt,
     bool? locationPermissionGranted,
+    bool? smsEnabled,
+    DateTime? smsLastSyncedAt,
+    DateTime? smsRateLimitResetAt,
+    int? smsRateLimitCount,
     SubscriptionTier? subscriptionTier,
     SubscriptionStatus? subscriptionStatus,
     DateTime? subscriptionExpiresAt,
@@ -271,6 +295,10 @@ class UserModel {
       googleCalendarId: googleCalendarId ?? this.googleCalendarId,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
       locationPermissionGranted: locationPermissionGranted ?? this.locationPermissionGranted,
+      smsEnabled: smsEnabled ?? this.smsEnabled,
+      smsLastSyncedAt: smsLastSyncedAt ?? this.smsLastSyncedAt,
+      smsRateLimitResetAt: smsRateLimitResetAt ?? this.smsRateLimitResetAt,
+      smsRateLimitCount: smsRateLimitCount ?? this.smsRateLimitCount,
       subscriptionTier: subscriptionTier ?? this.subscriptionTier,
       subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
       subscriptionExpiresAt: subscriptionExpiresAt ?? this.subscriptionExpiresAt,

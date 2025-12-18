@@ -1,139 +1,156 @@
 # Family Hub - QA Release Notes
 
-## Version: QA Build
-**Release Date:** $(Get-Date -Format "yyyy-MM-dd")
+## Version: 1.0.1+7
+**Release Date:** 2025-01-18
 **Branch:** release/qa
+**Build Number:** 7
 
 ---
 
 ## 🎉 New Features
 
-### Shopping Lists
-- **Complete Shopping List Management System**
-  - Create, edit, and delete shopping lists
-  - Real-time list updates using Firestore streams
-  - Add, edit, and delete items within lists
-  - Mark items as "Got It!" or "Unavailable"
-  - Smart recurring lists functionality
-  - Shopping categories and receipt management
-  - Speech-to-text and OCR receipt scanning support
+### Library Hub - Exploding Books
+- **Complete Library Management System**
+  - Upload and read EPUB and PDF books
+  - Book rating and review system
+  - Interactive book quizzes with AI-generated questions
+  - Exploding Books challenge system with countdown timers
+  - Leaderboard for reading achievements
+  - Book detail screens with metadata
+  - Reading progress tracking
 
-### Calendar Enhancements
-- **Multi-Calendar Event Creation**
-  - Add events to multiple family calendars/hubs simultaneously
-  - Improved calendar selection UI with checkboxes
-- **Family Day View Improvements**
-  - Explicit date selection required (no auto-default)
-  - Event indicator dots on date picker showing event counts
-  - Clickable scheduling conflict warnings with detailed conflict summaries
-  - Improved contrast for conflict warnings in light/dark modes
+### Cloud Functions - Subscription Management
+- **Backend Subscription Validation**
+  - Google Play subscription validation
+  - App Store subscription validation
+  - Automatic subscription expiration checking
+  - Subscription status updates
+  - Server-side receipt verification
 
-### Games
-- **Personal Stats Screen**
-  - Dedicated page showing detailed game statistics
-  - Clickable "My Stats" card and leaderboard entries
-  - Displays wins, streaks, high scores, and game-specific stats
-- **Game Improvements**
-  - Fixed Chess move validation logic
-  - Fixed Word Scramble answer validation
-  - Improved Tetris mobile usability (score/controls repositioned)
-  - Removed Family Bingo game
+### Widget Framework
+- **Android Widget Support**
+  - Widget configuration service
+  - Widget data synchronization
+  - Widget configuration screen
+  - Foundation for hub-specific widgets
 
-### Photos
-- **Album Display Fixes**
-  - First photo of album used as cover thumbnail if no cover set
-  - Fixed photo display bug where photos didn't appear in specific albums
-  - Improved fallback mechanism for photo loading
+### Encrypted Chat (Premium Feature)
+- **End-to-End Encryption Infrastructure**
+  - Encryption service with X25519/AES-256-GCM
+  - Message expiration service for auto-destruct messages
+  - Encrypted chat service integration
+  - Premium feature gating
 
-### Location
-- **Request Location Feature**
-  - Privacy-conscious location sharing
-  - Request/accept/deny location sharing between family members
-  - Clear prompts for location requests
-
----
-
-## 🐛 Bug Fixes
-
-### Shopping Lists
-- Fixed shopping lists not persisting after creation (now using real-time streams)
-- Fixed Firestore rules to allow shopping list operations
-- Added edit/delete functionality for lists and items
-
-### Home Screen (formerly Dashboard)
-- Restored family member avatars (removed only header text/logo/count)
-- Centered avatar display
-- Redesigned Jobs section to be more compact
-- Active jobs badge overlay (similar to message notifications)
-
-### Calendar
-- Fixed scheduling conflict detection and display
-- Improved date picker with event indicators
-
-### Tasks/Jobs
-- Fixed admin user deletion of tasks (Firestore rules updated)
-- Removed redundant "Jobs" title from tasks screen
-- Improved search bar contrast and added submit icon
-- Moved admin cleanup tools to Admin menu submenu
-
-### Photos
-- Fixed album photo display when photos exist but don't show in album view
-- Added fallback query mechanism for photo loading
-
-### Games
-- Fixed Chess move validation (now properly validates legal moves)
-- Fixed Word Scramble answer validation (case-insensitive, trimmed)
-- Improved Tetris mobile layout for better thumb reach
+### Location Settings
+- **Enhanced Location Management**
+  - Dedicated location settings screen
+  - Granular location sharing controls
+  - Location request management
 
 ---
 
 ## 🔧 Technical Improvements
 
-### Firebase
-- Updated Firestore security rules for shopping lists, items, categories, receipts
-- Updated Storage rules for profile photos
-- Deployed Firebase rules via Firebase CLI
+### Services & Infrastructure
+- Enhanced `ChatService` with improved message handling
+- Updated `HubService` with hub type registry support
+- Improved `SubscriptionService` with backend validation support
+- Enhanced `EncryptionService` with better key management
+- Added `BookService` for library management
+- Added `BookQuizService` and `BookQuizGeneratorService`
+- Added `ExplodingBooksService` for challenge system
+- Added `LeaderboardService` for reading achievements
+- Enhanced `LocationService` with settings management
+- Updated `WidgetConfigurationService` for widget support
 
-### Services
-- Added `ShoppingService` with full CRUD operations
-- Enhanced `PhotoService` with fallback query mechanisms
-- Added `LocationService` request/response methods
-- Improved `CalendarService` for multi-hub event creation
+### Models
+- Added `Book`, `BookQuiz`, `BookRating`, `ExplodingBookChallenge`, `LeaderboardEntry` models
+- Enhanced `Hub` model with hub type support
+- Updated `UserModel` with subscription fields
+
+### Firebase
+- Updated Firestore security rules for new features
+- Added Firestore indexes for optimized queries
+- Updated Firebase configuration
 
 ### UI/UX
-- Improved contrast for search bars and conflict warnings
-- Better mobile usability for games
-- Streamlined navigation and reduced redundancy
+- New library hub screens with modern design
+- Enhanced chat screens with better message handling
+- Improved budget screens with better UX
+- Updated shopping analytics with better visualizations
+- Enhanced location screen with settings integration
+
+---
+
+## 🐛 Bug Fixes
+
+### Chat
+- Improved message loading and caching
+- Fixed message stream handling
+- Enhanced error handling in chat service
+
+### Budget
+- Improved transaction handling
+- Enhanced budget detail screen functionality
+- Better error recovery
+
+### Shopping
+- Enhanced shopping analytics display
+- Improved shopping list detail screen
+
+### Tasks
+- Better task management UI
+- Improved task screen interactions
+
+### General
+- Fixed various UI inconsistencies
+- Improved error handling across services
+- Enhanced offline queue service
 
 ---
 
 ## 📝 Developer Notes
 
-### Breaking Changes
-- None
+### New Dependencies
+- No breaking dependency changes
+- All existing dependencies maintained
 
 ### Migration Notes
-- Shopping lists require Firestore rules update (already deployed)
-- Profile photos now use new storage path: `profile_photos/{userId}/{photoId}.jpg`
+- Library Hub features require Firestore rules update (already deployed)
+- Subscription validation requires Cloud Functions deployment
+- Widget framework requires Android widget setup
 
-### Dependencies
-- No new dependencies added in this release
-- All existing dependencies maintained
+### Breaking Changes
+- None
 
 ---
 
 ## 🧪 Testing Checklist
 
-- [x] Shopping lists create/edit/delete
-- [x] Shopping items add/edit/delete
-- [x] Real-time list updates
-- [x] Calendar multi-selection
-- [x] Family Day View date selection
-- [x] Scheduling conflict detection
-- [x] Games stats display
-- [x] Photo album display
-- [x] Location request flow
-- [x] Admin task deletion
+### Library Hub
+- [ ] Upload EPUB/PDF books
+- [ ] Read books with viewer
+- [ ] Rate and review books
+- [ ] Take book quizzes
+- [ ] Participate in Exploding Books challenges
+- [ ] View leaderboard
+
+### Subscription
+- [ ] Verify subscription status
+- [ ] Test premium feature gating
+- [ ] Test subscription screen
+
+### Widgets
+- [ ] Configure widgets (if available)
+- [ ] Verify widget data sync
+
+### Encrypted Chat
+- [ ] Test encryption (premium feature)
+- [ ] Test message expiration
+
+### Location
+- [ ] Test location settings screen
+- [ ] Verify location sharing controls
 
 ---
 
@@ -141,11 +158,12 @@
 
 - **Flavor:** QA
 - **Build Type:** Release
-- **Target SDK:** As per Flutter configuration
-- **Min SDK:** As per Flutter configuration
+- **Version:** 1.0.1+7
+- **Commit:** 15e02ac
+- **Deployed:** 2025-12-18 19:13
 
 ---
 
 ## 🙏 Acknowledgments
 
-This release includes significant improvements to shopping list functionality, calendar management, and overall app stability. Thank you to all testers for their feedback!
+This release includes major new features including the Library Hub with Exploding Books, subscription management infrastructure, and widget framework foundation. Thank you to all testers for their continued feedback!

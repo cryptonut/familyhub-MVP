@@ -41,5 +41,10 @@ class AppDateUtils {
         date1.month == date2.month &&
         date1.day == date2.day;
   }
+
+  static String getDayName(int weekday) {
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return days[weekday - 1];
+  }
 }
 

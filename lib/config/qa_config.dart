@@ -58,4 +58,10 @@ class QaConfig implements AppConfig {
   
   @override
   bool get enableEncryptedChat => true; // Enable encrypted chat in QA for testing
+  
+  @override
+  bool get enableSmsFeature => true; // Enable SMS feature in QA for testing
+  
+  @override
+  int get smsRateLimitPerMinute => 10; // Rate limit for SMS sending
 }

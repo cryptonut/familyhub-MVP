@@ -58,5 +58,11 @@ class DevConfig implements AppConfig {
   
   @override
   bool get enableEncryptedChat => true; // Enable encrypted chat in dev for testing
+  
+  @override
+  bool get enableSmsFeature => true; // Enable SMS feature in dev for testing
+  
+  @override
+  int get smsRateLimitPerMinute => 10; // Rate limit for SMS sending
 }
 
