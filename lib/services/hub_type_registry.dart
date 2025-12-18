@@ -34,6 +34,8 @@ class HubTypeRegistry {
         return 'Home Schooling Hub';
       case HubType.coparenting:
         return 'Co-Parenting Hub';
+      case HubType.library:
+        return 'Library Hub';
     }
   }
 
@@ -48,6 +50,8 @@ class HubTypeRegistry {
         return 'Manage homeschooling activities, curriculum, and student progress';
       case HubType.coparenting:
         return 'Coordinate with co-parents for custody schedules and expenses';
+      case HubType.library:
+        return 'Shared family library for books, reading challenges, and book discussions';
     }
   }
 
@@ -62,6 +66,8 @@ class HubTypeRegistry {
         return 'school';
       case HubType.coparenting:
         return 'handshake';
+      case HubType.library:
+        return 'menu_book';
     }
   }
 
@@ -105,6 +111,14 @@ class HubTypeRegistry {
           'Child information sharing',
           'Document storage',
         ];
+      case HubType.library:
+        return [
+          'Book collection',
+          'Reading challenges',
+          'Book ratings & reviews',
+          'Reading progress tracking',
+          'Family reading goals',
+        ];
     }
   }
 
@@ -130,6 +144,11 @@ class HubTypeRegistry {
           'custodySchedule': null, // Will be set up later
           'expenseSplitRatio': 50, // 50/50 default
           'communicationStyle': 'neutral', // neutral, formal, casual
+        };
+      case HubType.library:
+        return {
+          'readingGoals': [],
+          'defaultPrivacy': 'family', // family, members, public
         };
     }
   }
@@ -172,6 +191,15 @@ class HubTypeRegistry {
         if (data.containsKey('communicationStyle')) {
           final style = data['communicationStyle'] as String?;
           if (style != null && !['neutral', 'formal', 'casual'].contains(style)) {
+            return false;
+          }
+        }
+        return true;
+      case HubType.library:
+        // Validate default privacy
+        if (data.containsKey('defaultPrivacy')) {
+          final privacy = data['defaultPrivacy'] as String?;
+          if (privacy != null && !['family', 'members', 'public'].contains(privacy)) {
             return false;
           }
         }

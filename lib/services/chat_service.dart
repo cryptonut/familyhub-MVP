@@ -8,14 +8,19 @@ import '../utils/firestore_path_utils.dart';
 import '../config/config.dart';
 import 'auth_service.dart';
 import 'query_cache_service.dart';
+import 'encrypted_chat_service.dart';
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final AuthService _authService = AuthService();
+  EncryptedChatService? _encryptedChatService;
   
   String? _cachedFamilyId;
   Stream<List<ChatMessage>>? _cachedMessagesStream;
+  
+  ChatService({EncryptedChatService? encryptedChatService})
+      : _encryptedChatService = encryptedChatService;
   
   Future<String?> get _familyId async {
     if (_cachedFamilyId != null) return _cachedFamilyId;
@@ -188,6 +193,16 @@ class ChatService {
         'id': doc.id,
         ...data,
       } as Map<String, dynamic>;
+      
+      // CRITICAL: Filter out private messages (those with recipientId) from family chat
+      // Private messages belong in privateMessages/{chatId}/messages, not here
+      if (messageData['recipientId'] != null) {
+        Logger.warning(
+          'Skipping private message in family chat collection: ${doc.id}',
+          tag: 'ChatService',
+        );
+        continue; // Skip this message - it's a private message, not a family chat message
+      }
         
         // If senderName is missing, try to get it from user document
         if (messageData['senderName'] == null || 
@@ -236,31 +251,110 @@ class ChatService {
         ...data,
       } as Map<String, dynamic>;
       
-      // If senderName is missing, try to get it from user document
-      if (messageData['senderName'] == null || 
-          (messageData['senderName'] as String).isEmpty) {
-        final senderId = messageData['senderId'] as String?;
-        if (senderId != null) {
-          try {
-            final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(senderId).get();
-            if (userDoc.exists) {
-              final userData = userDoc.data();
+      // CRITICAL: Filter out private messages (those with recipientId) from family chat
+      // Private messages belong in privateMessages/{chatId}/messages, not here
+      if (messageData['recipientId'] != null) {
+        Logger.warning(
+          'Skipping private message in family chat collection: ${doc.id}',
+          tag: 'ChatService',
+        );
+        continue; // Skip this message - it's a private message, not a family chat message
+      }
+      
+      // If senderName or senderPhotoUrl is missing, try to get it from user document
+      final senderId = messageData['senderId'] as String?;
+      if (senderId != null) {
+        try {
+          // Try prefixed collection first, then unprefixed
+          var userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(senderId).get();
+          if (!userDoc.exists) {
+            userDoc = await _firestore.collection('users').doc(senderId).get();
+          }
+          
+          if (userDoc.exists) {
+            final userData = userDoc.data();
+            // Populate senderName if missing
+            if (messageData['senderName'] == null || 
+                (messageData['senderName'] as String).isEmpty) {
               messageData['senderName'] = userData?['displayName'] as String? ?? 
                                            userData?['email'] as String? ?? 
                                            'Unknown User';
-            } else {
+            }
+            // Populate senderPhotoUrl if missing (for avatar consistency)
+            if (messageData['senderPhotoUrl'] == null || 
+                (messageData['senderPhotoUrl'] as String).isEmpty) {
+              final photoUrl = userData?['photoUrl'] as String?;
+              if (photoUrl != null && photoUrl.isNotEmpty) {
+                messageData['senderPhotoUrl'] = photoUrl;
+              }
+            }
+          } else {
+            if (messageData['senderName'] == null || 
+                (messageData['senderName'] as String).isEmpty) {
               messageData['senderName'] = 'Unknown User';
             }
-          } catch (e) {
-            Logger.warning('Error fetching sender name', error: e, tag: 'ChatService');
+          }
+        } catch (e) {
+          Logger.warning('Error fetching sender info', error: e, tag: 'ChatService');
+          if (messageData['senderName'] == null || 
+              (messageData['senderName'] as String).isEmpty) {
             messageData['senderName'] = 'Unknown User';
           }
-        } else {
+        }
+      } else {
+        if (messageData['senderName'] == null || 
+            (messageData['senderName'] as String).isEmpty) {
           messageData['senderName'] = 'Unknown User';
         }
       }
       
-      messages.add(ChatMessage.fromJson(messageData));
+      final message = ChatMessage.fromJson(messageData);
+      
+      // Decrypt message if encrypted
+      if (message.isEncrypted && message.encryptedContent != null) {
+        if (_encryptedChatService == null) {
+          _encryptedChatService = EncryptedChatService();
+        }
+        try {
+          final decryptedContent = await _encryptedChatService!.decryptMessage(message);
+          // Create decrypted message copy
+          final decryptedMessage = ChatMessage(
+            id: message.id,
+            senderId: message.senderId,
+            senderName: message.senderName,
+            content: decryptedContent,
+            timestamp: message.timestamp,
+            type: message.type,
+            recipientId: message.recipientId,
+            hubId: message.hubId,
+            audioUrl: message.audioUrl,
+            reactions: message.reactions,
+            threadId: message.threadId,
+            parentMessageId: message.parentMessageId,
+            replyCount: message.replyCount,
+            postType: message.postType,
+            pollOptions: message.pollOptions,
+            pollExpiresAt: message.pollExpiresAt,
+            votedPollOptionId: message.votedPollOptionId,
+            likeCount: message.likeCount,
+            shareCount: message.shareCount,
+            commentCount: message.commentCount,
+            visibleHubIds: message.visibleHubIds,
+            urlPreview: message.urlPreview,
+            senderPhotoUrl: message.senderPhotoUrl,
+            isEncrypted: true, // Keep flag for UI indicators
+            expiresAt: message.expiresAt,
+            encryptedContent: message.encryptedContent,
+          );
+          messages.add(decryptedMessage);
+        } catch (e) {
+          Logger.warning('Error decrypting message ${message.id}', error: e, tag: 'ChatService');
+          // Add original message with encrypted placeholder
+          messages.add(message);
+        }
+      } else {
+        messages.add(message);
+      }
     }
     return messages;
   }
@@ -390,10 +484,18 @@ class ChatService {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
+    // CRITICAL: Family chat messages must NOT have recipientId (that's for private messages)
+    if (message.recipientId != null) {
+      throw ValidationException(
+        'Family chat messages cannot have recipientId. Use sendPrivateMessage() for private messages.',
+        code: 'invalid-message-type',
+      );
+    }
+
     try {
       // Use FirestorePathUtils to get the correct prefixed path
       final collectionPath = FirestorePathUtils.getFamilySubcollectionPath(familyId, 'messages');
-      await _firestore.collection(collectionPath).add(message.toJson());
+      await _firestore.collection(collectionPath).doc(message.id).set(message.toJson());
 
       // Invalidate cache after successful send
       await _invalidateChatMessagesCache(familyId);
@@ -465,7 +567,65 @@ class ChatService {
                 }
               }
               
-              messages.add(ChatMessage.fromJson(messageData));
+              final message = ChatMessage.fromJson(messageData);
+              
+              // Decrypt message if encrypted
+              if (message.isEncrypted && message.encryptedContent != null) {
+                if (_encryptedChatService == null) {
+                  _encryptedChatService = EncryptedChatService();
+                }
+                try {
+                  final decryptedContent = await _encryptedChatService!.decryptMessage(message);
+                  // Create decrypted message copy
+                  final decryptedMessage = ChatMessage(
+                    id: message.id,
+                    senderId: message.senderId,
+                    senderName: message.senderName,
+                    content: decryptedContent,
+                    timestamp: message.timestamp,
+                    type: message.type,
+                    recipientId: message.recipientId,
+                    hubId: message.hubId,
+                    audioUrl: message.audioUrl,
+                    reactions: message.reactions,
+                    threadId: message.threadId,
+                    parentMessageId: message.parentMessageId,
+                    replyCount: message.replyCount,
+                    postType: message.postType,
+                    pollOptions: message.pollOptions,
+                    pollExpiresAt: message.pollExpiresAt,
+                    votedPollOptionId: message.votedPollOptionId,
+                    likeCount: message.likeCount,
+                    shareCount: message.shareCount,
+                    commentCount: message.commentCount,
+                    visibleHubIds: message.visibleHubIds,
+                    urlPreview: message.urlPreview,
+                    senderPhotoUrl: message.senderPhotoUrl,
+                    isEncrypted: true, // Keep flag for UI indicators
+                    expiresAt: message.expiresAt,
+                    encryptedContent: message.encryptedContent,
+                  );
+                  messages.add(decryptedMessage);
+                } catch (e) {
+                  Logger.warning('Error decrypting private message', error: e, tag: 'ChatService');
+                  // Add message with encrypted placeholder
+                  final errorMessage = ChatMessage(
+                    id: message.id,
+                    senderId: message.senderId,
+                    senderName: message.senderName,
+                    content: '[Unable to decrypt message]',
+                    timestamp: message.timestamp,
+                    type: message.type,
+                    recipientId: message.recipientId,
+                    hubId: message.hubId,
+                    isEncrypted: true,
+                    encryptedContent: message.encryptedContent,
+                  );
+                  messages.add(errorMessage);
+                }
+              } else {
+                messages.add(message);
+              }
             }
             return messages;
           });
@@ -485,7 +645,7 @@ class ChatService {
     final chatId = _getChatId(currentUserId, recipientId);
     
     try {
-      // Create message with recipientId
+      // Create message with recipientId, preserving ALL fields from original message
       final privateMessage = ChatMessage(
         id: message.id,
         senderId: message.senderId,
@@ -494,14 +654,33 @@ class ChatService {
         timestamp: message.timestamp,
         type: message.type,
         recipientId: recipientId,
+        hubId: message.hubId,
         audioUrl: message.audioUrl,
+        reactions: message.reactions,
+        threadId: message.threadId,
+        parentMessageId: message.parentMessageId,
+        replyCount: message.replyCount,
+        postType: message.postType,
+        pollOptions: message.pollOptions,
+        pollExpiresAt: message.pollExpiresAt,
+        votedPollOptionId: message.votedPollOptionId,
+        likeCount: message.likeCount,
+        shareCount: message.shareCount,
+        commentCount: message.commentCount,
+        visibleHubIds: message.visibleHubIds,
+        urlPreview: message.urlPreview,
+        senderPhotoUrl: message.senderPhotoUrl,
+        isEncrypted: message.isEncrypted,
+        expiresAt: message.expiresAt,
+        encryptedContent: message.encryptedContent,
       );
       
       await _firestore
           .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'privateMessages'))
           .doc(chatId)
           .collection('messages')
-          .add(privateMessage.toJson());
+          .doc(privateMessage.id)
+          .set(privateMessage.toJson());
     } catch (e) {
       Logger.error('sendPrivateMessage error', error: e, tag: 'ChatService');
       rethrow;
@@ -609,6 +788,16 @@ class ChatService {
         'id': doc.id,
         ...data,
       } as Map<String, dynamic>;
+
+      // CRITICAL: Filter out private messages (those with recipientId) from family chat
+      // Private messages belong in privateMessages/{chatId}/messages, not here
+      if (messageData['recipientId'] != null) {
+        Logger.warning(
+          'Skipping private message in family chat collection: ${doc.id}',
+          tag: 'ChatService',
+        );
+        continue; // Skip this message - it's a private message, not a family chat message
+      }
 
         // If senderName is missing, try to get it from user document
         if (messageData['senderName'] == null ||

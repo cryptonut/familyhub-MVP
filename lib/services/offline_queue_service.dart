@@ -42,13 +42,13 @@ class QueuedOperation {
   };
 
   factory QueuedOperation.fromJson(Map<String, dynamic> json) => QueuedOperation(
-    id: json['id'],
+    id: json['id'] as String,
     type: QueuedOperationType.values.firstWhere(
-      (e) => e.toString() == json['type']
+      (e) => e.toString() == json['type'] as String
     ),
-    data: json['data'],
-    createdAt: DateTime.parse(json['createdAt']),
-    retryCount: json['retryCount'] ?? 0,
+    data: json['data'] as Map<String, dynamic>,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    retryCount: (json['retryCount'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -277,7 +277,7 @@ class OfflineQueueService {
         try {
           final jsonData = _queueBox!.get(key);
           if (jsonData != null) {
-            final operation = QueuedOperation.fromJson(Map<String, dynamic>.from(jsonData));
+            final operation = QueuedOperation.fromJson(Map<String, dynamic>.from(jsonData as Map<dynamic, dynamic>));
             _queue.add(operation);
           }
         } catch (e) {

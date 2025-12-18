@@ -264,21 +264,40 @@ class ShoppingService {
     Logger.info('updateShoppingList: Updated list ${list.id}', tag: 'ShoppingService');
   }
 
-  /// Delete (archive) a shopping list
+  /// Delete a shopping list (hard delete - removes from Firestore)
   Future<void> deleteShoppingList(String listId) async {
     final familyId = await _familyId;
     if (familyId == null) throw AuthException('User not part of a family', code: 'no-family');
 
-    // Soft delete by archiving
-    await _firestore
-        .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists'))
-        .doc(listId)
-        .update({
-      'isArchived': true,
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
-
-    Logger.info('deleteShoppingList: Archived list $listId', tag: 'ShoppingService');
+    try {
+      // First delete all items in the list
+      final itemsSnapshot = await _firestore
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists/$listId/items'))
+          .get();
+      
+      final batch = _firestore.batch();
+      for (var itemDoc in itemsSnapshot.docs) {
+        batch.delete(itemDoc.reference);
+      }
+      
+      // Then delete the list itself
+      final listRef = _firestore
+          .collection(FirestorePathUtils.getFamilySubcollectionPath(familyId, 'shoppingLists'))
+          .doc(listId);
+      
+      // Check if list exists before deleting
+      final listDoc = await listRef.get();
+      if (listDoc.exists) {
+        batch.delete(listRef);
+        await batch.commit();
+        Logger.info('deleteShoppingList: Hard deleted list $listId and ${itemsSnapshot.docs.length} items', tag: 'ShoppingService');
+      } else {
+        Logger.warning('deleteShoppingList: List $listId does not exist', tag: 'ShoppingService');
+      }
+    } catch (e, st) {
+      Logger.error('deleteShoppingList: Error deleting list $listId', error: e, stackTrace: st, tag: 'ShoppingService');
+      rethrow;
+    }
   }
 
   Future<void> _unsetOtherDefaults(String familyId, {String? excludeId}) async {
@@ -922,10 +941,12 @@ class ShoppingService {
         }
 
         for (var item in receipt.items ?? []) {
-          itemCounts[item.name] = (itemCounts[item.name] ?? 0) + (item.quantity as int);
+          final itemName = item.name as String;
+          final itemQuantity = (item.quantity as num?)?.toInt() ?? 0;
+          itemCounts[itemName] = (itemCounts[itemName] ?? 0) + itemQuantity;
           
-          priceHistory.putIfAbsent(item.name, () => []);
-          priceHistory[item.name]!.add({
+          priceHistory.putIfAbsent(itemName, () => []);
+          priceHistory[itemName]!.add({
             'date': receipt.purchaseDate?.toIso8601String(),
             'price': item.price,
             'store': receipt.storeName,

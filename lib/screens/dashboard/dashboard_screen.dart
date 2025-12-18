@@ -1855,8 +1855,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildQuickStats() {
-    return ModernCard(
-      padding: EdgeInsets.zero, // Remove padding here, apply to InkWell children
+    // Seamless design - no card wrapper, full-width integration
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade200, width: 1),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         children: [
           Row(
@@ -1915,7 +1919,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // Navigate to Tasks tab (index 2), Completed tab (1)
                     appState.setCurrentIndexWithTasksTab(2, 1);
                   },
-                  borderRadius: const BorderRadius.only(topRight: Radius.circular(12)),
+                  borderRadius: BorderRadius.zero, // No rounded corners for seamless look
                   child: Padding(
                     padding: const EdgeInsets.all(AppTheme.spacingMD),
                     child: Column(

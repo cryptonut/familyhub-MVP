@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:vibration/vibration.dart';
 import '../core/services/logger_service.dart';
-import '../core/errors/app_exceptions.dart';
 import 'auth_service.dart';
 import '../core/di/service_locator.dart';
 import '../games/chess/services/chess_service.dart';

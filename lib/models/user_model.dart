@@ -320,5 +320,26 @@ class UserModel {
     if (subscriptionExpiresAt!.isBefore(now)) return null;
     return subscriptionExpiresAt!.difference(now).inDays;
   }
+  
+  /// Calculate age from birthday (returns null if birthday is not set)
+  int? getAge() {
+    if (birthday == null) return null;
+    final now = DateTime.now();
+    int age = now.year - birthday!.year;
+    if (now.month < birthday!.month || 
+        (now.month == birthday!.month && now.day < birthday!.day)) {
+      age--;
+    }
+    return age;
+  }
+  
+  /// Check if user is a child (under 18) or has adult mode override
+  /// Note: adultModeOverride flag doesn't exist yet - this is a placeholder for future implementation
+  bool isChild({bool adultModeOverride = false}) {
+    if (adultModeOverride) return false; // Override flag (to be added to UserModel)
+    final age = getAge();
+    if (age == null) return false; // If no birthday, assume adult
+    return age < 18;
+  }
 }
 

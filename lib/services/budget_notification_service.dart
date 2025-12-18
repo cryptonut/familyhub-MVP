@@ -44,12 +44,12 @@ class BudgetNotificationService {
     UserModel user,
   ) async {
     try {
-      await _notificationService.createNotification(
+      await _notificationService.sendNotification(
         userId: user.uid,
-        type: 'budget_over_limit',
         title: 'Budget Exceeded',
-        message: '${budget.name} has exceeded its limit by \$${(-health.remaining).toStringAsFixed(2)}',
+        body: '${budget.name} has exceeded its limit by \$${(-health.remaining).toStringAsFixed(2)}',
         data: {
+          'type': 'budget_over_limit',
           'budgetId': budget.id,
           'budgetName': budget.name,
           'overAmount': -health.remaining,
@@ -67,12 +67,12 @@ class BudgetNotificationService {
     UserModel user,
   ) async {
     try {
-      await _notificationService.createNotification(
+      await _notificationService.sendNotification(
         userId: user.uid,
-        type: 'budget_approaching_limit',
         title: 'Budget Warning',
-        message: '${budget.name} is ${health.percentUsed.toStringAsFixed(0)}% used. \$${health.remaining.toStringAsFixed(2)} remaining.',
+        body: '${budget.name} is ${health.percentUsed.toStringAsFixed(0)}% used. \$${health.remaining.toStringAsFixed(2)} remaining.',
         data: {
+          'type': 'budget_approaching_limit',
           'budgetId': budget.id,
           'budgetName': budget.name,
           'percentUsed': health.percentUsed,
@@ -91,12 +91,12 @@ class BudgetNotificationService {
     UserModel user,
   ) async {
     try {
-      await _notificationService.createNotification(
+      await _notificationService.sendNotification(
         userId: user.uid,
-        type: 'budget_period_ending',
         title: 'Budget Period Ending Soon',
-        message: '${budget.name} period ends in ${health.daysRemaining} day${health.daysRemaining == 1 ? '' : 's'}.',
+        body: '${budget.name} period ends in ${health.daysRemaining} day${health.daysRemaining == 1 ? '' : 's'}.',
         data: {
+          'type': 'budget_period_ending',
           'budgetId': budget.id,
           'budgetName': budget.name,
           'daysRemaining': health.daysRemaining,

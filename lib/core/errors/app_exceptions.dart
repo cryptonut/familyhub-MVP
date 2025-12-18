@@ -1,10 +1,10 @@
 /// Base exception class for all application exceptions
 sealed class AppException implements Exception {
+  const AppException(this.message, {this.code, this.originalError});
+
   final String message;
   final String? code;
   final dynamic originalError;
-
-  const AppException(this.message, {this.code, this.originalError});
 
   @override
   String toString() {

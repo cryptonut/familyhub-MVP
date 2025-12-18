@@ -1203,6 +1203,21 @@ class MockHubService extends _i1.Mock implements _i13.HubService {
       ) as _i5.Future<_i8.Hub>);
 
   @override
+  _i5.Future<_i8.Hub> ensureLibraryHub() => (super.noSuchMethod(
+        Invocation.method(
+          #ensureLibraryHub,
+          [],
+        ),
+        returnValue: _i5.Future<_i8.Hub>.value(_FakeHub_12(
+          this,
+          Invocation.method(
+            #ensureLibraryHub,
+            [],
+          ),
+        )),
+      ) as _i5.Future<_i8.Hub>);
+
+  @override
   _i5.Future<void> addMember(
     String? hubId,
     String? userId,
@@ -1248,6 +1263,33 @@ class MockHubService extends _i1.Mock implements _i13.HubService {
             hubId,
             updates,
           ],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> transferOwnership(
+    String? hubId,
+    String? newOwnerId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #transferOwnership,
+          [
+            hubId,
+            newOwnerId,
+          ],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> leaveHub(String? hubId) => (super.noSuchMethod(
+        Invocation.method(
+          #leaveHub,
+          [hubId],
         ),
         returnValue: _i5.Future<void>.value(),
         returnValueForMissingStub: _i5.Future<void>.value(),
@@ -1483,6 +1525,16 @@ class MockAuthService extends _i1.Mock implements _i14.AuthService {
         returnValue: _i5.Future<void>.value(),
         returnValueForMissingStub: _i5.Future<void>.value(),
       ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<_i15.UserModel?> findUserByEmail(String? email) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #findUserByEmail,
+          [email],
+        ),
+        returnValue: _i5.Future<_i15.UserModel?>.value(),
+      ) as _i5.Future<_i15.UserModel?>);
 
   @override
   _i5.Future<String?> getFamilyIdByEmail(String? email) => (super.noSuchMethod(

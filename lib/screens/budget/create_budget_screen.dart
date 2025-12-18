@@ -201,15 +201,21 @@ class _CreateBudgetScreenState extends State<CreateBudgetScreen> {
                 labelText: 'Period',
                 border: OutlineInputBorder(),
               ),
-              items: ['weekly', 'monthly', 'yearly', 'custom'].map((period) {
+              items: ['weekly', 'monthly', 'yearly', 'one-off', 'custom'].map((period) {
                 return DropdownMenuItem(
                   value: period,
-                  child: Text(period.toUpperCase()),
+                  child: Text(period.toUpperCase().replaceAll('-', ' ')),
                 );
               }).toList(),
               onChanged: (value) {
                 if (value != null) {
-                  setState(() => _selectedPeriod = value);
+                  setState(() {
+                    _selectedPeriod = value;
+                    // For one-off budgets, set end date same as start date
+                    if (value == 'one-off') {
+                      _endDate = _startDate;
+                    }
+                  });
                 }
               },
             ),

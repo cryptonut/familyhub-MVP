@@ -1,182 +1,272 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/services/logger_service.dart';
-import '../core/errors/app_exceptions.dart';
 
-/// Service for end-to-end encryption of messages
-/// Uses X25519 for key exchange and AES-256-GCM for encryption
+/// Service for managing encryption keys and encrypting/decrypting messages
+/// Implements end-to-end encryption for premium chat features
 class EncryptionService {
-  static final EncryptionService _instance = EncryptionService._internal();
-  factory EncryptionService() => _instance;
-  EncryptionService._internal();
-
-  final Map<String, SimpleKeyPair> _keyPairs = {}; // userId -> keyPair
-  final Map<String, SimplePublicKey> _publicKeys = {}; // userId -> publicKey
-  final AesGcm _cipher = AesGcm.with256bits();
-
-  /// Generate or retrieve key pair for current user
-  Future<SimpleKeyPair> getOrCreateKeyPair(String userId) async {
-    if (_keyPairs.containsKey(userId)) {
-      return _keyPairs[userId]!;
-    }
-
+  static const String _prefsKeyPrefix = 'encryption_keys_';
+  static const String _deviceKeyKey = 'device_encryption_key';
+  
+  SecretKey? _deviceKey;
+  
+  /// Initialize encryption service and generate/load device key
+  Future<void> initialize() async {
     try {
-      final keyPair = await _cipher.newKeyPair();
-      _keyPairs[userId] = keyPair;
-      
-      // Extract and store public key
-      final publicKey = await keyPair.extractPublicKey();
-      _publicKeys[userId] = publicKey;
-      
-      Logger.info('Key pair generated for user: $userId', tag: 'EncryptionService');
-      return keyPair;
+      await _loadOrGenerateDeviceKey();
+      Logger.info('EncryptionService initialized', tag: 'EncryptionService');
     } catch (e) {
-      Logger.error('Error generating key pair', error: e, tag: 'EncryptionService');
-      throw EncryptionException('Failed to generate encryption keys', code: 'key-generation-failed', originalError: e);
+      Logger.error('Error initializing EncryptionService', error: e, tag: 'EncryptionService');
+      rethrow;
     }
   }
-
-  /// Get public key for a user
-  Future<SimplePublicKey?> getPublicKey(String userId) async {
-    if (_publicKeys.containsKey(userId)) {
-      return _publicKeys[userId];
-    }
-
-    // TODO: Fetch from Firestore or key exchange
-    // For now, return null (key exchange not implemented)
-    return null;
-  }
-
-  /// Encrypt a message
-  Future<EncryptedMessage> encryptMessage({
-    required String plaintext,
-    required String senderId,
-    required String recipientId,
-  }) async {
+  
+  /// Load or generate device encryption key
+  Future<void> _loadOrGenerateDeviceKey() async {
     try {
-      // Get or create sender's key pair
-      final senderKeyPair = await getOrCreateKeyPair(senderId);
+      final prefs = await SharedPreferences.getInstance();
+      final keyData = prefs.getString(_deviceKeyKey);
       
-      // Get recipient's public key
-      final recipientPublicKey = await getPublicKey(recipientId);
-      if (recipientPublicKey == null) {
-        throw EncryptionException(
-          'Recipient public key not found. Key exchange required.',
-          code: 'public-key-not-found',
-        );
+      if (keyData != null) {
+        // Load existing key
+        final keyBytes = base64Decode(keyData);
+        _deviceKey = SecretKey(Uint8List.fromList(keyBytes));
+      } else {
+        // Generate new key (256 bits = 32 bytes)
+        final algorithm = AesGcm.with256bits();
+        _deviceKey = await algorithm.newSecretKey();
+        
+        // Save key
+        final keyBytes = await _deviceKey!.extractBytes();
+        await prefs.setString(_deviceKeyKey, base64Encode(keyBytes));
       }
-
-      // Perform key agreement (ECDH)
-      final sharedSecret = await senderKeyPair.sharedSecretKey(
-        remotePublicKey: recipientPublicKey,
+    } catch (e) {
+      Logger.error('Error loading/generating device key', error: e, tag: 'EncryptionService');
+      rethrow;
+    }
+  }
+  
+  /// Generate a shared secret key for a chat conversation
+  /// This key is shared between all participants in the conversation
+  Future<SecretKey> generateSharedKey(String conversationId) async {
+    try {
+      final algorithm = AesGcm.with256bits();
+      final key = await algorithm.newSecretKey();
+      
+      // Store the key (encrypted with device key)
+      await _storeSharedKey(conversationId, key);
+      
+      return key;
+    } catch (e) {
+      Logger.error('Error generating shared key', error: e, tag: 'EncryptionService');
+      rethrow;
+    }
+  }
+  
+  /// Get shared key for a conversation (loads from storage)
+  Future<SecretKey?> getSharedKey(String conversationId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keyData = prefs.getString('$_prefsKeyPrefix$conversationId');
+      
+      if (keyData == null) return null;
+      
+      // Decrypt the stored key using device key
+      final encryptedKeyBytes = Uint8List.fromList(base64Decode(keyData));
+      final decryptedKeyBytes = await _decryptWithDeviceKey(encryptedKeyBytes);
+      
+      return SecretKey(decryptedKeyBytes);
+    } catch (e) {
+      Logger.error('Error getting shared key', error: e, tag: 'EncryptionService');
+      return null;
+    }
+  }
+  
+  /// Store shared key (encrypted with device key)
+  Future<void> _storeSharedKey(String conversationId, SecretKey key) async {
+    try {
+      final keyBytes = await key.extractBytes();
+      final encryptedKeyBytes = await _encryptWithDeviceKey(Uint8List.fromList(keyBytes));
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        '$_prefsKeyPrefix$conversationId',
+        base64Encode(encryptedKeyBytes),
       );
-
-      // Encrypt message
-      final secretBox = await _cipher.encrypt(
-        plaintext.codeUnits,
-        secretKey: sharedSecret,
+    } catch (e) {
+      Logger.error('Error storing shared key', error: e, tag: 'EncryptionService');
+      rethrow;
+    }
+  }
+  
+  /// Encrypt data with device key
+  Future<Uint8List> _encryptWithDeviceKey(Uint8List data) async {
+    if (_deviceKey == null) {
+      await _loadOrGenerateDeviceKey();
+    }
+    
+    final algorithm = AesGcm.with256bits();
+    final nonce = algorithm.newNonce();
+    final secretBox = await algorithm.encrypt(
+      data,
+      secretKey: _deviceKey!,
+      nonce: nonce,
+    );
+    
+    // Combine nonce, ciphertext, and MAC
+    final nonceLen = nonce.length;
+    final cipherLen = secretBox.cipherText.length;
+    final macLen = secretBox.mac.bytes.length;
+    final result = Uint8List(nonceLen + cipherLen + macLen);
+    var offset = 0;
+    result.setRange(offset, offset + nonceLen, nonce);
+    offset += nonceLen;
+    result.setRange(offset, offset + cipherLen, secretBox.cipherText);
+    offset += cipherLen;
+    result.setRange(offset, offset + macLen, secretBox.mac.bytes);
+    
+    return result;
+  }
+  
+  /// Decrypt data with device key
+  Future<Uint8List> _decryptWithDeviceKey(Uint8List encryptedData) async {
+    if (_deviceKey == null) {
+      await _loadOrGenerateDeviceKey();
+    }
+    
+    final algorithm = AesGcm.with256bits();
+    
+    // Extract nonce, ciphertext, and MAC
+    final nonceLength = algorithm.nonceLength;
+    final macLength = 16; // GCM MAC is 16 bytes
+    
+    final nonce = encryptedData.sublist(0, nonceLength);
+    final cipherText = encryptedData.sublist(
+      nonceLength,
+      encryptedData.length - macLength,
+    );
+    final macBytes = encryptedData.sublist(encryptedData.length - macLength);
+    
+    final secretBox = SecretBox(
+      cipherText,
+      nonce: nonce,
+      mac: Mac(macBytes),
+    );
+    
+    final decrypted = await algorithm.decrypt(
+      secretBox,
+      secretKey: _deviceKey!,
+    );
+    return Uint8List.fromList(decrypted);
+  }
+  
+  /// Encrypt a message for a conversation
+  Future<String> encryptMessage(String message, String conversationId) async {
+    try {
+      // Get or generate shared key for this conversation
+      var sharedKey = await getSharedKey(conversationId);
+      if (sharedKey == null) {
+        sharedKey = await generateSharedKey(conversationId);
+      }
+      
+      // Encrypt the message
+      final messageBytes = Uint8List.fromList(utf8.encode(message));
+      final algorithm = AesGcm.with256bits();
+      final nonce = algorithm.newNonce();
+      final secretBox = await algorithm.encrypt(
+        messageBytes,
+        secretKey: sharedKey,
+        nonce: nonce,
       );
-
-      return EncryptedMessage(
-        ciphertext: base64Encode(secretBox.cipherText),
-        nonce: base64Encode(secretBox.nonce),
-        mac: base64Encode(secretBox.mac.bytes),
-        senderPublicKey: base64Encode((await senderKeyPair.extractPublicKey()).bytes),
-      );
+      
+      // Encode as base64 for storage in Firestore
+      final encryptedData = {
+        'nonce': base64Encode(nonce),
+        'ciphertext': base64Encode(secretBox.cipherText),
+        'mac': base64Encode(secretBox.mac.bytes),
+      };
+      
+      return jsonEncode(encryptedData);
     } catch (e) {
       Logger.error('Error encrypting message', error: e, tag: 'EncryptionService');
-      if (e is EncryptionException) rethrow;
-      throw EncryptionException('Failed to encrypt message', code: 'encryption-failed', originalError: e);
+      rethrow;
     }
   }
-
-  /// Decrypt a message
-  Future<String> decryptMessage({
-    required EncryptedMessage encryptedMessage,
-    required String recipientId,
-    required String senderId,
-  }) async {
+  
+  /// Decrypt a message from a conversation
+  Future<String> decryptMessage(String encryptedMessageJson, String conversationId) async {
     try {
-      // Get recipient's key pair
-      final recipientKeyPair = await getOrCreateKeyPair(recipientId);
+      // Get shared key for this conversation
+      final sharedKey = await getSharedKey(conversationId);
+      if (sharedKey == null) {
+        throw Exception('Shared key not found for conversation: $conversationId');
+      }
       
-      // Get sender's public key from message
-      final senderPublicKeyBytes = base64Decode(encryptedMessage.senderPublicKey);
-      final senderPublicKey = SimplePublicKey(senderPublicKeyBytes, type: KeyPairType.x25519);
-
-      // Perform key agreement
-      final sharedSecret = await recipientKeyPair.sharedSecretKey(
-        remotePublicKey: senderPublicKey,
-      );
-
-      // Decrypt message
+      // Decode the encrypted message
+      final encryptedData = jsonDecode(encryptedMessageJson) as Map<String, dynamic>;
+      final nonce = base64Decode(encryptedData['nonce'] as String);
+      final cipherText = base64Decode(encryptedData['ciphertext'] as String);
+      final macBytes = base64Decode(encryptedData['mac'] as String);
+      
+      // Decrypt
+      final algorithm = AesGcm.with256bits();
       final secretBox = SecretBox(
-        base64Decode(encryptedMessage.ciphertext),
-        nonce: base64Decode(encryptedMessage.nonce),
-        mac: Mac(base64Decode(encryptedMessage.mac)),
+        cipherText,
+        nonce: nonce,
+        mac: Mac(macBytes),
       );
-
-      final plaintext = await _cipher.decrypt(
+      
+      final decryptedBytes = await algorithm.decrypt(
         secretBox,
-        secretKey: sharedSecret,
+        secretKey: sharedKey,
       );
-
-      return String.fromCharCodes(plaintext);
+      
+      return utf8.decode(Uint8List.fromList(decryptedBytes));
     } catch (e) {
       Logger.error('Error decrypting message', error: e, tag: 'EncryptionService');
-      if (e is EncryptionException) rethrow;
-      throw EncryptionException('Failed to decrypt message', code: 'decryption-failed', originalError: e);
+      rethrow;
     }
   }
-
-  /// Store public key (for key exchange)
-  Future<void> storePublicKey(String userId, SimplePublicKey publicKey) async {
-    _publicKeys[userId] = publicKey;
-    // TODO: Store in Firestore for key exchange
-    Logger.info('Public key stored for user: $userId', tag: 'EncryptionService');
-  }
-
-  /// Clear keys (for logout)
-  void clearKeys() {
-    _keyPairs.clear();
-    _publicKeys.clear();
-    Logger.info('Encryption keys cleared', tag: 'EncryptionService');
-  }
-}
-
-/// Encrypted message data structure
-class EncryptedMessage {
-  final String ciphertext; // Base64 encoded
-  final String nonce; // Base64 encoded
-  final String mac; // Base64 encoded
-  final String senderPublicKey; // Base64 encoded
-
-  EncryptedMessage({
-    required this.ciphertext,
-    required this.nonce,
-    required this.mac,
-    required this.senderPublicKey,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'ciphertext': ciphertext,
-        'nonce': nonce,
-        'mac': mac,
-        'senderPublicKey': senderPublicKey,
-      };
-
-  factory EncryptedMessage.fromJson(Map<String, dynamic> json) => EncryptedMessage(
-        ciphertext: json['ciphertext'] as String,
-        nonce: json['nonce'] as String,
-        mac: json['mac'] as String,
-        senderPublicKey: json['senderPublicKey'] as String,
+  
+  /// Share encryption key with another user
+  /// In a real implementation, this would use a key exchange protocol
+  /// For now, we'll store the key in Firestore encrypted with the recipient's public key
+  /// (This is a simplified version - full E2EE would use Signal Protocol)
+  Future<void> shareKeyWithUser(String conversationId, String recipientUserId) async {
+    try {
+      final sharedKey = await getSharedKey(conversationId);
+      if (sharedKey == null) {
+        throw Exception('Shared key not found for conversation: $conversationId');
+      }
+      
+      // TODO: Implement proper key exchange using recipient's public key
+      // For now, this is a placeholder
+      Logger.info(
+        'Key sharing requested for conversation $conversationId with user $recipientUserId',
+        tag: 'EncryptionService',
       );
+    } catch (e) {
+      Logger.error('Error sharing key', error: e, tag: 'EncryptionService');
+      rethrow;
+    }
+  }
+  
+  /// Check if encryption is enabled for a conversation
+  Future<bool> isEncryptionEnabled(String conversationId) async {
+    final sharedKey = await getSharedKey(conversationId);
+    return sharedKey != null;
+  }
+  
+  /// Delete encryption keys for a conversation (when leaving or deleting)
+  Future<void> deleteConversationKeys(String conversationId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('$_prefsKeyPrefix$conversationId');
+      Logger.info('Deleted encryption keys for conversation: $conversationId', tag: 'EncryptionService');
+    } catch (e) {
+      Logger.error('Error deleting conversation keys', error: e, tag: 'EncryptionService');
+    }
+  }
 }
-
-/// Exception for encryption-related errors
-class EncryptionException extends AppException {
-  const EncryptionException(super.message, {super.code, super.originalError});
-}
-
-

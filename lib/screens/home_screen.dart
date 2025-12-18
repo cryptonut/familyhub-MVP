@@ -672,7 +672,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const NavigationDestination(
         icon: Icon(Icons.shopping_bag_outlined),
         selectedIcon: Icon(Icons.shopping_bag),
-        label: 'Shopping',
+        label: 'Shop', // Shortened to prevent wrapping
       ),
       const NavigationDestination(
         icon: Icon(Icons.location_on_outlined),

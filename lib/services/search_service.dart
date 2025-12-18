@@ -140,14 +140,14 @@ class SearchService {
           .where((task) {
             return task.title.toLowerCase().contains(query) ||
                    (task.description?.toLowerCase().contains(query) ?? false) ||
-                   task.assignedToName.toLowerCase().contains(query);
+                   (task.assignedTo?.toLowerCase().contains(query) ?? false);
           })
           .take(limit)
           .map((task) => SearchResult(
             type: SearchResultType.task,
             item: task,
             title: task.title,
-            subtitle: 'Assigned to: ${task.assignedToName}',
+            subtitle: task.assignedTo != null ? 'Assigned to: ${task.assignedTo}' : 'Unassigned',
             timestamp: task.createdAt,
             highlightedText: _highlightMatch(task.title, query),
           ))
@@ -285,8 +285,7 @@ class SearchService {
     if (assignedTo != null) {
       results.tasks.retainWhere((result) {
         final task = result.item as Task;
-        return task.assignedTo.toLowerCase().contains(assignedTo.toLowerCase()) ||
-               task.assignedToName.toLowerCase().contains(assignedTo.toLowerCase());
+        return (task.assignedTo?.toLowerCase().contains(assignedTo.toLowerCase()) ?? false);
       });
     }
 
@@ -310,12 +309,12 @@ class SearchService {
 
       results.tasks.retainWhere((result) {
         final task = result.item as Task;
-        return task.createdBy.toLowerCase().contains(lowerCreatedBy);
+        return (task.createdBy?.toLowerCase().contains(lowerCreatedBy) ?? false);
       });
 
       results.events.retainWhere((result) {
         final event = result.item as CalendarEvent;
-        return event.createdBy.toLowerCase().contains(lowerCreatedBy);
+        return (event.createdBy?.toLowerCase().contains(lowerCreatedBy) ?? false);
       });
 
       results.photos.retainWhere((result) {

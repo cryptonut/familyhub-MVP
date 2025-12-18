@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../core/services/logger_service.dart';
-import 'package:flutter/foundation.dart';
 import '../../models/chat_message.dart';
 import '../../services/chat_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/encrypted_chat_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../../widgets/linkable_text.dart';
 import '../../widgets/message_reaction_widget.dart';
+import '../../widgets/emoji_picker_bottom_sheet.dart';
+import '../../services/message_reaction_service.dart';
 import 'package:uuid/uuid.dart';
 
 class PrivateChatScreen extends StatefulWidget {
@@ -26,14 +28,17 @@ class PrivateChatScreen extends StatefulWidget {
 class _PrivateChatScreenState extends State<PrivateChatScreen> {
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
+  late final EncryptedChatService _encryptedChatService;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? _familyId;
   String? _chatId;
+  bool _encryptMessage = false;
 
   @override
   void initState() {
     super.initState();
+    _encryptedChatService = EncryptedChatService(chatService: _chatService);
     _loadFamilyAndChatId();
     // Mark messages as read when the chat screen is opened
     _markMessagesAsRead();
@@ -117,9 +122,20 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
         senderName: currentUserName,
         content: text,
         timestamp: DateTime.now(),
+        recipientId: widget.recipientId,
+        isEncrypted: _encryptMessage,
       );
 
-      await _chatService.sendPrivateMessage(message, widget.recipientId);
+      if (_encryptMessage) {
+        // Send encrypted message
+        await _encryptedChatService.sendEncryptedMessage(
+          message: message,
+          expirationDuration: null, // No auto-destruct for now
+        );
+      } else {
+        // Send regular message
+        await _chatService.sendPrivateMessage(message, widget.recipientId);
+      }
       if (mounted) {
         _messageController.clear();
       }
@@ -261,7 +277,14 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       builder: (context, constraints) {
         return Align(
           alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
+          child: GestureDetector(
+            onLongPress: () {
+              // Show emoji picker on long press
+              if (_familyId != null && _chatId != null) {
+                _showEmojiPickerForMessage(message.id);
+              }
+            },
+            child: Container(
             margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
@@ -274,13 +297,39 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  message.senderName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: isCurrentUser ? Colors.white70 : Colors.black87,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      message.senderName,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isCurrentUser ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                    // Encryption indicator
+                    if (message.isEncrypted) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.lock,
+                        size: 12,
+                        color: isCurrentUser
+                            ? Colors.white70
+                            : Colors.black54,
+                      ),
+                    ],
+                    // Expiration indicator
+                    if (message.expiresAt != null && message.expiresAt!.isAfter(DateTime.now())) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.timer_outlined,
+                        size: 12,
+                        color: isCurrentUser
+                            ? Colors.white70
+                            : Colors.black54,
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
                 LinkableText(
@@ -311,8 +360,37 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
               ],
             ),
           ),
+          ),
         );
       },
+    );
+  }
+
+  void _showEmojiPickerForMessage(String messageId) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => EmojiPickerBottomSheet(
+        onEmojiSelected: (emoji) async {
+          Navigator.pop(context);
+          if (_familyId != null && _chatId != null) {
+            try {
+              final reactionService = MessageReactionService();
+              await reactionService.addReaction(
+                messageId,
+                emoji,
+                _familyId!,
+                chatId: _chatId,
+              );
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error adding reaction: $e')),
+                );
+              }
+            }
+          }
+        },
+      ),
     );
   }
 
@@ -333,11 +411,30 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
         ),
         child: Row(
           children: [
+            // Encryption toggle button
+            IconButton(
+              icon: Icon(
+                _encryptMessage ? Icons.lock : Icons.lock_open,
+                color: _encryptMessage
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey,
+              ),
+              onPressed: () {
+                setState(() {
+                  _encryptMessage = !_encryptMessage;
+                });
+              },
+              tooltip: _encryptMessage
+                  ? 'Encryption enabled - tap to disable'
+                  : 'Encryption disabled - tap to enable',
+            ),
             Expanded(
               child: TextField(
                 controller: _messageController,
                 decoration: InputDecoration(
-                  hintText: 'Type a message...',
+                  hintText: _encryptMessage
+                      ? 'Encrypted message...'
+                      : 'Type a message...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
                   ),

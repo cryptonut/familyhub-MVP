@@ -617,6 +617,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     return Scaffold(
       appBar: AppBar(
         title: const SizedBox.shrink(), // Remove title - redundant with bottom navigation
+        toolbarHeight: 48, // Reduced from default 56
         actions: [
           // Refresh button only - other items moved to Admin > Jobs menu
           IconButton(
@@ -628,12 +629,15 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
             },
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Active', icon: Icon(Icons.assignment)),
-            Tab(text: 'Completed', icon: Icon(Icons.check_circle)),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(40), // Reduced from default 48
+          child: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'Active', icon: Icon(Icons.assignment)),
+              Tab(text: 'Completed', icon: Icon(Icons.check_circle)),
+            ],
+          ),
         ),
       ),
       body: Column(
@@ -689,22 +693,24 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
 
   Widget _buildSearchAndFilterBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // Reduced vertical padding
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
           bottom: BorderSide(
-            color: Colors.grey.shade300,
-            width: 1,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey.shade700
+                : Colors.grey.shade300,
+            width: 0.5, // Thinner border
           ),
         ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Search bar - improved contrast and submit icon
+          // Search bar - compact design
           SizedBox(
-            height: 40,
+            height: 36, // Reduced from 40 to 36
             child: TextField(
               controller: _searchController,
               style: TextStyle(
@@ -779,10 +785,11 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                     width: 2,
                   ),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // Reduced padding
                 filled: true,
                 fillColor: Theme.of(context).colorScheme.surface,
                 isDense: true,
+                isCollapsed: false, // Keep expanded but compact
               ),
               onChanged: (value) {
                 setState(() {

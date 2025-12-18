@@ -3,6 +3,7 @@ import '../models/subscription_tier.dart';
 import '../services/subscription_service.dart';
 import '../services/auth_service.dart';
 import '../config/config.dart';
+import '../screens/subscription/subscription_screen.dart';
 
 /// Widget that gates premium features based on subscription status
 /// 
@@ -154,9 +155,11 @@ class _PremiumFeatureGateState extends State<PremiumFeatureGate> {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () {
-              // Navigate to subscription screen
-              // TODO: Navigate to subscription screen when implemented
-              Navigator.of(context).pushNamed('/subscription');
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const SubscriptionScreen(),
+                ),
+              );
             },
             icon: const Icon(Icons.star),
             label: const Text('Upgrade to Premium'),

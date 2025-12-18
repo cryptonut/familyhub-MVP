@@ -85,6 +85,24 @@ class PostCard extends StatelessWidget {
                           fontSize: 15,
                         ),
                       ),
+                      // Encryption indicator
+                      if (post.isEncrypted) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.lock,
+                          size: 12,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ],
+                      // Expiration indicator
+                      if (post.expiresAt != null && post.expiresAt!.isAfter(DateTime.now())) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 12,
+                          color: theme.colorScheme.secondary,
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 4),

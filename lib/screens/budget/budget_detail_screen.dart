@@ -229,6 +229,73 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
     }
   }
 
+  void _showAdherenceWarningDialog() {
+    if (_progressMetrics == null) return;
+    
+    final totalEstimated = _progressMetrics!.totalEstimated;
+    final budgetTotal = widget.budget.totalAmount;
+    final exceedsBy = totalEstimated - budgetTotal;
+    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning,
+              color: Colors.orange,
+            ),
+            const SizedBox(width: 8),
+            const Text('Budget Warning'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (totalEstimated > budgetTotal) ...[
+              Text(
+                'The total estimated amount of all budget items (${currencyFormat.format(totalEstimated)}) exceeds your budget total (${currencyFormat.format(budgetTotal)}).',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You are over budget by: ${currencyFormat.format(exceedsBy)}',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'To resolve this, you can:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('• Adjust item estimates to reduce total'),
+              const Text('• Increase your budget total'),
+              const Text('• Remove or modify budget items'),
+            ] else ...[
+              Text(
+                'Your actual spending is approaching or exceeding your estimated amounts.',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('Consider reviewing your budget items and spending.'),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -384,40 +451,54 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                                 child: const SizedBox.shrink(),
                               ),
                             
-                            // Budget Adherence Indicator
+                            // Budget Adherence Indicator (clickable if warning/over budget)
                             const SizedBox(height: AppTheme.spacingSM),
-                            Container(
-                              padding: const EdgeInsets.all(AppTheme.spacingSM),
-                              decoration: BoxDecoration(
-                                color: _getAdherenceColor(_progressMetrics!.budgetAdherence).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _getAdherenceColor(_progressMetrics!.budgetAdherence).withOpacity(0.3),
+                            InkWell(
+                              onTap: _progressMetrics!.budgetAdherence != BudgetAdherenceStatus.onTrack
+                                  ? () => _showAdherenceWarningDialog()
+                                  : null,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.all(AppTheme.spacingSM),
+                                decoration: BoxDecoration(
+                                  color: _getAdherenceColor(_progressMetrics!.budgetAdherence).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: _getAdherenceColor(_progressMetrics!.budgetAdherence).withOpacity(0.3),
+                                  ),
                                 ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    _progressMetrics!.budgetAdherence == BudgetAdherenceStatus.onTrack
-                                        ? Icons.check_circle
-                                        : _progressMetrics!.budgetAdherence == BudgetAdherenceStatus.warning
-                                            ? Icons.warning
-                                            : Icons.error,
-                                    color: _getAdherenceColor(_progressMetrics!.budgetAdherence),
-                                  ),
-                                  const SizedBox(width: AppTheme.spacingSM),
-                                  Text(
-                                    _progressMetrics!.budgetAdherence == BudgetAdherenceStatus.onTrack
-                                        ? 'On Track'
-                                        : _progressMetrics!.budgetAdherence == BudgetAdherenceStatus.warning
-                                            ? 'Warning: Approaching Budget Limit'
-                                            : 'Over Budget',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _progressMetrics!.budgetAdherence == BudgetAdherenceStatus.onTrack
+                                          ? Icons.check_circle
+                                          : _progressMetrics!.budgetAdherence == BudgetAdherenceStatus.warning
+                                              ? Icons.warning
+                                              : Icons.error,
                                       color: _getAdherenceColor(_progressMetrics!.budgetAdherence),
-                                      fontWeight: FontWeight.bold,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: AppTheme.spacingSM),
+                                    Expanded(
+                                      child: Text(
+                                        _progressMetrics!.budgetAdherence == BudgetAdherenceStatus.onTrack
+                                            ? 'On Track'
+                                            : _progressMetrics!.budgetAdherence == BudgetAdherenceStatus.warning
+                                                ? 'Warning'
+                                                : 'Over Budget',
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: _getAdherenceColor(_progressMetrics!.budgetAdherence),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_progressMetrics!.budgetAdherence != BudgetAdherenceStatus.onTrack)
+                                      Icon(
+                                        Icons.info_outline,
+                                        size: 18,
+                                        color: _getAdherenceColor(_progressMetrics!.budgetAdherence),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],

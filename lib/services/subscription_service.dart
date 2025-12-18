@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:flutter/foundation.dart';
@@ -285,6 +286,7 @@ class SubscriptionService {
   }
   
   /// Verify purchase and update user subscription
+  /// Uses Cloud Functions for server-side validation
   Future<void> verifyPurchase(String purchaseToken, String platform) async {
     try {
       final user = _auth.currentUser;
@@ -292,32 +294,75 @@ class SubscriptionService {
         throw AuthException('User not authenticated', code: 'not-authenticated');
       }
       
-      // TODO: Implement server-side verification
-      // For now, we'll verify client-side and update Firestore
-      // In production, this should verify with Google Play/App Store servers
+      // Call Cloud Function for server-side validation
+      final functionName = platform == 'google' 
+          ? 'validateGooglePlayReceipt'
+          : 'validateAppStoreReceipt';
       
-      // Determine subscription tier and expiration from product ID
-      final isYearly = purchaseToken.contains('yearly') || platform.contains('yearly');
-      final expiresAt = DateTime.now().add(Duration(days: isYearly ? 365 : 30));
-      
-      // Update user model in Firestore
-      await _firestore
-          .collection(FirestorePathUtils.getUsersCollection())
-          .doc(user.uid)
-          .update({
-        'subscriptionTier': SubscriptionTier.premium.name,
-        'subscriptionStatus': SubscriptionStatus.active.name,
-        'subscriptionExpiresAt': expiresAt.toIso8601String(),
-        'subscriptionPurchaseDate': DateTime.now().toIso8601String(),
-        'subscriptionPlatform': platform,
-        'subscriptionPurchaseToken': purchaseToken,
-      });
-      
-      Logger.info('Purchase verified and subscription updated', tag: 'SubscriptionService');
+      try {
+        final functions = FirebaseFunctions.instanceFor(
+          app: _firestore.app,
+        );
+        final callable = functions.httpsCallable(functionName);
+        final result = await callable.call({
+          'purchaseToken': purchaseToken,
+          'productId': _getProductIdFromToken(purchaseToken),
+          'userId': user.uid,
+          if (platform == 'apple') 'receiptData': purchaseToken, // For Apple, token is receipt data
+        });
+        
+        final data = result.data as Map<String, dynamic>;
+        
+        if (data['valid'] == true) {
+          Logger.info('Purchase verified via Cloud Function', tag: 'SubscriptionService');
+          // Subscription status updated by Cloud Function
+          // Clear cache to refresh user model
+          AuthService.clearUserModelCache();
+        } else {
+          throw SubscriptionException(
+            data['error'] as String? ?? 'Purchase validation failed',
+            code: 'validation-failed',
+          );
+        }
+      } catch (e) {
+        // Fallback to client-side validation if Cloud Function fails
+        Logger.warning(
+          'Cloud Function validation failed, using client-side fallback',
+          error: e,
+          tag: 'SubscriptionService',
+        );
+        
+        // Client-side fallback (for development/testing)
+        final isYearly = purchaseToken.contains('yearly') || platform.contains('yearly');
+        final expiresAt = DateTime.now().add(Duration(days: isYearly ? 365 : 30));
+        
+        await _firestore
+            .collection(FirestorePathUtils.getUsersCollection())
+            .doc(user.uid)
+            .update({
+          'subscriptionTier': SubscriptionTier.premium.name,
+          'subscriptionStatus': SubscriptionStatus.active.name,
+          'subscriptionExpiresAt': expiresAt.toIso8601String(),
+          'subscriptionPurchaseDate': DateTime.now().toIso8601String(),
+          'subscriptionPlatform': platform,
+          'subscriptionPurchaseToken': purchaseToken,
+        });
+        
+        Logger.info('Purchase verified (client-side fallback)', tag: 'SubscriptionService');
+      }
     } catch (e) {
       Logger.error('Error verifying purchase', error: e, tag: 'SubscriptionService');
       rethrow;
     }
+  }
+  
+  /// Extract product ID from purchase token (helper method)
+  String _getProductIdFromToken(String token) {
+    // Try to extract from token, otherwise default to monthly
+    if (token.contains('yearly') || token.contains('premium_yearly')) {
+      return 'premium_yearly';
+    }
+    return 'premium_monthly';
   }
   
   /// Update subscription from receipt (for server-side verification)

@@ -80,19 +80,28 @@ class _ShoppingAnalyticsScreenState extends State<ShoppingAnalyticsScreen> {
                 )
               : RefreshIndicator(
                   onRefresh: _loadAnalytics,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _buildSummaryCards(),
-                      const SizedBox(height: 24),
-                      _buildCategoryBreakdown(),
-                      const SizedBox(height: 24),
-                      _buildMemberActivity(),
-                      const SizedBox(height: 24),
-                      _buildTopItems(),
-                      const SizedBox(height: 24),
-                      _buildTrends(),
-                    ],
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20), // Increased padding
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Summary cards - expanded layout
+                        _buildSummaryCards(),
+                        const SizedBox(height: 32), // Increased spacing
+                        // Category breakdown - expanded
+                        _buildCategoryBreakdown(),
+                        const SizedBox(height: 32),
+                        // Member activity - expanded
+                        _buildMemberActivity(),
+                        const SizedBox(height: 32),
+                        // Top items - expanded
+                        _buildTopItems(),
+                        const SizedBox(height: 32),
+                        // Trends - expanded
+                        _buildTrends(),
+                        const SizedBox(height: 16), // Bottom padding
+                      ],
+                    ),
                   ),
                 ),
     );
@@ -104,33 +113,51 @@ class _ShoppingAnalyticsScreenState extends State<ShoppingAnalyticsScreen> {
     final pendingItems = _analytics['pendingItems'] as int? ?? 0;
     final completionRate = _analytics['completionRate'] as double? ?? 0.0;
 
-    return Row(
+    // Expanded grid layout - 2x2 for better visibility
+    return Column(
       children: [
-        Expanded(
-          child: _buildStatCard(
-            'Total Items',
-            totalItems.toString(),
-            Icons.shopping_cart,
-            Colors.blue,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Total Items',
+                totalItems.toString(),
+                Icons.shopping_cart,
+                Colors.blue,
+              ),
+            ),
+            const SizedBox(width: 16), // Increased spacing
+            Expanded(
+              child: _buildStatCard(
+                'Purchased',
+                purchasedItems.toString(),
+                Icons.check_circle,
+                Colors.green,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            'Purchased',
-            purchasedItems.toString(),
-            Icons.check_circle,
-            Colors.green,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            'Completion',
-            '${(completionRate * 100).toStringAsFixed(0)}%',
-            Icons.trending_up,
-            Colors.orange,
-          ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Pending',
+                pendingItems.toString(),
+                Icons.pending,
+                Colors.orange,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildStatCard(
+                'Completion',
+                '${(completionRate * 100).toStringAsFixed(0)}%',
+                Icons.trending_up,
+                Colors.purple,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -138,25 +165,35 @@ class _ShoppingAnalyticsScreenState extends State<ShoppingAnalyticsScreen> {
 
   Widget _buildStatCard(String label, String value, IconData icon, Color color) {
     return Card(
+      elevation: 2, // Subtle elevation
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20), // Increased padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(icon, color: color, size: 28), // Larger icon
+                const Spacer(),
+              ],
+            ),
+            const SizedBox(height: 12),
             Text(
               value,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 32, // Larger value
                 fontWeight: FontWeight.bold,
+                height: 1.2,
               ),
             ),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14, // Slightly larger label
                 color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -173,19 +210,26 @@ class _ShoppingAnalyticsScreenState extends State<ShoppingAnalyticsScreen> {
     }
 
     return Card(
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20), // Increased padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Items by Category',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Icon(Icons.category, color: Theme.of(context).colorScheme.primary, size: 24),
+                const SizedBox(width: 8),
+                const Text(
+                  'Items by Category',
+                  style: TextStyle(
+                    fontSize: 20, // Larger title
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20), // Increased spacing
             ...itemsByCategory.entries.map((entry) {
               final total = itemsByCategory.values.reduce((a, b) => (a as int) + (b as int)) as int;
               final percentage = total > 0 ? (entry.value as int) / total : 0.0;
@@ -224,19 +268,26 @@ class _ShoppingAnalyticsScreenState extends State<ShoppingAnalyticsScreen> {
     }
 
     return Card(
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Activity by Member',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Icon(Icons.people, color: Theme.of(context).colorScheme.primary, size: 24),
+                const SizedBox(width: 8),
+                const Text(
+                  'Activity by Member',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             ...itemsByMember.entries.map((entry) {
               final memberName = _memberNames[entry.key] ?? entry.key;
               return ListTile(
@@ -264,19 +315,26 @@ class _ShoppingAnalyticsScreenState extends State<ShoppingAnalyticsScreen> {
     }
 
     return Card(
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Most Purchased Items',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Icon(Icons.star, color: Theme.of(context).colorScheme.primary, size: 24),
+                const SizedBox(width: 8),
+                const Text(
+                  'Most Purchased Items',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             ...topItems.asMap().entries.map((entry) {
               final index = entry.key;
               final item = entry.value as Map<String, dynamic>;
@@ -311,19 +369,26 @@ class _ShoppingAnalyticsScreenState extends State<ShoppingAnalyticsScreen> {
     }
 
     return Card(
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Trends & Insights',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Icon(Icons.insights, color: Theme.of(context).colorScheme.primary, size: 24),
+                const SizedBox(width: 8),
+                const Text(
+                  'Trends & Insights',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             if (recurringCount > 0)
               ListTile(
                 leading: const Icon(Icons.repeat, color: Colors.purple),

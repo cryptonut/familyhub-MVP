@@ -388,11 +388,14 @@ class _CreateRecurringPaymentDialogState extends State<CreateRecurringPaymentDia
 
   @override
   Widget build(BuildContext context) {
-    // Filter out current user from recipients
-    final recipients = widget.familyMembers.where((m) {
-      // Could add logic to filter if needed
-      return true;
-    }).toList();
+    // Show all family members as recipients (no filtering)
+    // Note: Age-based filtering can be added later if needed (e.g., only show children)
+    final recipients = widget.familyMembers.toList();
+    
+    // Log if recipients list is empty for debugging
+    if (recipients.isEmpty) {
+      Logger.warning('CreateRecurringPaymentDialog: No family members available for recipients', tag: 'RecurringPaymentsScreen');
+    }
 
     return AlertDialog(
       title: Row(

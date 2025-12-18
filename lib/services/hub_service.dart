@@ -157,8 +157,8 @@ class HubService {
     final userId = currentUserId;
     if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
 
-    // Validate premium hub access
-    if (hubType != HubType.family) {
+    // Validate premium hub access (library hub is free)
+    if (hubType != HubType.family && hubType != HubType.library) {
       final hasAccess = await _subscriptionService.hasPremiumHubAccess(hubType.value);
       if (!hasAccess) {
         throw PermissionException(
@@ -221,6 +221,37 @@ class HubService {
       name: 'My Friends',
       description: 'Your personal friends hub',
       icon: 'people',
+    );
+  }
+
+  /// Ensure Library Hub exists for the current user
+  Future<Hub> ensureLibraryHub() async {
+    final userId = currentUserId;
+    if (userId == null) throw AuthException('User not logged in', code: 'not-authenticated');
+
+    // Check if Library Hub already exists
+    final existingHubs = await getUserHubs();
+    final libraryHub = existingHubs.firstWhere(
+      (hub) => hub.hubType == HubType.library && hub.creatorId == userId,
+      orElse: () => Hub(
+        id: '',
+        name: '',
+        description: '',
+        creatorId: '',
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    if (libraryHub.id.isNotEmpty) {
+      return libraryHub;
+    }
+
+    // Create Library Hub if it doesn't exist
+    return await createHub(
+      name: 'Library Hub',
+      description: 'Browse books, rate them, and take on Exploding Books challenges!',
+      icon: 'library_books',
+      hubType: HubType.library,
     );
   }
 

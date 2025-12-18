@@ -44,6 +44,7 @@ class BudgetSyncService {
 
       await _transactionService.createTransaction(
         budgetId: budgetId,
+        itemId: budgetId, // Use budgetId as itemId for now
         categoryId: categoryId,
         type: TransactionType.expense,
         amount: receipt.totalAmount!,
@@ -77,6 +78,7 @@ class BudgetSyncService {
     try {
       await _transactionService.createTransaction(
         budgetId: budgetId,
+        itemId: budgetId, // Use budgetId as itemId for now
         categoryId: categoryId,
         type: TransactionType.income,
         amount: amount,
@@ -124,6 +126,7 @@ class BudgetSyncService {
 
       await _transactionService.createTransaction(
         budgetId: budgetId,
+        itemId: budgetId, // Use budgetId as itemId for now
         categoryId: categoryId,
         type: TransactionType.income,
         amount: task.reward!,

@@ -83,7 +83,7 @@ class BudgetExportService {
               pw.Table(
                 border: pw.TableBorder.all(),
                 children: [
-                  _buildTableRow('Date', 'Description', 'Category', 'Amount', isHeader: true),
+                  _buildTableRow('Date', 'Description', 'Category', 'Amount', true),
                   ...transactions.map((t) => _buildTableRow(
                         dateFormat.format(t.date),
                         t.description,

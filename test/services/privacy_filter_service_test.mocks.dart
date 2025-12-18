@@ -266,6 +266,21 @@ class MockHubService extends _i1.Mock implements _i7.HubService {
       ) as _i5.Future<_i2.Hub>);
 
   @override
+  _i5.Future<_i2.Hub> ensureLibraryHub() => (super.noSuchMethod(
+        Invocation.method(
+          #ensureLibraryHub,
+          [],
+        ),
+        returnValue: _i5.Future<_i2.Hub>.value(_FakeHub_0(
+          this,
+          Invocation.method(
+            #ensureLibraryHub,
+            [],
+          ),
+        )),
+      ) as _i5.Future<_i2.Hub>);
+
+  @override
   _i5.Future<void> addMember(
     String? hubId,
     String? userId,
@@ -311,6 +326,33 @@ class MockHubService extends _i1.Mock implements _i7.HubService {
             hubId,
             updates,
           ],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> transferOwnership(
+    String? hubId,
+    String? newOwnerId,
+  ) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #transferOwnership,
+          [
+            hubId,
+            newOwnerId,
+          ],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> leaveHub(String? hubId) => (super.noSuchMethod(
+        Invocation.method(
+          #leaveHub,
+          [hubId],
         ),
         returnValue: _i5.Future<void>.value(),
         returnValueForMissingStub: _i5.Future<void>.value(),

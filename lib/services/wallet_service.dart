@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/services/logger_service.dart';
 import '../core/constants/app_constants.dart';
-import '../core/errors/app_exceptions.dart';
 import '../models/task.dart';
 import '../models/user_model.dart';
 import 'task_service.dart';

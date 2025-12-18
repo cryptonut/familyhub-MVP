@@ -14,6 +14,8 @@ import 'create_hub_dialog.dart';
 import '../homeschooling/homeschooling_hub_screen.dart';
 import '../extended_family/extended_family_hub_screen.dart';
 import '../coparenting/coparenting_hub_screen.dart';
+import '../library/library_hub_screen.dart';
+import '../widgets/widget_configuration_screen.dart';
 
 class MyHubsScreen extends StatefulWidget {
   const MyHubsScreen({super.key});
@@ -47,6 +49,9 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
     try {
       // Ensure "My Friends" hub exists
       await _hubService.ensureMyFriendsHub();
+      
+      // Ensure Library Hub exists
+      await _hubService.ensureLibraryHub();
       
       // Load all user hubs
       final hubs = await _hubService.getUserHubs();
@@ -131,9 +136,29 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
                     return _buildHubCard(hub);
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createHub,
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: 'configure_widget',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const WidgetConfigurationScreen(),
+                ),
+              );
+            },
+            tooltip: 'Configure Widget',
+            child: const Icon(Icons.widgets),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton(
+            heroTag: 'create_hub',
+            onPressed: _createHub,
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }
@@ -165,6 +190,13 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => CoparentingHubScreen(hubId: hub.id),
+            ),
+          );
+        } else if (hub.hubType == HubType.library) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LibraryHubScreen(hub: hub),
             ),
           );
         } else {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 // import 'package:speech_to_text/speech_to_text.dart' as stt; // Temporarily disabled due to Kotlin compilation errors
 import '../../core/services/logger_service.dart';
@@ -37,8 +38,9 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
   Map<String, List<ShoppingItem>> _groupedItems = {};
   bool _isLoading = true;
   bool _isShopper = false;
-  bool _showCompleted = false;
+  bool _showCompleted = true; // Default to showing completed items
   String? _currentUserId;
+  Map<String, bool> _categoryExpanded = {}; // Track category expansion state
   
   // Speech to text - TEMPORARILY DISABLED
   // final stt.SpeechToText _speech = stt.SpeechToText();
@@ -80,6 +82,10 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
             _items = items;
             _groupItems();
             _isLoading = false;
+            // Initialize category expansion state (all collapsed by default)
+            for (var category in _groupedItems.keys) {
+              _categoryExpanded.putIfAbsent(category, () => false);
+            }
           });
         }
       },
@@ -230,14 +236,58 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
           _groupItems();
         });
         ToastNotification.success(context, 'Item added');
+        // Force a small delay then refresh to ensure stream updates
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          // Stream should update automatically, but ensure UI refreshes
+          setState(() {});
+        }
       } else if (result == true) {
-        // Item was updated (not added)
+        // Item was updated (not added) - refresh data
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          _loadData();
+        }
         ToastNotification.success(context, 'Item updated');
+      }
+    }
+  }
+  
+  Future<void> _loadData() async {
+    try {
+      final items = await _shoppingService.getShoppingItems(widget.list.id);
+      final userIds = items.map((i) => i.addedBy).toSet();
+      await _loadUserNames(userIds);
+      
+      if (mounted) {
+        setState(() {
+          _items = items;
+          _groupItems();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      Logger.error('Error loading items', error: e, tag: 'ShoppingListDetailScreen');
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
   Future<void> _markItemStatus(ShoppingItem item, ShoppingItemStatus status) async {
+    // Haptic feedback
+    HapticFeedback.mediumImpact();
+    
+    // Optimistic update - immediately update local state
+    final updatedItem = item.copyWith(status: status);
+    final itemIndex = _items.indexWhere((i) => i.id == item.id);
+    if (itemIndex != -1 && mounted) {
+      setState(() {
+        _items[itemIndex] = updatedItem;
+        _groupItems();
+      });
+    }
+    
     try {
       switch (status) {
         case ShoppingItemStatus.gotIt:
@@ -254,6 +304,13 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
           break;
       }
     } catch (e) {
+      // Rollback optimistic update on error
+      if (itemIndex != -1 && mounted) {
+        setState(() {
+          _items[itemIndex] = item;
+          _groupItems();
+        });
+      }
       if (mounted) {
         ToastNotification.error(context, 'Error updating item: $e');
       }
@@ -543,10 +600,10 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
           _buildQuickAddBar(),
           // Items list
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _items.isEmpty
-                    ? _buildEmptyState()
+            child: _items.isEmpty && !_isLoading
+                ? _buildEmptyState()
+                : _isLoading && _items.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
                     : _buildGroupedList(),
           ),
         ],
@@ -651,6 +708,15 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
               color: Colors.grey[500],
             ),
           ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _addItemWithDialog,
+            icon: const Icon(Icons.add),
+            label: const Text('Add First Item'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
         ],
       ),
     );
@@ -703,9 +769,16 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
 
   Widget _buildCategorySection(ShoppingCategory category, List<ShoppingItem> items) {
     final theme = Theme.of(context);
+    final categoryKey = category.name;
+    final isExpanded = _categoryExpanded[categoryKey] ?? false; // Default to collapsed
     
     return ExpansionTile(
-      initiallyExpanded: true,
+      initiallyExpanded: isExpanded,
+      onExpansionChanged: (expanded) {
+        setState(() {
+          _categoryExpanded[categoryKey] = expanded;
+        });
+      },
       leading: Text(
         category.icon ?? '📦',
         style: const TextStyle(fontSize: 24),
@@ -787,15 +860,17 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
           _shoppingService.deleteShoppingItem(widget.list.id, item.id);
         }
       },
-      child: ListTile(
-        leading: _buildItemLeading(item),
-        title: Text(
-          item.name,
-          style: TextStyle(
-            decoration: isCompleted ? TextDecoration.lineThrough : null,
-            color: isCompleted ? theme.colorScheme.onSurfaceVariant : null,
-          ),
-        ),
+      child: Stack(
+        children: [
+          ListTile(
+            leading: _buildItemLeading(item),
+            title: Text(
+              item.name,
+              style: TextStyle(
+                decoration: isCompleted ? TextDecoration.lineThrough : null,
+                color: isCompleted ? theme.colorScheme.onSurfaceVariant : null,
+              ),
+            ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -855,6 +930,45 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
         onLongPress: () {
           _deleteItem(item);
         },
+          ),
+          // DONE stamp watermark for completed items
+          if (isCompleted)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Transform.rotate(
+                    angle: -0.1, // Slight rotation for stamp effect
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: item.status == ShoppingItemStatus.gotIt
+                            ? Colors.green.withValues(alpha: 0.2)
+                            : Colors.red.withValues(alpha: 0.2),
+                        border: Border.all(
+                          color: item.status == ShoppingItemStatus.gotIt
+                              ? Colors.green
+                              : Colors.red,
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        item.status == ShoppingItemStatus.gotIt ? 'DONE' : 'UNAVAILABLE',
+                        style: TextStyle(
+                          fontSize: 12, // Half size (was 24)
+                          fontWeight: FontWeight.bold,
+                          color: item.status == ShoppingItemStatus.gotIt
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

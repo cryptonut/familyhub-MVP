@@ -9,6 +9,7 @@ import '../../services/location_service.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
+import 'location_settings_screen.dart';
 
 class LocationScreen extends StatefulWidget {
   const LocationScreen({super.key});
@@ -222,6 +223,18 @@ class _LocationScreenState extends State<LocationScreen> {
         title: const Text('Family Location'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LocationSettingsScreen(),
+                ),
+              );
+            },
+            tooltip: 'Location settings',
+          ),
+          IconButton(
             icon: const Icon(Icons.my_location),
             onPressed: _updateMyLocation,
             tooltip: 'Update my location',
@@ -346,9 +359,12 @@ class _LocationScreenState extends State<LocationScreen> {
     showDialog(
       context: context,
       builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(16), // Add padding around dialog
         child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          height: MediaQuery.of(context).size.height * 0.7,
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.95,
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -389,7 +405,7 @@ class _LocationScreenState extends State<LocationScreen> {
                 ),
               ],
               const SizedBox(height: 12),
-              Expanded(
+              Flexible(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: GoogleMap(
@@ -410,6 +426,9 @@ class _LocationScreenState extends State<LocationScreen> {
                     mapType: MapType.normal,
                     myLocationButtonEnabled: false,
                     zoomControlsEnabled: true,
+                    onMapCreated: (GoogleMapController controller) {
+                      // Map created successfully
+                    },
                   ),
                 ),
               ),

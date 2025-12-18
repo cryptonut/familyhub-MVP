@@ -181,10 +181,11 @@ class BudgetAnalyticsService {
           ? (totalActual / totalEstimated * 100)
           : 0.0;
       
-      // Budget-level adherence
+      // Budget-level adherence - check if estimated amounts exceed budget
       final budgetAdherence = _calculateBudgetAdherence(
         totalEstimated: totalEstimated,
         totalActual: totalActual,
+        budgetTotal: budget.totalAmount,
         threshold: budget.adherenceThreshold,
       );
       
@@ -205,13 +206,22 @@ class BudgetAnalyticsService {
   }
 
   /// Calculate budget-level adherence status
+  /// Checks both: (1) if estimated amounts exceed budget, (2) if actual spending exceeds estimated
   BudgetAdherenceStatus _calculateBudgetAdherence({
     required double totalEstimated,
     required double totalActual,
+    required double budgetTotal,
     required double threshold,
   }) {
+    // CRITICAL: If cumulative estimated amounts exceed budget total, show warning
+    if (totalEstimated > budgetTotal) {
+      return BudgetAdherenceStatus.warning;
+    }
+    
+    // If no estimated amounts, consider on track
     if (totalEstimated == 0) return BudgetAdherenceStatus.onTrack;
     
+    // Check if actual spending exceeds estimated amounts
     final percentage = ((totalActual - totalEstimated) / totalEstimated) * 100;
     
     if (percentage <= 0) {

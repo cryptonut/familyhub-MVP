@@ -213,8 +213,11 @@ class BudgetService {
       throw ValidationException('Individual budget requires userId', code: 'missing-user-id');
     }
 
-    if (type == BudgetType.project && projectId == null) {
-      throw ValidationException('Project budget requires projectId', code: 'missing-project-id');
+    // Auto-generate project ID if missing for project budgets
+    String? finalProjectId = projectId;
+    if (type == BudgetType.project && finalProjectId == null) {
+      finalProjectId = _uuid.v4();
+      Logger.info('createBudget: Auto-generated project ID $finalProjectId for project budget', tag: 'BudgetService');
     }
 
     try {
@@ -228,7 +231,7 @@ class BudgetService {
         description: description,
         type: type,
         userId: userId,
-        projectId: projectId,
+        projectId: finalProjectId,
         totalAmount: totalAmount,
         startDate: startDate,
         endDate: endDate,

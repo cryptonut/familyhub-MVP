@@ -3,11 +3,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/errors/app_exceptions.dart';
 import '../models/family_member.dart';
 import 'auth_service.dart';
+import 'notification_service.dart';
 
 class LocationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final AuthService _authService = AuthService();
+  final NotificationService _notificationService = NotificationService();
+  
+  // Rate limiting: track last request time per user pair
+  final Map<String, DateTime> _lastRequestTime = {};
 
   Future<String?> get _familyId async {
     final userModel = await _authService.getCurrentUserModel();
@@ -115,12 +120,43 @@ class LocationService {
   }
 
   /// Request a location update from a family member
-  /// Creates a notification for the target user
+  /// Creates a push notification for the target user
+  /// Rate limited to 1 request per hour per person
   Future<void> requestLocationUpdate(String targetUserId) async {
     final currentUser = await _authService.getCurrentUserModel();
     if (currentUser == null) throw AuthException('User not authenticated', code: 'not-authenticated');
     
-    // Create notification
+    // Rate limiting: Check if we've requested from this user in the last hour
+    final rateLimitKey = '${currentUser.uid}_$targetUserId';
+    final lastRequest = _lastRequestTime[rateLimitKey];
+    if (lastRequest != null) {
+      final timeSinceLastRequest = DateTime.now().difference(lastRequest);
+      if (timeSinceLastRequest.inHours < 1) {
+        final targetName = await _getTargetUserName(targetUserId);
+        throw Exception(
+          'You can only request location from $targetName once per hour. '
+          'Please wait ${60 - timeSinceLastRequest.inMinutes} more minutes.',
+        );
+      }
+    }
+    
+    // Update rate limit tracking
+    _lastRequestTime[rateLimitKey] = DateTime.now();
+    
+    // Send push notification via NotificationService
+    await _notificationService.sendNotification(
+      userId: targetUserId,
+      title: 'Location Request',
+      body: '${currentUser.displayName} is requesting your location',
+      data: {
+        'type': 'location_request',
+        'senderId': currentUser.uid,
+        'senderName': currentUser.displayName,
+        'action': 'open_location_screen',
+      },
+    );
+    
+    // Also create a notification document for tracking
     await _firestore.collection('notifications').add({
       'userId': targetUserId,
       'type': 'location_request',
@@ -132,5 +168,19 @@ class LocationService {
       'read': false,
       'status': 'pending', // pending, accepted, declined
     });
+  }
+  
+  /// Helper method to get target user's name (for error messages)
+  Future<String> _getTargetUserName(String userId) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final data = userDoc.data();
+        return data?['displayName'] as String? ?? 'this person';
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    return 'this person';
   }
 }

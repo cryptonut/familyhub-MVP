@@ -184,7 +184,9 @@ class _ChatWidgetState extends State<ChatWidget> {
                       Text(
                         app_date_utils.AppDateUtils.getRelativeTime(message.timestamp),
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          color: theme.brightness == Brightness.dark
+                              ? theme.colorScheme.onSurface.withValues(alpha: 0.7)
+                              : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                           fontSize: 15,
                         ),
                       ),
@@ -197,6 +199,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                     style: theme.textTheme.bodyLarge?.copyWith(
                       fontSize: 15,
                       height: 1.4,
+                      color: theme.colorScheme.onSurface, // Ensure text is visible in dark mode
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -250,7 +253,11 @@ class _ChatWidgetState extends State<ChatWidget> {
             Icon(
               isLiked ? Icons.favorite : Icons.favorite_border,
               size: 18.75,
-              color: isLiked ? Colors.red : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              color: isLiked 
+                  ? Colors.red 
+                  : theme.brightness == Brightness.dark
+                      ? theme.colorScheme.onSurface.withValues(alpha: 0.8)
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             if (likeCount > 0) ...[
               const SizedBox(width: 4),
@@ -258,7 +265,11 @@ class _ChatWidgetState extends State<ChatWidget> {
                 _formatCount(likeCount),
                 style: TextStyle(
                   fontSize: 13,
-                  color: isLiked ? Colors.red : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: isLiked 
+                      ? Colors.red 
+                      : theme.brightness == Brightness.dark
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.8)
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
             ],
@@ -284,12 +295,15 @@ class _ChatWidgetState extends State<ChatWidget> {
     }
 
     if (_messages.isEmpty) {
+      final theme = Theme.of(context);
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Text(
             widget.emptyStateMessage,
-            style: TextStyle(color: Colors.grey[600]),
+            style: TextStyle(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
             textAlign: TextAlign.center,
           ),
         ),
@@ -503,31 +517,11 @@ class _ChatWidgetState extends State<ChatWidget> {
     
     // If embedded with max height, make it collapsible
     if (isEmbedded) {
+      // Seamless design - no outer box, matches inner content style
       return Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey.shade700
-                : Theme.of(context).primaryColor.withOpacity(0.3),
-            width: 1.5,
-          ),
-          boxShadow: Theme.of(context).brightness == Brightness.dark
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+          // No border, no shadow - seamless integration
+          color: Colors.transparent,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -543,18 +537,13 @@ class _ChatWidgetState extends State<ChatWidget> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey.shade800.withOpacity(0.8)
-                      : Theme.of(context).primaryColor.withOpacity(0.1),
+                  // Seamless design - transparent background, subtle border
+                  color: Colors.transparent,
                   border: Border(
                     bottom: BorderSide(
-                      color: Theme.of(context).primaryColor.withOpacity(0.3),
-                      width: 1,
+                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+                      width: 0.5,
                     ),
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
                   ),
                 ),
                 child: Row(

@@ -1,17 +1,16 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import '../utils/app_theme.dart';
+import 'package:flutter/material.dart';
 
 /// Global error handler widget that catches and displays errors gracefully
 class ErrorHandler extends StatelessWidget {
-  final Widget child;
-  final bool showErrorDetails;
-
   const ErrorHandler({
     super.key,
     required this.child,
     this.showErrorDetails = kDebugMode,
   });
+
+  final Widget child;
+  final bool showErrorDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -21,16 +20,16 @@ class ErrorHandler extends StatelessWidget {
 
 /// Widget to display errors in a user-friendly way
 class ErrorDisplayWidget extends StatelessWidget {
-  final Object error;
-  final StackTrace? stackTrace;
-  final bool showDetails;
-
   const ErrorDisplayWidget({
     super.key,
     required this.error,
-    this.stackTrace,
     this.showDetails = false,
+    this.stackTrace,
   });
+
+  final Object error;
+  final bool showDetails;
+  final StackTrace? stackTrace;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +40,7 @@ class ErrorDisplayWidget extends StatelessWidget {
       body: SafeArea(
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -68,7 +67,7 @@ class ErrorDisplayWidget extends StatelessWidget {
                     title: const Text('Technical Details'),
                     children: [
                       Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.all(16),
                         child: SelectableText(
                           error.toString(),
                           style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),

@@ -4,6 +4,7 @@ enum HubType {
   extendedFamily,   // Extended family hub (premium)
   homeschooling,    // Homeschooling hub (premium)
   coparenting,      // Co-parenting hub (premium)
+  library,          // Library hub (free)
 }
 
 extension HubTypeExtension on HubType {
@@ -17,6 +18,8 @@ extension HubTypeExtension on HubType {
         return 'homeschooling';
       case HubType.coparenting:
         return 'coparenting';
+      case HubType.library:
+        return 'library';
     }
   }
 
@@ -30,6 +33,8 @@ extension HubTypeExtension on HubType {
         return HubType.homeschooling;
       case 'coparenting':
         return HubType.coparenting;
+      case 'library':
+        return HubType.library;
       default:
         return HubType.family;
     }
@@ -118,7 +123,7 @@ class Hub {
       );
   
   /// Check if this is a premium hub type
-  bool get isPremiumHub => hubType != HubType.family;
+  bool get isPremiumHub => hubType != HubType.family && hubType != HubType.library;
   
   /// Check if this is an extended family hub
   bool get isExtendedFamilyHub => hubType == HubType.extendedFamily;

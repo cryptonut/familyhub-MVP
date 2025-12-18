@@ -116,17 +116,18 @@ class _MessageReactionWidgetState extends State<MessageReactionWidget> {
   }
 
   Widget _buildAddReactionButton() {
-    return GestureDetector(
+    return InkWell(
       onTap: _showEmojiPicker,
+      borderRadius: BorderRadius.circular(AppTheme.radiusLG),
       child: Container(
-        padding: const EdgeInsets.all(AppTheme.spacingXS),
+        padding: const EdgeInsets.all(8), // Increased from spacingXS (4px) to 8px
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppTheme.radiusLG),
         ),
         child: Icon(
           Icons.add_reaction_outlined,
-          size: 16,
+          size: 24, // Increased from 16 to 24 for better touch target
           color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
         ),
       ),

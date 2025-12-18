@@ -148,6 +148,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
       await _transactionService.createTransaction(
         budgetId: widget.budgetId,
+        itemId: widget.budgetId, // Using budgetId as itemId - transactions must be linked to a budget item
         categoryId: _selectedCategory?.id,
         type: _selectedType,
         amount: amount,

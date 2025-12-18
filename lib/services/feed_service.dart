@@ -13,18 +13,26 @@ import 'auth_service.dart';
 import 'chat_service.dart';
 import 'message_reaction_service.dart';
 import 'url_preview_service.dart';
+import 'encrypted_chat_service.dart';
+import 'subscription_service.dart';
 
 /// Service for managing feed-style posts and interactions
 /// Extends ChatService functionality with feed-specific features
 class FeedService extends ChatService {
   final MessageReactionService _reactionService = MessageReactionService();
   final UrlPreviewService _urlPreviewService = UrlPreviewService();
+  final EncryptedChatService? _encryptedChatService;
+  final SubscriptionService _subscriptionService = SubscriptionService();
   final Uuid _uuid = const Uuid();
 
   // Re-declare parent private members for access (since they're private)
   final FirebaseFirestore _feedFirestore = FirebaseFirestore.instance;
   final FirebaseAuth _feedAuth = FirebaseAuth.instance;
   final AuthService _feedAuthService = AuthService();
+  
+  FeedService({EncryptedChatService? encryptedChatService})
+      : _encryptedChatService = encryptedChatService,
+        super(encryptedChatService: encryptedChatService);
 
   Future<String?> get _feedFamilyId async {
     final userModel = await _feedAuthService.getCurrentUserModel();
@@ -296,18 +304,54 @@ class FeedService extends ChatService {
           .orderBy('timestamp', descending: true)
           .limit(limit)
           .snapshots()
-          .map((snapshot) {
-        return snapshot.docs
-            .map((doc) {
+          .asyncMap((snapshot) async {
+        // Process messages and populate missing sender info
+        final messages = <ChatMessage>[];
+        for (var doc in snapshot.docs) {
+          try {
+            final data = doc.data() as Map<String, dynamic>;
+            var messageData = {'id': doc.id, ...data};
+            
+            // Populate senderPhotoUrl from user document if missing
+            final senderId = messageData['senderId'] as String?;
+            if (senderId != null && 
+                (messageData['senderPhotoUrl'] == null || 
+                 (messageData['senderPhotoUrl'] as String).isEmpty)) {
               try {
-                return ChatMessage.fromJson({'id': doc.id, ...doc.data()});
-              } on Exception catch (e) {
-                Logger.warning('Error parsing message ${doc.id}', error: e, tag: 'FeedService');
-                return null;
+                final userDoc = await _feedFirestore
+                    .collection(FirestorePathUtils.getUsersCollection())
+                    .doc(senderId)
+                    .get();
+                if (!userDoc.exists) {
+                  final unprefixedDoc = await _feedFirestore
+                      .collection('users')
+                      .doc(senderId)
+                      .get();
+                  if (unprefixedDoc.exists) {
+                    final userData = unprefixedDoc.data();
+                    final photoUrl = userData?['photoUrl'] as String?;
+                    if (photoUrl != null && photoUrl.isNotEmpty) {
+                      messageData['senderPhotoUrl'] = photoUrl;
+                    }
+                  }
+                } else {
+                  final userData = userDoc.data();
+                  final photoUrl = userData?['photoUrl'] as String?;
+                  if (photoUrl != null && photoUrl.isNotEmpty) {
+                    messageData['senderPhotoUrl'] = photoUrl;
+                  }
+                }
+              } catch (e) {
+                Logger.warning('Error fetching sender photo for ${doc.id}', error: e, tag: 'FeedService');
               }
-            })
-            .whereType<ChatMessage>()
-            .toList();
+            }
+            
+            messages.add(ChatMessage.fromJson(messageData));
+          } on Exception catch (e) {
+            Logger.warning('Error parsing message ${doc.id}', error: e, tag: 'FeedService');
+          }
+        }
+        return messages;
       });
     });
   }

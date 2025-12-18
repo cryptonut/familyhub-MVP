@@ -6,6 +6,7 @@ import '../screens/hubs/my_hubs_screen.dart';
 import '../screens/homeschooling/homeschooling_hub_screen.dart';
 import '../screens/extended_family/extended_family_hub_screen.dart';
 import '../screens/coparenting/coparenting_hub_screen.dart';
+import '../screens/library/library_hub_screen.dart';
 import '../screens/hubs/my_friends_hub_screen.dart';
 import '../screens/calendar/calendar_screen.dart';
 import '../screens/tasks/tasks_screen.dart';
@@ -106,6 +107,9 @@ class DeepLinkService {
           break;
         case HubType.coparenting:
           targetScreen = CoparentingHubScreen(hubId: hubId);
+          break;
+        case HubType.library:
+          targetScreen = LibraryHubScreen(hub: hub);
           break;
         case HubType.family:
         default:

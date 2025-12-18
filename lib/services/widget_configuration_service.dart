@@ -37,7 +37,7 @@ class WidgetConfigurationService {
       Logger.debug('Widget config saved: ${config.widgetId}', tag: 'WidgetConfigurationService');
     } catch (e, st) {
       Logger.error('Error saving widget config', error: e, stackTrace: st, tag: 'WidgetConfigurationService');
-      throw AppException('Failed to save widget configuration: $e');
+      throw Exception('Failed to save widget configuration: $e');
     }
   }
 
@@ -100,7 +100,7 @@ class WidgetConfigurationService {
       Logger.debug('Widget config deleted: $widgetId', tag: 'WidgetConfigurationService');
     } catch (e, st) {
       Logger.error('Error deleting widget config', error: e, stackTrace: st, tag: 'WidgetConfigurationService');
-      throw AppException('Failed to delete widget configuration: $e');
+      throw Exception('Failed to delete widget configuration: $e');
     }
   }
 

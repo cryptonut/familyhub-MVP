@@ -14,7 +14,6 @@ import '../services/app_state.dart';
 import '../services/calendar_sync_service.dart';
 import '../services/background_sync_service.dart';
 import '../services/deep_link_service.dart';
-import '../widgets/error_handler.dart';
 import '../models/user_model.dart';
 
 class AuthWrapper extends StatefulWidget {

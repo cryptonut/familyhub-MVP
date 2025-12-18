@@ -152,14 +152,20 @@ class _BudgetHomeScreenState extends State<BudgetHomeScreen> {
               : RefreshIndicator(
                   onRefresh: _loadBudgets,
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(AppTheme.spacingMD),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacingMD,
+                      vertical: AppTheme.spacingLG,
+                    ),
                     itemCount: _budgets.length,
                     itemBuilder: (context, index) {
                       final budget = _budgets[index];
                       return ModernCard(
-                        margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
+                        margin: const EdgeInsets.only(bottom: AppTheme.spacingLG),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.all(AppTheme.spacingMD),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppTheme.spacingMD,
+                            vertical: AppTheme.spacingMD,
+                          ),
                           title: Text(
                             budget.name,
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -176,32 +182,33 @@ class _BudgetHomeScreenState extends State<BudgetHomeScreen> {
                                     : '${budget.type.name.toUpperCase()} Budget',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
-                              const SizedBox(height: AppTheme.spacingXS),
-                              Row(
+                              const SizedBox(height: AppTheme.spacingSM),
+                              Wrap(
+                                spacing: AppTheme.spacingXS,
+                                runSpacing: AppTheme.spacingXS,
                                 children: [
                                   Chip(
                                     label: Text(
-                                      budget.period.toUpperCase(),
-                                      style: const TextStyle(fontSize: 10),
+                                      budget.period.toUpperCase().replaceAll('-', ' '),
+                                      style: const TextStyle(fontSize: 11),
                                     ),
-                                    padding: EdgeInsets.zero,
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
                                   ),
-                                  const SizedBox(width: AppTheme.spacingXS),
                                   if (budget.type == BudgetType.individual)
                                     Chip(
                                       label: const Text(
                                         'INDIVIDUAL',
-                                        style: TextStyle(fontSize: 10),
+                                        style: TextStyle(fontSize: 11),
                                       ),
-                                      padding: EdgeInsets.zero,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
                                     ),
                                   if (budget.type == BudgetType.project)
                                     Chip(
                                       label: const Text(
                                         'PROJECT',
-                                        style: TextStyle(fontSize: 10),
+                                        style: TextStyle(fontSize: 11),
                                       ),
-                                      padding: EdgeInsets.zero,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
                                     ),
                                 ],
                               ),

@@ -586,6 +586,59 @@ Specialized hub type designed to assist parents with homeschooling coordination,
 
 ---
 
+### Phase 3.5: Library Hub Enhancements (Future)
+**Status:** 🚧 Planned
+**Priority:** Medium - Accessibility and convenience feature
+
+#### Overview
+Enhancements to the Library Hub (Exploding Books feature) to improve accessibility and user experience, including text-to-speech functionality for listening to books.
+
+#### Key Features
+
+- [ ] **Text-to-Speech (TTS) for Books**
+  - **Status:** 🚧 Planned
+  - **Priority:** Medium - Accessibility and convenience feature
+  - **Objective:** Enable users to listen to books while reading, supporting accessibility and multi-tasking
+  
+  **Key Features:**
+  - [ ] **TTS Integration**
+    - Integrate `flutter_tts` package for cross-platform TTS
+    - Extract text from EPUB and PDF files
+    - Support for chapter-by-chapter reading
+    - Background playback support
+  
+  - [ ] **TTS Controls**
+    - Play/pause/resume functionality
+    - Speed control (0.5x - 2.0x)
+    - Voice selection (male/female, different accents)
+    - Volume control
+    - Skip forward/backward by chapter
+  
+  - [ ] **Progress Synchronization**
+    - Sync TTS position with page counter
+    - Resume from last read position
+    - Update reading progress as TTS plays
+  
+  - [ ] **User Experience**
+    - TTS button in book reader AppBar
+    - Floating TTS controls overlay
+    - Settings to save TTS preferences (speed, voice)
+    - Visual indicator when TTS is active
+  
+  **Technical Requirements:**
+  - Add `flutter_tts: ^3.8.5` to dependencies
+  - Add `epub_decoder: ^1.0.0` for EPUB text extraction
+  - Create `BookTTSService` for TTS management
+  - Integrate with existing `BookViewer` and `BookReaderScreen`
+  
+  **Estimated Effort:** 6-8 hours
+  - TTS Service: ~3 hours
+  - EPUB/PDF text extraction: ~2 hours
+  - UI integration: ~2 hours
+  - Testing: ~1 hour
+
+---
+
 ### Phase 4: Co-Parenting Hubs (Q4 2025)
 **Status:** ✅ **Complete** - 100%
 

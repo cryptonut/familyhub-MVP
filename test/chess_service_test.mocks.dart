@@ -1523,6 +1523,16 @@ class MockAuthService extends _i1.Mock implements _i12.AuthService {
       ) as _i5.Future<void>);
 
   @override
+  _i5.Future<_i13.UserModel?> findUserByEmail(String? email) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #findUserByEmail,
+          [email],
+        ),
+        returnValue: _i5.Future<_i13.UserModel?>.value(),
+      ) as _i5.Future<_i13.UserModel?>);
+
+  @override
   _i5.Future<String?> getFamilyIdByEmail(String? email) => (super.noSuchMethod(
         Invocation.method(
           #getFamilyIdByEmail,

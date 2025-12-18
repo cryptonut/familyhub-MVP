@@ -259,6 +259,22 @@ class _ChatScreenState extends State<ChatScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  String _formatExpirationTime(DateTime expiresAt) {
+    final now = DateTime.now();
+    if (expiresAt.isBefore(now)) return 'Expired';
+    
+    final remaining = expiresAt.difference(now);
+    if (remaining.inDays > 0) {
+      return '${remaining.inDays}d left';
+    } else if (remaining.inHours > 0) {
+      return '${remaining.inHours}h left';
+    } else if (remaining.inMinutes > 0) {
+      return '${remaining.inMinutes}m left';
+    } else {
+      return '${remaining.inSeconds}s left';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -390,14 +406,70 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (!isCurrentUser) ...[
-                  Text(
-                    message.senderName,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                    color: isCurrentUser
-                        ? Colors.white.withValues(alpha: 0.9)
-                        : theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        message.senderName,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                        color: isCurrentUser
+                            ? Colors.white.withValues(alpha: 0.9)
+                            : theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      // Encryption indicator
+                      if (message.isEncrypted) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.lock,
+                          size: 12,
+                          color: isCurrentUser
+                              ? Colors.white.withValues(alpha: 0.8)
+                              : theme.colorScheme.primary,
+                        ),
+                      ],
+                      // Expiration indicator
+                      if (message.expiresAt != null && message.expiresAt!.isAfter(DateTime.now())) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 12,
+                          color: isCurrentUser
+                              ? Colors.white.withValues(alpha: 0.8)
+                              : theme.colorScheme.secondary,
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: AppTheme.spacingXS),
+                ],
+                // Encryption/expiration indicators for current user messages
+                if (isCurrentUser && (message.isEncrypted || message.expiresAt != null)) ...[
+                  Row(
+                    children: [
+                      if (message.isEncrypted) ...[
+                        Icon(
+                          Icons.lock,
+                          size: 12,
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if (message.expiresAt != null && message.expiresAt!.isAfter(DateTime.now())) ...[
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 12,
+                          color: Colors.white.withValues(alpha: 0.8),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatExpirationTime(message.expiresAt!),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: AppTheme.spacingXS),
                 ],

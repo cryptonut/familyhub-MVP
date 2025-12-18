@@ -69,19 +69,19 @@ class Achievement {
   };
 
   factory Achievement.fromJson(Map<String, dynamic> json) => Achievement(
-    id: json['id'],
-    title: json['title'],
-    description: json['description'],
-    icon: json['icon'],
+    id: json['id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String,
+    icon: json['icon'] as String,
     type: AchievementType.values.firstWhere(
-      (e) => e.toString() == json['type']
+      (e) => e.toString() == json['type'] as String
     ),
-    points: json['points'],
-    criteria: json['criteria'],
-    isSecret: json['isSecret'] ?? false,
-    unlockedAt: json['unlockedAt'] != null ? DateTime.parse(json['unlockedAt']) : null,
-    progress: json['progress'] ?? 0,
-    target: json['target'] ?? 1,
+    points: json['points'] as int,
+    criteria: json['criteria'] as Map<String, dynamic>,
+    isSecret: (json['isSecret'] as bool?) ?? false,
+    unlockedAt: json['unlockedAt'] != null ? DateTime.parse(json['unlockedAt'] as String) : null,
+    progress: (json['progress'] as int?) ?? 0,
+    target: (json['target'] as int?) ?? 1,
   );
 }
 
@@ -265,8 +265,8 @@ class AchievementService {
           .doc('progress')
           .get();
 
-      final progressData = progressDoc.data() ?? {};
-      final unlockedIds = List<String>.from(progressData['unlockedAchievements'] ?? []);
+      final progressData = progressDoc.data() ?? <String, dynamic>{};
+      final unlockedIds = List<String>.from((progressData['unlockedAchievements'] as List<dynamic>?) ?? []);
 
       // Build achievements with progress
       final achievements = <Achievement>[];
@@ -288,7 +288,7 @@ class AchievementService {
           criteria: achievement.criteria,
           isSecret: achievement.isSecret,
           unlockedAt: isUnlocked ? DateTime.now() : null, // Simplified
-          progress: progress,
+          progress: (progress as int?) ?? 0,
           target: achievement.target,
         );
 
@@ -438,7 +438,7 @@ class AchievementService {
           .collection('achievements')
           .doc('progress');
 
-      batch.set({
+      batch.set(progressRef, {
         'unlockedAchievements': FieldValue.arrayUnion([achievement.id]),
         'unlockedAt_${achievement.id}': DateTime.now().toIso8601String(),
       }, SetOptions(merge: true));
@@ -450,7 +450,7 @@ class AchievementService {
           .collection('achievements')
           .doc(achievement.id);
 
-      batch.set({
+      batch.set(unlockedRef, {
         'achievementId': achievement.id,
         'unlockedAt': DateTime.now().toIso8601String(),
         'points': achievement.points,
@@ -469,11 +469,11 @@ class AchievementService {
     try {
       // This would query all family members and their achievements
       // Simplified implementation
-      final familyMembers = await _authService.getFamilyMembers(familyId);
+      final familyMembers = await _authService.getFamilyMembers();
       final leaderboard = <UserAchievements>[];
 
       for (final member in familyMembers) {
-        final achievements = await getUserAchievements(member.id);
+        final achievements = await getUserAchievements(member.uid);
         leaderboard.add(achievements);
       }
 
