@@ -1,48 +1,64 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow all authenticated users (basic security for now)
-    // This ensures all photo uploads work immediately
     
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is a member of the family by checking the members subcollection in Firestore
+    function isFamilyMember(familyId) {
+      return isAuthenticated() && 
+             firestore.exists(/databases/(default)/documents/families/$(familyId)/members/$(request.auth.uid));
+    }
+
     // Regular photos (photo albums)
     match /photos/{familyId}/{photoId} {
-      allow read, write, delete: if request.auth != null;
+      allow read: if isFamilyMember(familyId);
+      allow write: if isFamilyMember(familyId); 
+      allow delete: if isFamilyMember(familyId);
     }
     
     // Thumbnails
     match /thumbnails/{familyId}/{photoId} {
-      allow read, write, delete: if request.auth != null;
+      allow read: if isFamilyMember(familyId);
+      allow write: if isFamilyMember(familyId);
+      allow delete: if isFamilyMember(familyId);
     }
     
     // Voice messages
     match /families/{familyId}/voice_messages/{fileName} {
-      allow read, write, delete: if request.auth != null;
+      allow read: if isFamilyMember(familyId);
+      allow write: if isFamilyMember(familyId);
+      allow delete: if isFamilyMember(familyId);
     }
     
     // Shopping receipts
     match /families/{familyId}/receipts/{receiptId} {
-      allow read, write, delete: if request.auth != null;
+      allow read: if isFamilyMember(familyId);
+      allow write: if isFamilyMember(familyId);
+      allow delete: if isFamilyMember(familyId);
     }
     
     // Event photos
     match /eventPhotos/{familyId}/{eventId}/{photoId} {
-      allow read, write, delete: if request.auth != null;
+      allow read: if isFamilyMember(familyId);
+      allow write: if isFamilyMember(familyId);
+      allow delete: if isFamilyMember(familyId);
     }
     
-    // Profile photos - NEW PATH (fixes avatar upload unauthorized error)
-    // Path: profile_photos/{userId}/{photoId}.jpg
+    // Profile photos - Public read for authenticated users to see each other
     match /profile_photos/{userId}/{photoId} {
-      // Allow read for all authenticated users (profiles are visible to family)
-      allow read: if request.auth != null;
-      
-      // Allow write/delete only for the user's own profile photo
-      allow write, delete: if request.auth != null && request.auth.uid == userId;
+      allow read: if isAuthenticated();
+      allow write, delete: if isAuthenticated() && request.auth.uid == userId;
     }
     
     // Budget receipts
     match /budget_receipts/{familyId}/{budgetId}/{receiptId} {
-      allow read, write, delete: if request.auth != null;
+      allow read: if isFamilyMember(familyId);
+      allow write: if isFamilyMember(familyId);
+      allow delete: if isFamilyMember(familyId);
     }
   }
 }
-
