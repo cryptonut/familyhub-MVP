@@ -601,7 +601,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                               if (_selectedCalendar!.accountName != null && _selectedCalendar!.accountName!.isNotEmpty)
                                 Text(
                                   _selectedCalendar!.accountName!,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                                 ),
                               if (lastSynced != null) ...[
                                 const SizedBox(height: 4),

@@ -109,7 +109,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
                 dateFormat.format(task.dueDate!),
                 task.dueDate!.isBefore(DateTime.now()) && !task.isCompleted
                     ? Colors.red
-                    : Colors.grey[700]!,
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             
             // Created Date
@@ -311,7 +311,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ),
