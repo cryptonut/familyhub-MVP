@@ -238,7 +238,7 @@ class _MigrationScreenState extends State<MigrationScreen> {
                     ? const Center(
                         child: Text(
                           'No logs yet. Click "Run Migration" to start.',
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         ),
                       )
                     : ListView.builder(

@@ -354,7 +354,7 @@ class _MergeUsersScreenState extends State<MergeUsersScreen> {
       appBar: AppBar(
         title: const Text('Merge Users'),
         backgroundColor: Colors.orange.shade700,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

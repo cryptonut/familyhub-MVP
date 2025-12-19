@@ -307,7 +307,7 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
       appBar: AppBar(
         title: const Text('Database Reset'),
         backgroundColor: Colors.red.shade700,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -378,7 +378,7 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
               label: Text(_isResetting ? 'Resetting Database...' : 'Reset Database'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 minimumSize: const Size(double.infinity, 50),
                 disabledBackgroundColor: Colors.grey,
               ),
@@ -396,7 +396,7 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                   ),
                   child: ListView.builder(
                     itemCount: _logs.length,

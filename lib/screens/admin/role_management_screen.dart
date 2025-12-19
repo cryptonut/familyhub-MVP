@@ -271,7 +271,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
                     'Only Admins can edit',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       fontStyle: FontStyle.italic,
                     ),
                   ),

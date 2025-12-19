@@ -179,7 +179,7 @@ class _DeleteUserScreenState extends State<DeleteUserScreen> {
       appBar: AppBar(
         title: const Text('Delete User'),
         backgroundColor: Colors.red.shade700,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
