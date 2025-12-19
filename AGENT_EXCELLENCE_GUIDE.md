@@ -1,9 +1,9 @@
 # Agent Excellence Guide 🚀
 ## How to Be the Agent That Gets It Done
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Created:** January 2025  
-**Last Updated:** December 2025  
+**Last Updated:** December 19, 2025  
 **For:** Future AI Coding Agents Working on Family Hub MVP  
 **Purpose:** Share the mindset, workflow, and strategies that enable exceptional performance
 
@@ -19,6 +19,26 @@
 5. **NEVER REMOVE FUNCTIONALITY** - See critical rule below
 
 **If you skip reading this guide or ignore its principles, you WILL waste human time and create frustration. This is unacceptable.**
+
+---
+
+## 🚨 MANDATORY PRE-ACTION CHECKLIST {#mandatory-pre-action-checklist}
+
+**YOU MUST COMPLETE AND REPORT THIS BEFORE TAKING ANY ACTION:**
+
+**This checklist is NON-NEGOTIABLE. You MUST report completion before proceeding.**
+
+- [ ] I have re-read the Agent Excellence Guide (full read, not skim)
+- [ ] I understand the task and have searched the codebase for context
+- [ ] I know which branch I'm working in (develop for dev work, release/qa only for distribution)
+- [ ] I have a plan that preserves all existing functionality
+- [ ] I will monitor all builds/app runs with visible output
+- [ ] I will verify success before reporting to the user
+- [ ] I will NOT remove functionality without explicit agreement
+
+**REPORT COMPLETION: "Pre-action checklist complete. Starting [task]."**
+
+**IF YOU SKIP THIS CHECKLIST, YOU HAVE FAILED. DO NOT PROCEED WITHOUT REPORTING COMPLETION.**
 
 ---
 
@@ -92,6 +112,26 @@
 
 See `FUNCTIONALITY_REMOVAL_INCIDENT_REPORT.md` for full details.
 
+### 🚨 FUNCTIONALITY REMOVAL CHECKPOINT
+
+**BEFORE ANY CHANGE THAT REMOVES/CHANGES USER-FACING FEATURES:**
+
+**STOP. DO NOT PROCEED. REPORT:**
+
+"I am about to change [feature]. This will [impact]. 
+User agreement required: [Yes/No - if No, STOP]"
+
+**ONLY PROCEED IF USER EXPLICITLY AGREES.**
+
+**Examples of changes that require this checkpoint:**
+- Changing a screen from one view type to another (feed → chat, list → grid)
+- Removing a button or navigation option
+- Changing how data is displayed (removing a view mode)
+- Consolidating features that users currently use separately
+- Any change that removes user-visible functionality
+
+**If you're unsure if a change requires this checkpoint, ASK THE USER FIRST.**
+
 ### Remember
 
 **User-facing functionality is sacred.**
@@ -113,16 +153,20 @@ See `FUNCTIONALITY_REMOVAL_INCIDENT_REPORT.md` for full details.
 
 ## Table of Contents
 
-1. [The Foundation: Mindset & Attitude](#the-foundation)
-2. [Workflow Patterns](#workflow-patterns)
-3. [Problem-Solving Strategies](#problem-solving)
-4. [Code Quality & Standards](#code-quality)
-5. [Communication & Collaboration](#communication)
-6. [Task Ownership & Proactivity](#task-ownership)
-7. [Technical Excellence](#technical-excellence)
-8. [Common Pitfalls & Solutions](#common-pitfalls)
-9. [Debugging & Troubleshooting](#debugging)
-10. [Git Workflow Best Practices](#git-workflow)
+1. [🚨 MANDATORY PRE-ACTION CHECKLIST](#mandatory-pre-action-checklist)
+2. [🔴 CRITICAL RULE: NEVER REMOVE FUNCTIONALITY](#critical-rule-never-remove-functionality-without-explicit-agreement)
+3. [The Foundation: Mindset & Attitude](#the-foundation)
+4. [Workflow Patterns](#workflow-patterns)
+5. [Problem-Solving Strategies](#problem-solving)
+6. [Code Quality & Standards](#code-quality)
+7. [Communication & Collaboration](#communication)
+8. [Task Ownership & Proactivity](#task-ownership)
+9. [Technical Excellence](#technical-excellence)
+10. [Common Pitfalls & Solutions](#common-pitfalls)
+11. [Debugging & Troubleshooting](#debugging)
+12. [🚨 Running Apps: MANDATORY Monitoring](#running-apps-mandatory-monitoring)
+13. [Git Workflow Best Practices](#git-workflow)
+14. [🚨 MANDATORY POST-ACTION VERIFICATION](#mandatory-post-action-verification)
 
 ---
 
@@ -897,20 +941,53 @@ flutter pub outdated
 
 **CRITICAL: When running Flutter apps, you MUST monitor the output:**
 
+## 🚨 MANDATORY APP RUN SEQUENCE
+
+**YOU CANNOT SKIP THESE STEPS. YOU MUST REPORT COMPLETION OF EACH STEP:**
+
+**Step 1: Get Device ID**
 ```powershell
-# ✅ CORRECT: Run and monitor output (use visible terminal or log file)
+adb devices
+```
+**REPORT:** "Device ID: [DEVICE_ID]"
+
+**Step 2: Clear Logs**
+```powershell
+adb -s DEVICE_ID logcat -c
+```
+**REPORT:** "Logs cleared"
+
+**Step 3: Start Log Monitoring (in separate terminal or background)**
+```powershell
+adb -s DEVICE_ID logcat Flutter:I *:S
+```
+**REPORT:** "Log monitoring started"
+
+**Step 4: Run App**
+```powershell
 flutter run --flavor qa -t lib/main.dart -d DEVICE_ID
+```
+**REPORT:** "App build started. Monitoring output..."
 
-# ❌ WRONG: Running in background without monitoring
-# flutter run --flavor qa -t lib/main.dart  # is_background: true without checking output
+**Step 5: WAIT AND WATCH**
+- **DO NOT** proceed until you see "BUILD SUCCEEDED" or similar success message
+- **DO NOT** proceed until you see the app launch on the device
+- **DO NOT** proceed if you see any errors
+- **WATCH** the output until completion
 
+**Step 6: VERIFICATION REPORT**
+**REPORT:** "App running on [DEVICE_ID]. Build succeeded at [time]. No errors in logs. App launched successfully."
+
+**IF YOU SKIP ANY STEP, YOU HAVE FAILED. DO NOT CLAIM SUCCESS WITHOUT COMPLETING ALL STEPS.**
+
+---
+
+**Alternative: If you need background execution, you MUST still monitor:**
+
+```powershell
 # ✅ CORRECT: If you need background, monitor via logs
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; flutter run --flavor qa -t lib/main.dart -d DEVICE_ID"
 # Then monitor: adb logcat or check the PowerShell window
-
-# ✅ CORRECT: Check build status before claiming success
-flutter devices  # Verify device is connected
-flutter analyze  # Check for errors before running
 ```
 
 **VERIFICATION CHECKLIST when running apps:**
@@ -928,13 +1005,15 @@ flutter analyze  # Check for errors before running
 - Skip monitoring build output
 - Assume a command worked just because it didn't error immediately
 - Say "the app should build now" - verify it actually did
+- Skip any step in the mandatory sequence above
 
 **MANDATORY WORKFLOW:**
-1. Run the build command
+1. Complete all 6 steps in the mandatory sequence above
 2. **Monitor the output** until you see success or failure
 3. **Fix any errors** that appear
 4. **Verify success** by seeing "BUILD SUCCEEDED" or app launching
-5. **Only then** report success to the user
+5. **Report completion** with the verification report format
+6. **Only then** report success to the user
 
 ---
 
@@ -988,17 +1067,51 @@ Longer description if needed explaining:
 ```
 🚨 CRITICAL: All development work MUST be done in the develop branch
 
+## 🚨 MANDATORY BRANCH CHECK
+
+**BEFORE ANY COMMIT OR CODE CHANGE:**
+
+**Step 1: Check Current Branch**
+```powershell
+git branch --show-current
+```
+
+**Step 2: REPORT Branch Status**
+**REPORT:** "Current branch: [branch]. [If release/qa, explain why dev work is in release/qa]"
+
+**Step 3: Branch Validation**
+- ✅ If branch is `develop`: Proceed with work
+- ✅ If branch is `feature/*`: Proceed with work (will merge to develop)
+- ❌ If branch is `release/qa` and you're doing dev work: **STOP. Switch to develop first.**
+- ❌ If branch is `main/master`: **STOP. Never commit directly to main/master.**
+
+**Step 4: If Wrong Branch, Switch**
+```powershell
+# If working in release/qa for dev work:
+git checkout develop
+# Or create feature branch:
+git checkout -b feature/description
+```
+
+**REPORT:** "Switched to [branch]. Ready to proceed."
+
+**IF YOU SKIP THIS CHECK, YOU HAVE FAILED. DO NOT COMMIT TO WRONG BRANCH.**
+
+---
+
 ✅ CORRECT Workflow:
-1. Switch to develop branch: git checkout develop
-2. Create feature branch if needed: git checkout -b feature/description
-3. Make changes and commit to develop (or feature branch, then merge to develop)
-4. Test thoroughly in develop
-5. Merge develop to release/qa: git checkout release/qa && git merge develop
-6. Build and distribute from release/qa
+1. **Complete Mandatory Branch Check** (above)
+2. Switch to develop branch: git checkout develop
+3. Create feature branch if needed: git checkout -b feature/description
+4. Make changes and commit to develop (or feature branch, then merge to develop)
+5. Test thoroughly in develop
+6. Merge develop to release/qa: git checkout release/qa && git merge develop
+7. Build and distribute from release/qa
 
 ❌ WRONG: Working directly in release/qa branch
 ❌ WRONG: Committing directly to main/master
 ❌ WRONG: Merging release/qa to develop (develop is the source of truth)
+❌ WRONG: Skipping the mandatory branch check
 
 ✅ Branch Purposes:
 - develop: All ongoing development work
@@ -1091,11 +1204,76 @@ git commit -m "Descriptive message"
 
 ---
 
+## 🚨 MANDATORY POST-ACTION VERIFICATION {#mandatory-post-action-verification}
+
+**AFTER EVERY ACTION, YOU MUST COMPLETE AND REPORT THIS VERIFICATION:**
+
+**This verification is NON-NEGOTIABLE. You MUST report completion before claiming success.**
+
+**REPORT FORMAT:**
+```
+POST-ACTION VERIFICATION REPORT:
+
+- [ ] What I did: [description]
+- [ ] Branch used: [branch] (verified with mandatory branch check)
+- [ ] Functionality preserved: [Yes/No - if No, explain why with user agreement]
+- [ ] Build verified: [Yes/No - if Yes, show evidence: "BUILD SUCCEEDED at [time]"]
+- [ ] Logs monitored: [Yes/No - if Yes, show evidence: "Logs checked, no errors"]
+- [ ] App launched: [Yes/No - if Yes, show evidence: "App running on [DEVICE_ID]"]
+- [ ] Ready for user: [Yes/No]
+
+IF ANY BOX IS NO, FIX IT BEFORE REPORTING.
+```
+
+**Examples:**
+
+✅ **GOOD Verification Report:**
+```
+POST-ACTION VERIFICATION REPORT:
+
+- [x] What I did: Fixed dark mode text color in ChatWidget header
+- [x] Branch used: develop (verified with mandatory branch check)
+- [x] Functionality preserved: Yes - no functionality removed
+- [x] Build verified: Yes - BUILD SUCCEEDED at 14:32:15
+- [x] Logs monitored: Yes - Logs checked, no errors
+- [x] App launched: Yes - App running on RFCT61EGZEH
+- [x] Ready for user: Yes
+```
+
+❌ **BAD Verification Report:**
+```
+POST-ACTION VERIFICATION REPORT:
+
+- [x] What I did: Fixed dark mode text color
+- [ ] Branch used: (missing)
+- [ ] Functionality preserved: (missing)
+- [ ] Build verified: (missing)
+- [ ] Logs monitored: (missing)
+- [ ] App launched: (missing)
+- [ ] Ready for user: (missing)
+```
+
+**CRITICAL RULES:**
+- **NEVER** claim "ready for user" if any box is unchecked
+- **NEVER** skip this verification report
+- **NEVER** report success without evidence
+- **ALWAYS** provide specific evidence (times, device IDs, error messages)
+- **ALWAYS** complete this report before telling the user you're done
+
+**IF YOU SKIP THIS VERIFICATION, YOU HAVE FAILED. DO NOT REPORT SUCCESS WITHOUT COMPLETING THIS REPORT.**
+
+---
+
 ## Final Thoughts
 
 ### 🌟 The Agent's Creed
 
 **I am an Agent of Excellence. I:**
+- **Complete the MANDATORY PRE-ACTION CHECKLIST before every task**
+- **Complete the MANDATORY BRANCH CHECK before every commit**
+- **Complete the MANDATORY APP RUN SEQUENCE when running apps**
+- **Complete the FUNCTIONALITY REMOVAL CHECKPOINT before changing features**
+- **Complete the MANDATORY POST-ACTION VERIFICATION after every action**
 - **Re-read this guide before starting any task**
 - Take ownership of outcomes, not just tasks
 - Solve problems, not just execute instructions
@@ -1109,6 +1287,7 @@ git commit -m "Descriptive message"
 - **Never claim something works without seeing it work myself**
 - **Always monitor build/app output - never assume success**
 - **Check for errors before claiming success - every single time**
+- **Report completion of all mandatory checklists - never skip them**
 
 ### 🎯 Success Indicators
 
@@ -1134,11 +1313,13 @@ git commit -m "Descriptive message"
 ## Quick Reference Checklist
 
 ### Before Starting Work
+- [ ] **COMPLETE MANDATORY PRE-ACTION CHECKLIST** - Report completion before proceeding
 - [ ] **RE-READ THIS GUIDE** - Especially sections relevant to your task
 - [ ] Understand the request fully
 - [ ] Check current codebase state
 - [ ] Read related documentation
 - [ ] Verify workspace location
+- [ ] **COMPLETE MANDATORY BRANCH CHECK** - Report branch status before any commits
 - [ ] Check git status
 - [ ] **Understand: Verification is mandatory, not optional**
 
@@ -1152,11 +1333,14 @@ git commit -m "Descriptive message"
 - [ ] Update todos as you go
 
 ### Before Finishing
+- [ ] **COMPLETE MANDATORY POST-ACTION VERIFICATION REPORT** - Report all items before claiming success
 - [ ] Verify it compiles (check lints AND actually build it)
+- [ ] **If running an app: Follow MANDATORY APP RUN SEQUENCE** - Complete all 6 steps
 - [ ] **If running an app: Monitor the build output and see it succeed**
 - [ ] **If running an app: Verify it actually launches on the device**
 - [ ] **If running an app: Check for runtime errors in logs**
 - [ ] **NEVER claim "app is running" unless you've seen it launch successfully**
+- [ ] **If changing functionality: Complete FUNCTIONALITY REMOVAL CHECKPOINT** - Get user agreement
 - [ ] Verify it works (mentally walk through the code)
 - [ ] **Compare structure with similar working code - ensure it matches**
 - [ ] **For UI screens: Verify structure matches working screens (no unnecessary wrappers)**
@@ -1172,6 +1356,7 @@ git commit -m "Descriptive message"
 - [ ] For UI fixes: Verify overflow/constraints are properly handled
 - [ ] Remove any placeholder code or TODOs that block functionality
 - [ ] Update documentation
+- [ ] **Complete MANDATORY BRANCH CHECK before committing**
 - [ ] Commit logical units
 - [ ] Update progress tracker
 - [ ] **When running apps: Use visible output, not background processes**
