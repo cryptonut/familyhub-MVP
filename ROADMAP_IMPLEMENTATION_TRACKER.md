@@ -14,6 +14,7 @@
 | **Phase 4: Co-Parenting** | ✅ Complete | ~95% | Medium |
 | **Phase 5: Feed Redesign** | 🚧 In Progress | ~50% | **HIGH** |
 | **Phase 6: Budgeting** | ✅ Core Complete | ~85% | Low (polish) |
+| **Phase 7: Pets Hub** | 🚧 Design Phase | ~5% | Medium |
 
 ---
 

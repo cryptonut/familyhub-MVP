@@ -1709,6 +1709,208 @@ lib/screens/budget/
 
 ---
 
+### Phase 7: Pets Hub (Q3-Q4 2026)
+**Status:** 🚧 Design Phase  
+**Priority:** High - Family pet management is a common need
+
+#### Overview
+Comprehensive pet management hub allowing families to track and manage their pets' information, health records, medications, and care schedules. Follows freemium model with basic pet profiles free and advanced health/document management as premium features.
+
+#### Key Features
+
+**7.1 Free Tier Features**
+- [ ] **Pet Profiles**
+  - Pet name, species/breed (Dog, Cat, Bird, Fish, Rabbit, Horse, Reptile, Insect, Other)
+  - Date of birth or adoption date
+  - Multiple photos per pet with primary photo selection
+  - Basic info: gender, color, current weight, size
+  - Pet bio/notes
+  - Microchip number (optional)
+  - Emergency contact info (optional)
+  - Basic vet contact info (optional)
+
+- [ ] **Multi-Pet Management**
+  - Add up to 3 pets per hub (free tier limit)
+  - Premium: Unlimited pets
+  - View all pets in hub (grid/list view)
+  - Quick access to each pet's profile
+  - Pet count and quick stats
+
+- [ ] **Photo Gallery**
+  - Upload multiple photos per pet
+  - Auto-create photo album per pet (accessible via Photos screen)
+  - Each pet has separate album
+  - View pet photo gallery
+  - Set primary photo
+
+- [ ] **Family Sharing**
+  - All hub members can view pets
+  - Only Parent/Admin roles can add/edit pets
+  - View-only access for regular members
+
+**7.2 Premium Tier Features**
+- [ ] **Medication Management**
+  - Add medication schedules with dosage and frequency
+  - Set custom reminder times (e.g., 8:00 AM, 8:00 PM)
+  - Track medication history
+  - Medication notes and instructions
+  - Mark medications as given
+  - Push notifications for medication reminders
+
+- [ ] **Document Storage**
+  - Upload vet records (PDF, images)
+  - Upload vaccination certificates
+  - Upload insurance documents
+  - Upload microchip registration
+  - Upload adoption papers
+  - Upload other documents (catch-all category)
+  - Organize documents by category
+  - View/download documents
+  - Document date tracking (e.g., vaccination date)
+
+- [ ] **Advanced Health Tracking**
+  - Vaccination schedule with due date reminders
+  - Vet appointment tracking and calendar integration (mandatory sync)
+  - Health event timeline (vaccinations, vet visits, illnesses, surgeries)
+  - Medication history log
+  - Weight tracking over time with charts (premium feature)
+  - Allergy tracking
+  - Chronic condition management
+  - Activity tracking: feeding schedules, walks, exercise, grooming
+
+- [ ] **Reminders & Notifications**
+  - Medication reminders (configurable times)
+  - Vaccination due date reminders (X days before)
+  - Vet appointment reminders (calendar integration)
+  - Grooming appointment reminders
+  - Pet birthday reminders
+  - Activity reminders (feeding, walks, exercise)
+  - Custom reminders (flea treatment, heartworm prevention, etc.)
+  - Push notification integration
+
+- [ ] **Vet Contact Management**
+  - Store multiple vet contacts per pet
+  - Emergency vet contacts with "Emergency" flag
+  - Vet appointment history
+  - Quick call/email vet from app
+  - Vet clinic information (name, address, phone, email)
+
+**7.3 Technical Requirements**
+- [ ] **Data Models**
+  - `Pet` model with all pet information
+  - `MedicationSchedule` model for medication tracking
+  - `PetDocument` model for document storage
+  - `HealthEvent` model for health timeline
+  - `VetContact` model for vet information
+  - `WeightEntry` model for weight tracking
+
+- [ ] **Services**
+  - `PetService` for pet CRUD operations
+  - `PetMedicationService` for medication management
+  - `PetDocumentService` for document storage
+  - `PetHealthService` for health tracking
+  - `PetReminderService` for notifications
+
+- [ ] **Firestore Collections**
+  - `hubs/{hubId}/pets/{petId}` - Pet profiles
+  - `hubs/{hubId}/pets/{petId}/medications/{medicationId}` - Medication schedules
+  - `hubs/{hubId}/pets/{petId}/documents/{documentId}` - Document metadata
+  - `hubs/{hubId}/pets/{petId}/healthEvents/{eventId}` - Health timeline
+  - `hubs/{hubId}/pets/{petId}/vetContacts/{contactId}` - Vet contacts
+  - `hubs/{hubId}/pets/{petId}/weightHistory/{entryId}` - Weight tracking
+
+- [ ] **Storage**
+  - Firebase Storage: `hubs/{hubId}/pets/{petId}/photos/{photoId}`
+  - Firebase Storage: `hubs/{hubId}/pets/{petId}/documents/{documentId}`
+  - File size limits: 10MB per document, 5MB per photo
+
+- [ ] **Hub Integration**
+  - Add `HubType.pets` to hub type enum
+  - Update `HubTypeRegistry` with pets hub configuration
+  - Add pets hub to hub creation flow
+  - Premium feature gating for advanced features
+
+**7.4 UI/UX Design**
+- [ ] **Main Pets Hub Screen**
+  - Pet grid/list view with photos
+  - Add Pet button (prominent)
+  - Quick stats: upcoming medications, vet appointments, overdue vaccinations
+  - Search/filter pets
+
+- [ ] **Pet Detail Screen**
+  - Tabbed interface:
+    - Overview (Free): Basic info, photos, bio
+    - Health (Premium): Medications, vaccinations, health timeline, weight chart
+    - Documents (Premium): Document categories, upload, view
+    - Vets (Premium): Vet contacts, quick actions
+    - Photos (Free): Photo gallery, upload
+
+- [ ] **Add/Edit Pet Screen**
+  - Basic info section (Free)
+  - Premium sections gated with upgrade prompts
+  - Photo upload
+  - Form validation
+
+- [ ] **Medication Management UI**
+  - Medication list with active schedules
+  - Add/edit medication form
+  - Reminder time picker
+  - Medication history view
+  - "Mark as given" functionality
+
+- [ ] **Document Management UI**
+  - Document categories (vet records, vaccinations, insurance, etc.)
+  - Upload document button
+  - Document list with preview
+  - View/download documents
+  - Document date tracking
+
+**7.5 Integration Points**
+- [ ] **Calendar Integration**
+  - Vet appointments sync to main calendar
+  - Medication reminders can create calendar events (optional)
+  - Vaccination due dates as calendar events
+
+- [ ] **Notifications**
+  - Push notifications for medication reminders
+  - Push notifications for upcoming vet appointments
+  - Push notifications for vaccination due dates
+  - In-app notification badges
+
+**7.6 Monetization**
+- [ ] **Pricing Strategy**
+  - Free tier: Basic pet profiles, photos, basic info
+  - Premium tier: Medication management, document storage, advanced health tracking, reminders
+  - Premium features require active subscription
+
+- [ ] **IAP Integration**
+  - Premium subscription unlocks all pets hub premium features
+  - Feature gating using `PremiumFeatureGate` widget
+  - Upgrade prompts with clear value proposition
+
+**Success Metrics:**
+- 60%+ of families with pets create a Pets Hub
+- Average 2+ pets per hub
+- 40%+ of pets hub users upgrade to premium
+- 80%+ medication reminder compliance (medications marked as given)
+- 70%+ document upload rate for premium users
+- User satisfaction: 4.5+ stars for Pets Hub
+
+**Estimated Timeline:**
+- **Q3 2026**: Foundation (Phase 7.1 - Free tier features)
+- **Q4 2026**: Premium features (Phase 7.2 - Medication, documents, health tracking)
+- **Q1 2027**: Reminders and polish (Phase 7.5 - Notifications, calendar integration)
+
+**Dependencies:**
+- Requires subscription service infrastructure (Phase 1)
+- Requires Firebase Storage for photos and documents
+- Premium features require IAP integration
+- Calendar integration requires existing calendar service
+
+**Reference:** `PETS_HUB_DESIGN.md` - Comprehensive design document
+
+---
+
 **Document Owner**: Product & Engineering Teams  
 **Last Reviewed**: December 12, 2025  
 **Next Review**: January 2026  
