@@ -380,7 +380,7 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
                 backgroundColor: Colors.red,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 minimumSize: const Size(double.infinity, 50),
-                disabledBackgroundColor: Colors.grey,
+                disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(height: 24),
