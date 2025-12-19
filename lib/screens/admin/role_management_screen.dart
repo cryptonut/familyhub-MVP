@@ -180,7 +180,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
             description,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[700],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           ),
         ),
@@ -204,7 +204,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
                   backgroundColor: Theme.of(context).primaryColor,
                   child: Text(
                     member.displayName[0].toUpperCase(),
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -245,7 +245,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
                         member.email,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
@@ -265,7 +265,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
                 ),
                 if (!(_currentUser?.isAdmin() ?? false)) ...[
                   const SizedBox(width: 8),
-                  Icon(Icons.lock, size: 14, color: Colors.grey[600]),
+                  Icon(Icons.lock, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                   const SizedBox(width: 4),
                   Text(
                     'Only Admins can edit',
@@ -315,7 +315,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
       selectedColor: _getRoleColor(role).withOpacity(0.2),
       checkmarkColor: _getRoleColor(role),
       labelStyle: TextStyle(
-        color: hasRole ? _getRoleColor(role) : Colors.grey[700],
+        color: hasRole ? _getRoleColor(role) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
         fontWeight: hasRole ? FontWeight.bold : FontWeight.normal,
       ),
       tooltip: !isCurrentUserAdmin 
@@ -379,7 +379,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
       case 'tester':
         return Colors.teal;
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
     }
   }
 }

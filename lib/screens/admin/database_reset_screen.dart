@@ -109,8 +109,8 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: Colors.grey,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                   child: const Text('Delete Forever'),
                 ),
@@ -370,7 +370,7 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         strokeWidth: 2,
                       ),
                     )
@@ -394,7 +394,7 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.grey.shade300),
                   ),

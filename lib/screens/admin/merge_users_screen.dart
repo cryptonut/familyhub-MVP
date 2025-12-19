@@ -214,7 +214,7 @@ class _MergeUsersScreenState extends State<MergeUsersScreen> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: const Text('Merge Users'),
           ),
@@ -474,7 +474,7 @@ class _MergeUsersScreenState extends State<MergeUsersScreen> {
                         const SizedBox(height: 8),
                         const Text(
                           'Choose which user\'s value to use for each field:',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         ),
                         const SizedBox(height: 16),
                         Expanded(
@@ -500,7 +500,7 @@ class _MergeUsersScreenState extends State<MergeUsersScreen> {
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onPrimary,
                             strokeWidth: 2,
                           ),
                         )
@@ -508,9 +508,9 @@ class _MergeUsersScreenState extends State<MergeUsersScreen> {
                   label: Text(_isMerging ? 'Merging Users...' : 'Merge Users'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    disabledBackgroundColor: Colors.grey,
+                    disabledBackgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
               ),
@@ -528,9 +528,9 @@ class _MergeUsersScreenState extends State<MergeUsersScreen> {
                 height: 150,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                 ),
                 child: ListView.builder(
                   itemCount: _logs.length,

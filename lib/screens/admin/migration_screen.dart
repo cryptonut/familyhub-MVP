@@ -191,7 +191,7 @@ class _MigrationScreenState extends State<MigrationScreen> {
                             label: const Text('Run Migration'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             ),
                           ),
                         ),

@@ -98,7 +98,7 @@ class _GrantPremiumTestScreenState extends State<GrantPremiumTestScreen> {
             const SizedBox(height: 8),
             const Text(
               'This tool grants premium subscription access for testing purposes. Enter either an email address or user ID.',
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),
             const SizedBox(height: 24),
             TextField(
@@ -140,7 +140,7 @@ class _GrantPremiumTestScreenState extends State<GrantPremiumTestScreen> {
               label: Text(_isLoading ? 'Granting...' : 'Grant Premium Access'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
