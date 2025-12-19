@@ -31,22 +31,41 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
   }
 
   Future<void> _loadData() async {
+    Logger.debug('_loadData: STARTING LOAD DATA', tag: 'RecurringPaymentsScreen');
     setState(() => _isLoading = true);
     try {
       // DEBUG: Check current user family status first
       await _authService.debugCurrentUserFamilyStatus();
 
       _recurringPayments = await _recurringPaymentService.getCreatedRecurringPayments();
-      _familyMembers = await _authService.getFamilyMembers();
 
-      Logger.debug('_loadData: Loaded ${_familyMembers.length} family members', tag: 'RecurringPaymentsScreen');
-      for (var member in _familyMembers) {
-        Logger.debug('  - ${member.displayName} (${member.uid})', tag: 'RecurringPaymentsScreen');
+      Logger.debug('_loadData: About to call getFamilyMembers()', tag: 'RecurringPaymentsScreen');
+      try {
+        _familyMembers = await _authService.getFamilyMembers();
+        Logger.debug('_loadData: Successfully loaded ${_familyMembers.length} family members', tag: 'RecurringPaymentsScreen');
+        for (var member in _familyMembers) {
+          Logger.debug('  - ${member.displayName} (${member.uid})', tag: 'RecurringPaymentsScreen');
+        }
+      } catch (e, st) {
+        Logger.debug('_loadData: ENTERED EXCEPTION HANDLER', tag: 'RecurringPaymentsScreen');
+        Logger.error('_loadData: getFamilyMembers() threw exception: $e', error: e, stackTrace: st, tag: 'RecurringPaymentsScreen');
+        Logger.error('_loadData: Exception type: ${e.runtimeType}', tag: 'RecurringPaymentsScreen');
+        // TEMPORARY WORKAROUND: Create a dummy family member so the screen works
+        Logger.warning('_loadData: Using temporary workaround - creating dummy family member', tag: 'RecurringPaymentsScreen');
+        _familyMembers = [
+          UserModel(
+            uid: 'temp-user-1',
+            email: 'temp@example.com',
+            displayName: 'Temporary User',
+            familyId: 'temp-family',
+            createdAt: DateTime.now(),
+          )
+        ];
       }
 
       // DEBUG: Search for Lilly Case specifically
-      if (_familyMembers.isEmpty) {
-        Logger.warning('_loadData: Family members list is empty, searching for Lilly Case...', tag: 'RecurringPaymentsScreen');
+      if (_familyMembers.isEmpty || (_familyMembers.length == 1 && _familyMembers.first.uid == 'temp-user-1')) {
+        Logger.warning('_loadData: Family members list is empty or using workaround, searching for Lilly Case...', tag: 'RecurringPaymentsScreen');
         final lillyUsers = await _authService.findUsersByDisplayName('Lilly Case');
         if (lillyUsers.isNotEmpty) {
           Logger.warning('_loadData: Found Lilly Case in database but not in family members!', tag: 'RecurringPaymentsScreen');
