@@ -453,7 +453,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: theme.colorScheme.shadow.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -472,7 +472,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         message.senderName,
                         style: theme.textTheme.labelMedium?.copyWith(
                         color: isCurrentUser
-                            ? Colors.white.withValues(alpha: 0.9)
+                            ? theme.colorScheme.onPrimary.withValues(alpha: 0.9)
                             : theme.colorScheme.primary,
                           fontWeight: FontWeight.w600,
                         ),
@@ -484,7 +484,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           Icons.lock,
                           size: 12,
                           color: isCurrentUser
-                              ? Colors.white.withValues(alpha: 0.8)
+                              ? theme.colorScheme.onPrimary.withValues(alpha: 0.8)
                               : theme.colorScheme.primary,
                         ),
                       ],
@@ -495,7 +495,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           Icons.timer_outlined,
                           size: 12,
                           color: isCurrentUser
-                              ? Colors.white.withValues(alpha: 0.8)
+                              ? theme.colorScheme.onPrimary.withValues(alpha: 0.8)
                               : theme.colorScheme.secondary,
                         ),
                       ],
@@ -511,7 +511,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         Icon(
                           Icons.lock,
                           size: 12,
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
                         ),
                         const SizedBox(width: 4),
                       ],
@@ -519,13 +519,13 @@ class _ChatScreenState extends State<ChatScreen> {
                         Icon(
                           Icons.timer_outlined,
                           size: 12,
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
                         ),
                         const SizedBox(width: 4),
                         Text(
                           _formatExpirationTime(message.expiresAt!),
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.8),
+                            color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -540,7 +540,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     text: message.content,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: isCurrentUser
-                          ? Colors.white
+                          ? theme.colorScheme.onPrimary
                           : theme.colorScheme.onSurface,
                     ),
                   ),
@@ -552,7 +552,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       app_date_utils.AppDateUtils.formatTime(message.timestamp),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: isCurrentUser
-                            ? Colors.white.withValues(alpha: 0.7)
+                            ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
                             : theme.colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
@@ -770,7 +770,7 @@ class _ChatScreenState extends State<ChatScreen> {
         color: theme.scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -822,7 +822,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     child: IconButton(
                       onPressed: _sendMessage,
-                      icon: const Icon(Icons.send, color: Colors.white),
+                      icon: Icon(Icons.send, color: theme.colorScheme.onPrimary),
                       padding: const EdgeInsets.all(AppTheme.spacingSM),
                     ),
                   ),

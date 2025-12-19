@@ -346,9 +346,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             decoration: BoxDecoration(
               color: isCurrentUser 
                   ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey[800]!
-                      : Colors.grey[300]!,
+                  : Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(20),
             ),
             constraints: BoxConstraints(
@@ -365,7 +363,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: isCurrentUser 
-                            ? Colors.white70 
+                            ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)
                             : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                       ),
                     ),
@@ -376,7 +374,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         Icons.lock,
                         size: 12,
                         color: isCurrentUser
-                            ? Colors.white70
+                            ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)
                             : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
                       ),
                     ],
@@ -387,7 +385,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         Icons.timer_outlined,
                         size: 12,
                         color: isCurrentUser
-                            ? Colors.white70
+                            ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)
                             : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
                       ),
                     ],
@@ -398,7 +396,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   text: message.content,
                   style: TextStyle(
                     color: isCurrentUser 
-                        ? Colors.white 
+                        ? Theme.of(context).colorScheme.onPrimary
                         : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                   ),
                 ),
@@ -408,7 +406,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     color: isCurrentUser
-                        ? Colors.white70
+                        ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)
                         : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
                   ),
                 ),
@@ -467,7 +465,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
           color: Theme.of(context).scaffoldBackgroundColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, -2),
             ),
@@ -527,9 +525,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   borderRadius: BorderRadius.circular(24),
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    child: const Icon(
+                    child: Icon(
                       Icons.send,
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onPrimary,
                       size: 24,
                     ),
                   ),

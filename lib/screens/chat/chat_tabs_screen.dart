@@ -101,9 +101,9 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
           color: Colors.purple.shade700,
           shape: BoxShape.circle,
         ),
-        child: const Icon(
+        child: Icon(
           Icons.group,
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.onPrimary,
           size: 14,
         ),
       );
@@ -126,8 +126,8 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
                     : member.email.isNotEmpty
                         ? member.email[0].toUpperCase()
                         : '?',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
@@ -146,8 +146,8 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
             : member.email.isNotEmpty
                 ? member.email[0].toUpperCase()
                 : '?',
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onPrimary,
           fontSize: 10,
           fontWeight: FontWeight.bold,
         ),

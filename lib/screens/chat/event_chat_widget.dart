@@ -208,7 +208,7 @@ class _EventChatWidgetState extends State<EventChatWidget> {
             return Container(
               height: 300,
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: ListView.builder(
@@ -235,8 +235,8 @@ class _EventChatWidgetState extends State<EventChatWidget> {
                               message.senderName.isNotEmpty
                                   ? message.senderName[0].toUpperCase()
                                   : '?',
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onPrimary,
                                 fontSize: 12,
                               ),
                             ),
@@ -250,7 +250,7 @@ class _EventChatWidgetState extends State<EventChatWidget> {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: isOwnMessage ? Colors.blue : Colors.white,
+                              color: isOwnMessage ? Colors.blue : Theme.of(context).colorScheme.surface,
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Column(
@@ -263,8 +263,8 @@ class _EventChatWidgetState extends State<EventChatWidget> {
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                       color: isOwnMessage
-                                          ? Colors.white
-                                          : Colors.grey[700],
+                                          ? Theme.of(context).colorScheme.onPrimary
+                                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                     ),
                                   ),
                                 LinkableText(
@@ -273,8 +273,8 @@ class _EventChatWidgetState extends State<EventChatWidget> {
                                       : message.content,
                                   style: TextStyle(
                                     color: isOwnMessage
-                                        ? Colors.white
-                                        : Colors.black87,
+                                        ? Theme.of(context).colorScheme.onPrimary
+                                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                                   ),
                                 ),
                                 if (message.editedAt != null)
@@ -283,8 +283,8 @@ class _EventChatWidgetState extends State<EventChatWidget> {
                                     style: TextStyle(
                                       fontSize: 10,
                                       color: isOwnMessage
-                                          ? Colors.white70
-                                          : Colors.grey[600],
+                                          ? Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7)
+                                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                       ),
                                   ),
                               ],
@@ -300,8 +300,8 @@ class _EventChatWidgetState extends State<EventChatWidget> {
                               message.senderName.isNotEmpty
                                   ? message.senderName[0].toUpperCase()
                                   : '?',
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onPrimary,
                                 fontSize: 12,
                               ),
                             ),
