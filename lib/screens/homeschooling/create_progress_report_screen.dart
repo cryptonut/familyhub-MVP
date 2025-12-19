@@ -174,7 +174,7 @@ class _CreateProgressReportScreenState
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.all(AppTheme.spacingMD),
               backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
           ),
         ),

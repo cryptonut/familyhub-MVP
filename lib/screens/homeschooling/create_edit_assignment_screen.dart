@@ -280,7 +280,7 @@ class _CreateEditAssignmentScreenState extends State<CreateEditAssignmentScreen>
                     style: TextStyle(
                       color: _dueDate != null
                           ? Theme.of(context).textTheme.bodyLarge?.color
-                          : Colors.grey,
+                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
@@ -301,7 +301,7 @@ class _CreateEditAssignmentScreenState extends State<CreateEditAssignmentScreen>
                 color: Theme.of(context).scaffoldBackgroundColor,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, -2),
                   ),
@@ -328,7 +328,7 @@ class _CreateEditAssignmentScreenState extends State<CreateEditAssignmentScreen>
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
                           ),
                         )
                       : const Icon(Icons.check_circle),
@@ -342,7 +342,7 @@ class _CreateEditAssignmentScreenState extends State<CreateEditAssignmentScreen>
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
