@@ -10,6 +10,8 @@ import '../../widgets/budget_item_list.dart';
 import '../../widgets/budget_item_completion_dialog.dart';
 import '../../widgets/budget_item_edit_dialog.dart';
 import '../../widgets/premium_feature_gate.dart';
+import '../../widgets/budget/category_spending_chart.dart';
+import '../../widgets/budget/spending_trends_chart.dart';
 import 'package:intl/intl.dart';
 
 /// Budget detail screen with items, progress, and adherence
@@ -34,6 +36,8 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
   BudgetProgressMetrics? _progressMetrics;
   bool _isLoading = true;
   bool _isPremium = false;
+  List<CategorySpending> _categoryBreakdown = [];
+  Map<DateTime, double> _spendingTrends = {};
 
   @override
   void initState() {
@@ -60,6 +64,28 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
         budget: widget.budget,
         isPremium: _isPremium,
       );
+      
+      // Load chart data (premium feature)
+      if (_isPremium) {
+        final categoryBreakdown = await _analyticsService.getCategoryBreakdown(
+          budgetId: widget.budget.id,
+          startDate: widget.budget.startDate,
+          endDate: widget.budget.endDate,
+        );
+        
+        final trends = await _analyticsService.getSpendingTrends(
+          budgetId: widget.budget.id,
+          startDate: widget.budget.startDate,
+          endDate: widget.budget.endDate,
+        );
+        
+        if (mounted) {
+          setState(() {
+            _categoryBreakdown = categoryBreakdown;
+            _spendingTrends = trends;
+          });
+        }
+      }
       
       if (mounted) {
         setState(() {
@@ -226,6 +252,17 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
         return Colors.orange;
       case BudgetAdherenceStatus.overBudget:
         return Colors.red;
+    }
+  }
+
+  Color _parseColor(String colorString, Color fallback) {
+    try {
+      if (colorString.startsWith('#')) {
+        return Color(int.parse(colorString.substring(1), radix: 16) + 0xFF000000);
+      }
+      return fallback;
+    } catch (e) {
+      return fallback;
     }
   }
 
@@ -505,6 +542,103 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: AppTheme.spacingMD),
+                    ],
+
+                    // Analytics Charts (Premium)
+                    if (_isPremium && (_categoryBreakdown.isNotEmpty || _spendingTrends.isNotEmpty)) ...[
+                      PremiumFeatureGate(
+                        featureName: 'Budget Analytics',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Analytics',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: AppTheme.spacingSM),
+                            
+                            // Category Breakdown Chart
+                            if (_categoryBreakdown.isNotEmpty) ...[
+                              ModernCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Spending by Category',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppTheme.spacingMD),
+                                    CategorySpendingChart(
+                                      categorySpending: _categoryBreakdown,
+                                      height: 250,
+                                    ),
+                                    const SizedBox(height: AppTheme.spacingSM),
+                                    ..._categoryBreakdown.take(5).map((category) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 8.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: _parseColor(category.color, theme.colorScheme.primary),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                category.categoryName,
+                                                style: theme.textTheme.bodyMedium,
+                                              ),
+                                            ],
+                                          ),
+                                          Text(
+                                            '\$${category.amount.toStringAsFixed(2)} (${category.percentage.toStringAsFixed(1)}%)',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppTheme.spacingMD),
+                            ],
+                            
+                            // Spending Trends Chart
+                            if (_spendingTrends.isNotEmpty) ...[
+                              ModernCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Spending Trends',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppTheme.spacingMD),
+                                    SpendingTrendsChart(
+                                      trends: _spendingTrends,
+                                      height: 250,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppTheme.spacingMD),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
 
                     // Budget Items Section
