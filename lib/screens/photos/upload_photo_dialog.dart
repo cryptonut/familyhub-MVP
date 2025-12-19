@@ -174,11 +174,11 @@ class _UploadPhotoDialogState extends State<UploadPhotoDialog> {
                         height: 200,
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: Colors.grey[200],
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Center(
-                          child: Icon(Icons.photo, size: 64, color: Colors.grey),
+                          child: Icon(Icons.photo, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         ),
                       ),
                     const SizedBox(height: 16),

@@ -173,7 +173,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
           // Photo Info
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -208,7 +208,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                             '${dateFormat.format(widget.photo.uploadedAt)} at ${timeFormat.format(widget.photo.uploadedAt)}',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ],
@@ -217,11 +217,11 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                     if (widget.photo.viewCount > 0)
                       Row(
                         children: [
-                          Icon(Icons.visibility, size: 16, color: Colors.grey[600]),
+                          Icon(Icons.visibility, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                           const SizedBox(width: 4),
                           Text(
                             '${widget.photo.viewCount}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                           ),
                         ],
                       ),
@@ -235,8 +235,8 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
           Container(
             height: 200,
             decoration: BoxDecoration(
-              color: Colors.grey[50],
-              border: Border(top: BorderSide(color: Colors.grey[300]!)),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              border: Border(top: BorderSide(color: Theme.of(context).colorScheme.surfaceContainerHighest)),
             ),
             child: Column(
               children: [
@@ -270,8 +270,8 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border(top: BorderSide(color: Colors.grey[300]!)),
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border(top: BorderSide(color: Theme.of(context).colorScheme.surfaceContainerHighest)),
                   ),
                   child: Row(
                     children: [
@@ -325,7 +325,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -349,7 +349,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                     dateFormat.format(comment.createdAt),
                     style: TextStyle(
                       fontSize: 10,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ),

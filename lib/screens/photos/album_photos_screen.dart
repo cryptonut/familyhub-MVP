@@ -105,11 +105,11 @@ class _AlbumPhotosScreenState extends State<AlbumPhotosScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.photo_library, size: 64, color: Colors.grey[400]),
+                          Icon(Icons.photo_library, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                           const SizedBox(height: 16),
                           Text(
                             'No photos in this album',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 18),
                           ),
                           const SizedBox(height: 8),
                           ElevatedButton.icon(
@@ -148,11 +148,11 @@ class _AlbumPhotosScreenState extends State<AlbumPhotosScreen> {
                           imageUrl: photo.thumbnailUrl ?? photo.imageUrl,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
-                            color: Colors.grey[300],
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             child: const Center(child: CircularProgressIndicator()),
                           ),
                           errorWidget: (context, url, error) => Container(
-                            color: Colors.grey[300],
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             child: const Icon(Icons.photo),
                           ),
                         ),

@@ -231,7 +231,7 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return Container(
-                      color: Colors.grey[200],
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       child: const Center(child: CircularProgressIndicator()),
                     );
                   }
@@ -239,8 +239,8 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
                   final photos = snapshot.data!;
                   if (photos.isEmpty) {
                     return Container(
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.folder_open, size: 48, color: Colors.grey),
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      child: Icon(Icons.folder_open, size: 48, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                     );
                   }
                   
@@ -257,7 +257,7 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
                             children: [
                               Expanded(child: _buildPreviewImage(previewPhotos[0])),
                               const SizedBox(width: 1),
-                              Expanded(child: previewPhotos.length > 1 ? _buildPreviewImage(previewPhotos[1]) : Container(color: Colors.grey[200])),
+                              Expanded(child: previewPhotos.length > 1 ? _buildPreviewImage(previewPhotos[1]) : Container(color: Theme.of(context).colorScheme.surfaceContainerHighest)),
                             ],
                           ),
                         ),
@@ -265,9 +265,9 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
                         Expanded(
                           child: Row(
                             children: [
-                              Expanded(child: previewPhotos.length > 2 ? _buildPreviewImage(previewPhotos[2]) : Container(color: Colors.grey[200])),
+                              Expanded(child: previewPhotos.length > 2 ? _buildPreviewImage(previewPhotos[2]) : Container(color: Theme.of(context).colorScheme.surfaceContainerHighest)),
                               const SizedBox(width: 1),
-                              Expanded(child: previewPhotos.length > 3 ? _buildPreviewImage(previewPhotos[3]) : Container(color: Colors.grey[200])),
+                              Expanded(child: previewPhotos.length > 3 ? _buildPreviewImage(previewPhotos[3]) : Container(color: Theme.of(context).colorScheme.surfaceContainerHighest)),
                             ],
                           ),
                         ),
@@ -295,7 +295,7 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
                     '${album.photoCount} photo${album.photoCount != 1 ? 's' : ''}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -312,11 +312,11 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
       imageUrl: photo.thumbnailUrl ?? photo.imageUrl,
       fit: BoxFit.cover,
       placeholder: (context, url) => Container(
-        color: Colors.grey[200],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
       errorWidget: (context, url, error) => Container(
-        color: Colors.grey[200],
-        child: const Icon(Icons.broken_image, size: 20, color: Colors.grey),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        child: Icon(Icons.broken_image, size: 20, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
       ),
     );
   }
@@ -334,11 +334,11 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.photo_library, size: 64, color: Colors.grey[400]),
+                  Icon(Icons.photo_library, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                   const SizedBox(height: 16),
                   Text(
                     'No photos yet',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
@@ -386,11 +386,11 @@ class _PhotosHomeScreenState extends State<PhotosHomeScreen>
         imageUrl: photo.thumbnailUrl ?? photo.imageUrl,
         fit: BoxFit.cover,
         placeholder: (context, url) => Container(
-          color: Colors.grey[300],
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: const Center(child: CircularProgressIndicator()),
         ),
         errorWidget: (context, url, error) => Container(
-          color: Colors.grey[300],
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: const Icon(Icons.photo),
         ),
       ),
