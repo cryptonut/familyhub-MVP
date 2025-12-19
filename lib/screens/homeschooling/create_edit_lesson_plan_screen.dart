@@ -340,7 +340,7 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
                     style: TextStyle(
                       color: _scheduledDate != null
                           ? Theme.of(context).textTheme.bodyLarge?.color
-                          : Colors.grey,
+                          : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
@@ -494,7 +494,7 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

@@ -265,7 +265,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                                   Icon(
                                     Icons.cake,
                                     size: 16,
-                                    color: Colors.grey[600],
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(

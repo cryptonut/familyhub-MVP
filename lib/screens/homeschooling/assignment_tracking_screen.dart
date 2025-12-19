@@ -327,7 +327,7 @@ class _AssignmentTrackingScreenState extends State<AssignmentTrackingScreen> {
                                       Icon(
                                         Icons.subject,
                                         size: 16,
-                                        color: Colors.grey[600],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
@@ -338,7 +338,7 @@ class _AssignmentTrackingScreenState extends State<AssignmentTrackingScreen> {
                                       Icon(
                                         Icons.calendar_today,
                                         size: 16,
-                                        color: isOverdue ? Colors.red : Colors.grey[600],
+                                        color: isOverdue ? Colors.red : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
@@ -357,7 +357,7 @@ class _AssignmentTrackingScreenState extends State<AssignmentTrackingScreen> {
                                         Icon(
                                           Icons.grade,
                                           size: 16,
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                         ),
                                         const SizedBox(width: 4),
                                         Text(

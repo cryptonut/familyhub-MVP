@@ -219,7 +219,7 @@ class _LessonPlanningScreenState extends State<LessonPlanningScreen> {
                                       Icon(
                                         Icons.calendar_today,
                                         size: 16,
-                                        color: Colors.grey[600],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
@@ -230,7 +230,7 @@ class _LessonPlanningScreenState extends State<LessonPlanningScreen> {
                                       Icon(
                                         Icons.access_time,
                                         size: 16,
-                                        color: Colors.grey[600],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(

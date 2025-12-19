@@ -355,7 +355,7 @@ class _CreateEditResourceScreenState extends State<CreateEditResourceScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
+                      border: Border.all(color: Theme.of(context).colorScheme.outline),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -397,7 +397,7 @@ class _CreateEditResourceScreenState extends State<CreateEditResourceScreen> {
                               if (_isUploading)
                                 Text(
                                   'Uploading... ${(_uploadProgress * 100).toStringAsFixed(0)}%',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                                 ),
                             ],
                           ),
@@ -488,7 +488,7 @@ class _CreateEditResourceScreenState extends State<CreateEditResourceScreen> {
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.all(AppTheme.spacingMD),
               backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
           ),
         ),
