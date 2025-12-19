@@ -160,7 +160,7 @@ class _RequestPayoutDialogState extends State<RequestPayoutDialog> {
           onPressed: _isProcessing ? null : _requestPayout,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: _isProcessing
               ? const SizedBox(
@@ -168,7 +168,7 @@ class _RequestPayoutDialogState extends State<RequestPayoutDialog> {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
                   ),
                 )
               : const Text('Request'),

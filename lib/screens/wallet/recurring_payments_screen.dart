@@ -86,14 +86,14 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
                           Icon(
                             Icons.account_balance_wallet_outlined,
                             size: 64,
-                            color: Colors.grey[400],
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                           ),
                           const SizedBox(height: 16),
                           Text(
                             'No recurring payments set up',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -179,7 +179,7 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
@@ -187,7 +187,7 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Colors.grey,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -199,7 +199,7 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
                 'Next payment: ${dateFormat.format(payment.nextPaymentDate!)}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 4),
@@ -209,7 +209,7 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
                 'Last payment: ${dateFormat.format(payment.lastPaymentDate!)}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             if (payment.notes != null && payment.notes!.isNotEmpty) ...[
@@ -218,7 +218,7 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
                 'Notes: ${payment.notes}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -244,7 +244,7 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
                               onPressed: () => Navigator.pop(context, true),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
+                                foregroundColor: Theme.of(context).colorScheme.onPrimary,
                               ),
                               child: const Text('Deactivate'),
                             ),
@@ -519,7 +519,7 @@ class _CreateRecurringPaymentDialogState extends State<CreateRecurringPaymentDia
           onPressed: _isProcessing ? null : _createPayment,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: _isProcessing
               ? const SizedBox(
@@ -527,7 +527,7 @@ class _CreateRecurringPaymentDialogState extends State<CreateRecurringPaymentDia
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
                   ),
                 )
               : const Text('Set Up'),

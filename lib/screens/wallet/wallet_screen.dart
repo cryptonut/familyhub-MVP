@@ -239,14 +239,14 @@ class _WalletScreenState extends State<WalletScreen> {
                                       Icon(
                                         Icons.account_balance_wallet_outlined,
                                         size: 64,
-                                        color: Colors.grey[400],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                                       ),
                                       const SizedBox(height: 16),
                                       Text(
                                         'No transactions yet',
                                         style: TextStyle(
                                           fontSize: 16,
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                         ),
                                       ),
                                       const SizedBox(height: 8),
@@ -254,7 +254,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                         'Create or complete jobs with rewards to see transactions here',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: Colors.grey[500],
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
@@ -356,7 +356,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                         'Track income, expenses, and savings goals',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                         ),
                                       ),
                                       const SizedBox(height: 8),
@@ -373,7 +373,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                 ),
                                 const Icon(
                                   Icons.chevron_right,
-                                  color: Colors.grey,
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                 ),
                               ],
                             ),
@@ -409,7 +409,7 @@ class _WalletScreenState extends State<WalletScreen> {
             'Total Balance',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.white70,
+              color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 8),
@@ -418,19 +418,19 @@ class _WalletScreenState extends State<WalletScreen> {
             style: TextStyle(
               fontSize: 40,
               fontWeight: FontWeight.bold,
-              color: _totalBalance >= 0 ? Colors.white : Colors.red.shade100,
+              color: _totalBalance >= 0 ? Theme.of(context).colorScheme.onPrimary : Colors.red.shade100,
             ),
           ),
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.white70, size: 16),
+                  Icon(Icons.check_circle, color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7), size: 16),
                   const SizedBox(width: 8),
                   Text(
                     '${_completedJobs.length} completed, ${_createdJobs.length} created',
                     style: const TextStyle(
                       fontSize: 14,
-                      color: Colors.white70,
+                      color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -454,7 +454,7 @@ class _WalletScreenState extends State<WalletScreen> {
                     icon: const Icon(Icons.request_quote),
                     label: const Text('Request Payout'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
                       foregroundColor: Colors.blue.shade700,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -504,7 +504,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 'Completed: ${dateFormat.format(task.completedAt!)} at ${timeFormat.format(task.completedAt!)}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             ] else ...[
@@ -512,7 +512,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 'Completed: ${dateFormat.format(task.createdAt)}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -523,7 +523,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   'Completed by: ${_userNames[task.claimedBy] ?? _userNames[task.assignedTo] ?? "Unknown"}',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey[500],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -535,7 +535,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   'Assigned to: ${_userNames[task.assignedTo] ?? "Unknown"}',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey[500],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -566,7 +566,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       'AUD',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                     if (_runningBalances.containsKey(task.id)) ...[
@@ -575,7 +575,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         'Balance: \$${_runningBalances[task.id]!.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 9,
-                          color: Colors.grey[500],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -584,7 +584,7 @@ class _WalletScreenState extends State<WalletScreen> {
               ],
             ),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right, color: Colors.grey[400]),
+            Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
           ],
         ),
       ),
@@ -630,7 +630,7 @@ class _WalletScreenState extends State<WalletScreen> {
               'Created: ${dateFormat.format(task.createdAt)}',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             if (isCompleted && task.completedAt != null)
@@ -638,7 +638,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 'Completed: ${dateFormat.format(task.completedAt!)}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               )
             else if (!isCompleted)
@@ -678,7 +678,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       'AUD',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                     if (_runningBalances.containsKey(task.id)) ...[
@@ -687,7 +687,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         'Balance: \$${_runningBalances[task.id]!.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 9,
-                          color: Colors.grey[500],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -696,7 +696,7 @@ class _WalletScreenState extends State<WalletScreen> {
               ],
             ),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right, color: Colors.grey[400]),
+            Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
           ],
         ),
         ),
@@ -751,7 +751,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       Text(
                         'Next: ${dateFormat.format(payment.nextPaymentDate!)}',
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                           fontSize: 11,
                         ),
                       ),
@@ -760,7 +760,7 @@ class _WalletScreenState extends State<WalletScreen> {
               ),
               Icon(
                 Icons.chevron_right,
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
               ),
             ],
           ),

@@ -153,7 +153,7 @@ class _ApprovePayoutDialogState extends State<ApprovePayoutDialog> {
           onPressed: _isProcessing ? null : _approvePayout,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: _isProcessing
               ? const SizedBox(
@@ -161,7 +161,7 @@ class _ApprovePayoutDialogState extends State<ApprovePayoutDialog> {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
                   ),
                 )
               : const Text('Approve Payout'),

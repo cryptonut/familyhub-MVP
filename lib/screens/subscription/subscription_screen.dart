@@ -195,7 +195,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               children: [
                 Icon(
                   isPremium ? Icons.star : Icons.star_border,
-                  color: isPremium ? Colors.amber : Colors.grey,
+                  color: isPremium ? Colors.amber : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   size: 32,
                 ),
                 const SizedBox(width: 12),
@@ -240,7 +240,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 Text(
                   '${_expiresAt!.difference(DateTime.now()).inDays} days remaining',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
               ],
@@ -286,7 +286,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         children: [
           Icon(
             hasAccess ? Icons.check_circle : Icons.lock_outline,
-            color: hasAccess ? Colors.green : Colors.grey,
+            color: hasAccess ? Colors.green : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -297,13 +297,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   title,
                   style: TextStyle(
                     fontWeight: FontWeight.w500,
-                    color: hasAccess ? null : Colors.grey,
+                    color: hasAccess ? null : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
                 Text(
                   description,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 ),
               ],
@@ -321,7 +321,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              const Icon(Icons.info_outline, size: 48, color: Colors.grey),
+              Icon(Icons.info_outline, size: 48, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
               const SizedBox(height: 16),
               Text(
                 'No subscription products available',
@@ -388,7 +388,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             child: const Text(
                               'Best Value',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onPrimary,
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
