@@ -265,7 +265,7 @@ class _HubInviteScreenState extends State<HubInviteScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
                             child: _isAccepting
-                                ? const SizedBox(
+                                ? SizedBox(
                                     height: 20,
                                     width: 20,
                                     child: CircularProgressIndicator(

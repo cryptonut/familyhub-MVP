@@ -87,6 +87,20 @@
       ]
     },
     {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "familyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "dev_users",
       "queryScope": "COLLECTION",
       "fields": [

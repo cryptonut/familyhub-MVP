@@ -190,7 +190,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Your birthday helps us remind your family members',
               style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),

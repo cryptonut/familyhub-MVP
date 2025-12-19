@@ -60,7 +60,7 @@ class SpendingTrendsChart extends StatelessWidget {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 30,
-                interval: sortedDates.length > 7 ? (sortedDates.length / 7).ceil() : 1,
+                interval: sortedDates.length > 7 ? (sortedDates.length / 7).ceil().toDouble() : 1.0,
                 getTitlesWidget: (value, meta) {
                   final index = value.toInt();
                   if (index >= 0 && index < sortedDates.length) {

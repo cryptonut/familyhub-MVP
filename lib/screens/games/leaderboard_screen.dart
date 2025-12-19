@@ -121,7 +121,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     bottom: 0,
                     child: Container(
                       padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.onPrimary,
                         shape: BoxShape.circle,
                       ),

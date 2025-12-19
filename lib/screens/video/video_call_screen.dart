@@ -305,18 +305,19 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
-    Color color = Theme.of(context).colorScheme.onPrimary,
+    Color? color,
   }) {
+    final effectiveColor = color ?? Theme.of(context).colorScheme.onPrimary;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: effectiveColor.withOpacity(0.2),
             shape: BoxShape.circle,
           ),
           child: IconButton(
-            icon: Icon(icon, color: color, size: 28),
+            icon: Icon(icon, color: effectiveColor, size: 28),
             onPressed: onPressed,
             iconSize: 28,
           ),

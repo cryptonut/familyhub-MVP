@@ -366,7 +366,7 @@ class _DatabaseResetScreenState extends State<DatabaseResetScreen> {
             ElevatedButton.icon(
               onPressed: _isResetting ? null : _resetDatabase,
               icon: _isResetting
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(

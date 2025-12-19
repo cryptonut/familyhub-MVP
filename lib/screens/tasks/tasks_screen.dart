@@ -1082,7 +1082,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                           color: Colors.blue,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Active',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onPrimary,

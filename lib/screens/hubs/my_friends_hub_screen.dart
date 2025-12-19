@@ -494,7 +494,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
           ..._upcomingBirthdays.map((birthday) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                  leading: const CircleAvatar(
+                  leading: CircleAvatar(
                     backgroundColor: Colors.pink,
                     child: Icon(Icons.cake, color: Theme.of(context).colorScheme.onPrimary),
                   ),

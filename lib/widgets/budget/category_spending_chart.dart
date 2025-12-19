@@ -61,7 +61,7 @@ class CategorySpendingChart extends StatelessWidget {
         titleStyle: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: _getContrastColor(color),
+          color: _getContrastColor(color, context),
         ),
       );
     }).toList();
@@ -78,7 +78,7 @@ class CategorySpendingChart extends StatelessWidget {
     }
   }
 
-  Color _getContrastColor(Color color) {
+  Color _getContrastColor(Color color, BuildContext context) {
     // Calculate luminance to determine if text should be black or white
     final luminance = color.computeLuminance();
     final theme = Theme.of(context);

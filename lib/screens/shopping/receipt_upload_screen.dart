@@ -21,6 +21,13 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
   File? _selectedImage;
   bool _isUploading = false;
 
+  @override
+  void dispose() {
+    // Clean up the selected image file reference
+    _selectedImage = null;
+    super.dispose();
+  }
+
   Future<void> _pickImage() async {
     try {
       final XFile? image = await _imagePicker.pickImage(
@@ -87,10 +94,23 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Upload Receipt'),
-      ),
+    return PopScope(
+      canPop: !_isUploading,
+      onPopInvoked: (didPop) {
+        if (!didPop && _isUploading) {
+          // Show warning if trying to go back during upload
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please wait for upload to complete'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Upload Receipt'),
+        ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -105,10 +125,31 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    _selectedImage!,
-                    fit: BoxFit.contain,
-                  ),
+                  child: _selectedImage != null && _selectedImage!.existsSync()
+                      ? Image.file(
+                          _selectedImage!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.error_outline, color: Colors.red),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Error loading image',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        )
+                      : const Center(
+                          child: Text('Image file not found'),
+                        ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -173,6 +214,7 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

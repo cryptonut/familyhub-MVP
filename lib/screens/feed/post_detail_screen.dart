@@ -147,8 +147,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   ),
               ],
             ),
-            // Nested replies
-            if (nestedReplies.isNotEmpty && depth < 2) ...[
+            // Nested replies (support full depth up to maxDepth = 3)
+            if (nestedReplies.isNotEmpty && depth < 3) ...[
               const SizedBox(height: AppTheme.spacingSM),
               ...nestedReplies.map((reply) => _buildCommentCard(reply, allComments, depth + 1)),
             ],

@@ -36,14 +36,19 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
       _recurringPayments = await _recurringPaymentService.getCreatedRecurringPayments();
       _familyMembers = await _authService.getFamilyMembers();
       
+      Logger.debug('_loadData: Loaded ${_familyMembers.length} family members', tag: 'RecurringPaymentsScreen');
+      for (var member in _familyMembers) {
+        Logger.debug('  - ${member.displayName} (${member.uid})', tag: 'RecurringPaymentsScreen');
+      }
+      
       // Build user names map
       for (var member in _familyMembers) {
         _userNames[member.uid] = member.displayName.isNotEmpty 
             ? member.displayName 
             : member.email;
       }
-    } catch (e) {
-      Logger.error('Error loading recurring payments', error: e, tag: 'RecurringPaymentsScreen');
+    } catch (e, st) {
+      Logger.error('Error loading recurring payments', error: e, stackTrace: st, tag: 'RecurringPaymentsScreen');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -52,6 +57,43 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
   }
 
   Future<void> _createRecurringPayment() async {
+    // Wait for initial load to complete if still loading
+    if (_isLoading) {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+      // Wait a bit for load to complete
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    }
+    
+    // Ensure family members are loaded before showing dialog
+    if (_familyMembers.isEmpty) {
+      // Reload family members
+      await _loadData();
+    }
+    
+    // If still empty after loading, show error with more details
+    if (_familyMembers.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to load family members. Please check your connection and try again.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      Logger.warning('_createRecurringPayment: Family members list is empty after loading', tag: 'RecurringPaymentsScreen');
+      return;
+    }
+    
+    Logger.debug('_createRecurringPayment: Showing dialog with ${_familyMembers.length} family members', tag: 'RecurringPaymentsScreen');
     final result = await showDialog(
       context: context,
       builder: (context) => CreateRecurringPaymentDialog(familyMembers: _familyMembers),
@@ -182,7 +224,7 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
                       color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Inactive',
                       style: TextStyle(
                         fontSize: 12,
@@ -420,27 +462,43 @@ class _CreateRecurringPaymentDialogState extends State<CreateRecurringPaymentDia
               ),
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedUserId,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Select recipient',
-              ),
-              items: recipients.map((member) {
-                final name = member.displayName.isNotEmpty 
-                    ? member.displayName 
-                    : member.email;
-                return DropdownMenuItem(
-                  value: member.uid,
-                  child: Text(name),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedUserId = value;
-                });
-              },
-            ),
+            recipients.isEmpty
+                ? Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.orange),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'No family members available. Please add family members first.',
+                      style: TextStyle(color: Colors.orange),
+                    ),
+                  )
+                : DropdownButtonFormField<String>(
+                    value: _selectedUserId,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      hintText: 'Select recipient',
+                    ),
+                    items: recipients.map((member) {
+                      final name = member.displayName.isNotEmpty 
+                          ? member.displayName 
+                          : member.email;
+                      return DropdownMenuItem<String>(
+                        value: member.uid,
+                        child: Text(name),
+                      );
+                    }).toList(),
+                    onChanged: recipients.isEmpty
+                        ? null
+                        : (String? value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedUserId = value;
+                              });
+                            }
+                          },
+                  ),
             const SizedBox(height: 16),
             TextField(
               controller: _amountController,
@@ -522,7 +580,7 @@ class _CreateRecurringPaymentDialogState extends State<CreateRecurringPaymentDia
             foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: _isProcessing
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(

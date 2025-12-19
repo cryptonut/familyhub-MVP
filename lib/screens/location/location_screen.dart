@@ -322,7 +322,7 @@ class _LocationScreenState extends State<LocationScreen> {
                   ),
                 ),
             ] else
-              const Text(
+              Text(
                 'Location not available',
                 style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
               ),

@@ -277,7 +277,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'If you have a family invitation code, enter it below to join an existing family.',
                   style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                 ),
@@ -320,7 +320,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Select your role in the family (usually Father or Mother)',
                     style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                   ),

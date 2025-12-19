@@ -149,9 +149,12 @@ This document tracks all addressable issues found during systematic screen-by-sc
 - ⏳ **TODO**: Verify transaction grouping/display logic
 
 ### Feed Screen
-- ⏳ **TODO**: Review post display and filtering
-- ⏳ **TODO**: Verify empty states
-- ⏳ **TODO**: Verify post ordering (newest first)
+- ✅ **FIXED**: FeedScreen "All" tab now shows same messages as ChatWidget preview
+  - **Issue**: FeedScreen used `FeedService.getFeedStream()` with `includeReplies: false`, filtering out replies. ChatWidget uses `ChatService.getMessagesStream()` showing all messages.
+  - **Fix**: Modified FeedScreen to use `ChatService.getMessagesStream()` for family feed (no hubId), matching ChatWidget behavior. Hub feeds still use FeedService for feed-style posts.
+  - **Status**: ✅ Fixed
+- ✅✅ Empty states verified OK
+- ✅✅ Post ordering verified (newest first)
 
 ---
 
@@ -209,10 +212,27 @@ This document tracks all addressable issues found during systematic screen-by-sc
 
 ---
 
+## Runtime Error Fixes
+
+### ✅ COMPLETED
+1. **MessageExpirationService Errors**
+   - **Issue**: Periodic errors when checking family/hub messages for expiration
+   - **Fix**: Added checks for empty collections, wrapped each family/hub in try-catch, added stack traces to error logs, fixed batch commit logic
+   - **Status**: ✅ Fixed
+
+2. **Flutter TransformLayer Invalid Matrix Errors**
+   - **Issue**: `TransformLayer is constructed with an invalid matrix` errors in `reorderable_navigation_bar.dart`
+   - **Fix**: Added `_isValidOffset()` helper to validate Offset values before use in `Transform.translate`, falling back to `Offset.zero` if invalid
+   - **Status**: ✅ Fixed
+
+---
+
 ## Notes
 
 - All critical filtering bugs have been fixed
 - Empty state improvements completed for most filtered screens
+- Runtime errors (MessageExpirationService, TransformLayer) have been fixed
+- FeedScreen "All" tab now matches ChatWidget preview behavior
 - Remaining work is primarily verification and minor improvements
 - Most screens follow correct patterns (in-memory filtering, proper empty states)
 

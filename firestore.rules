@@ -1389,7 +1389,7 @@ service cloud.firestore {
       function isGameParticipant() {
         return resource.data.whitePlayerId == request.auth.uid ||
                resource.data.blackPlayerId == request.auth.uid ||
-               (resource.data.invitedPlayerId != null && 
+               (resource.data.invitedPlayerId != null &&
                 resource.data.invitedPlayerId == request.auth.uid) ||
                request.auth.uid in resource.data.spectators;
       }

@@ -385,7 +385,7 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> with TickerPr
                         member.displayName.isNotEmpty
                             ? member.displayName[0].toUpperCase()
                             : member.email[0].toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Theme.of(context).colorScheme.onPrimary,
                           fontSize: 12,
                         ),
@@ -467,7 +467,7 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> with TickerPr
             },
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'OR',
             textAlign: TextAlign.center,
             style: TextStyle(

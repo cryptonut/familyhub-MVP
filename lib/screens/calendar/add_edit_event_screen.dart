@@ -515,14 +515,14 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Select family members to invite (optional)',
               style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),
             const SizedBox(height: 12),
             if (_familyMembers.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Center(
                   child: Text(
                     'No family members available',
@@ -566,7 +566,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Select which hubs/family calendars this event appears on',
               style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),
@@ -606,8 +606,8 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
             ),
             // Hub calendars
             if (_availableHubs.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: Center(
                   child: Text(
                     'No hubs available',

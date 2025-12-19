@@ -257,8 +257,8 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
         ),
         const SizedBox(height: 8),
         if (_dependencyTaskIds.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(8.0),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
             child: Text(
               'No dependencies. This task can be started immediately.',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12),

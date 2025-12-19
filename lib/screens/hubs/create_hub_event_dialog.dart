@@ -217,7 +217,7 @@ class _CreateHubEventDialogState extends State<CreateHubEventDialog> {
               ),
               const SizedBox(height: 8),
               if (widget.members.isEmpty)
-                const Text(
+                Text(
                   'No members to invite',
                   style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                 )

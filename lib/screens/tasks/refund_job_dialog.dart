@@ -191,7 +191,7 @@ class _RefundJobDialogState extends State<RefundJobDialog> {
             foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: _isProcessing
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(

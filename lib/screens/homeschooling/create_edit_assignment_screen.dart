@@ -323,7 +323,7 @@ class _CreateEditAssignmentScreenState extends State<CreateEditAssignmentScreen>
                     }
                   },
                   icon: _isSaving
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(

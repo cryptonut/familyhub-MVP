@@ -82,7 +82,7 @@ class SwipeableListItem extends StatelessWidget {
           const SizedBox(width: AppTheme.spacingSM),
           Text(
             action.label,
-            style: const TextStyle(
+            style: TextStyle(
               color: Theme.of(context).colorScheme.onPrimary,
               fontWeight: FontWeight.bold,
             ),

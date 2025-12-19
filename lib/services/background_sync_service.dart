@@ -2,11 +2,14 @@ import 'package:flutter/foundation.dart';
 import 'package:workmanager/workmanager.dart';
 import '../core/services/logger_service.dart';
 import 'calendar_sync_service.dart';
+import 'recurring_transaction_service.dart';
 
 /// Service for background calendar synchronization
 class BackgroundSyncService {
   static const String _syncTaskName = 'calendarSyncTask';
+  static const String _recurringTransactionTaskName = 'recurringTransactionTask';
   static const Duration _syncInterval = Duration(minutes: 30);
+  static const Duration _recurringTransactionInterval = Duration(hours: 24); // Daily
 
   /// Initialize background sync
   static Future<void> initialize() async {
@@ -42,6 +45,27 @@ class BackgroundSyncService {
     }
   }
 
+  /// Register periodic recurring transaction processing
+  static Future<void> registerRecurringTransactionProcessing() async {
+    try {
+      await Workmanager().registerPeriodicTask(
+        _recurringTransactionTaskName,
+        _recurringTransactionTaskName,
+        frequency: _recurringTransactionInterval,
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+          requiresBatteryNotLow: false,
+          requiresCharging: false,
+          requiresDeviceIdle: false,
+          requiresStorageNotLow: false,
+        ),
+      );
+      Logger.info('Periodic recurring transaction processing registered', tag: 'BackgroundSyncService');
+    } catch (e, st) {
+      Logger.error('Error registering recurring transaction processing', error: e, stackTrace: st, tag: 'BackgroundSyncService');
+    }
+  }
+
   /// Cancel periodic sync
   static Future<void> cancelPeriodicSync() async {
     try {
@@ -71,13 +95,20 @@ class BackgroundSyncService {
 void _callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
-      Logger.info('Background calendar sync started', tag: 'BackgroundSyncService');
-      final syncService = CalendarSyncService();
-      await syncService.performSync();
-      Logger.info('Background calendar sync completed', tag: 'BackgroundSyncService');
+      if (task == 'calendarSyncTask') {
+        Logger.info('Background calendar sync started', tag: 'BackgroundSyncService');
+        final syncService = CalendarSyncService();
+        await syncService.performSync();
+        Logger.info('Background calendar sync completed', tag: 'BackgroundSyncService');
+      } else if (task == 'recurringTransactionTask') {
+        Logger.info('Background recurring transaction processing started', tag: 'BackgroundSyncService');
+        final recurringService = RecurringTransactionService();
+        await recurringService.processRecurringTransactions();
+        Logger.info('Background recurring transaction processing completed', tag: 'BackgroundSyncService');
+      }
       return true;
     } catch (e, st) {
-      Logger.error('Background calendar sync error', error: e, stackTrace: st, tag: 'BackgroundSyncService');
+      Logger.error('Background task error', error: e, stackTrace: st, tag: 'BackgroundSyncService');
       return false;
     }
   });

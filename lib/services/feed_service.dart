@@ -356,80 +356,152 @@ class FeedService extends ChatService {
     });
   }
 
-  /// Get multi-hub feed (aggregates posts from multiple hubs)
+  /// Get multi-hub feed (aggregates posts from multiple hubs in real-time)
   Stream<List<ChatMessage>> _getMultiHubFeedStream(
     List<String> hubIds,
     int limit,
     bool includeReplies,
-  ) async* {
-    // Create streams for each hub
-    final streams = hubIds.map((hubId) {
+  ) {
+    // Use StreamController to merge multiple hub streams in real-time
+    final controller = StreamController<List<ChatMessage>>();
+    final hubMessages = <String, Map<String, ChatMessage>>{}; // hubId -> messageId -> message
+    final hubReady = <String, bool>{};
+    
+    // Initialize tracking for each hub
+    for (final hubId in hubIds) {
+      hubMessages[hubId] = <String, ChatMessage>{};
+      hubReady[hubId] = false;
+    }
+    
+    void emitCombined() {
+      // Only emit if we have data from at least one hub
+      if (hubReady.values.every((ready) => !ready)) return;
+      
+      final allPosts = <ChatMessage>[];
+      final seenIds = <String>{};
+      
+      // Collect all messages from all hubs
+      for (final hubId in hubIds) {
+        final messages = hubMessages[hubId]?.values ?? <ChatMessage>[];
+        for (final message in messages) {
+          // Include if:
+          // 1. It's from this hub (hubId matches)
+          // 2. OR it's a cross-hub post visible to this hub
+          final visibleHubIds = message.visibleHubIds;
+          final isFromThisHub = message.hubId == hubId;
+          final isCrossHubVisible = visibleHubIds.isNotEmpty &&
+              (visibleHubIds.contains(hubId) || visibleHubIds.any((id) => hubIds.contains(id)));
+          
+          if ((isFromThisHub || isCrossHubVisible) && !seenIds.contains(message.id)) {
+            seenIds.add(message.id);
+            allPosts.add(message);
+          }
+        }
+      }
+      
+      // Sort by timestamp (newest first) and limit
+      allPosts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      final limited = allPosts.take(limit).toList();
+      
+      if (!controller.isClosed) {
+        controller.add(limited);
+      }
+    }
+    
+    // Create subscriptions for each hub stream
+    final subscriptions = <StreamSubscription>[];
+    
+    for (final hubId in hubIds) {
       final collectionPath = FirestorePathUtils.getHubSubcollectionPath(hubId, 'messages');
       final query = _feedFirestore
           .collection(collectionPath)
           .where('parentMessageId', isNull: includeReplies ? null : true)
           .orderBy('timestamp', descending: true)
           .limit(limit);
-
-      // If cross-hub posts exist, also query for them
-      return query.snapshots().map((snapshot) {
-        return snapshot.docs
-            .map((doc) {
+      
+      final subscription = query.snapshots().listen(
+        (snapshot) async {
+          try {
+            final messages = <ChatMessage>[];
+            for (final doc in snapshot.docs) {
               try {
-                final data = doc.data();
-                final message = ChatMessage.fromJson({'id': doc.id, ...data});
-
-                // Include if:
-                // 1. It's from this hub (hubId matches)
-                // 2. OR it's a cross-hub post visible to this hub
-                final visibleHubIds = message.visibleHubIds;
-                final isFromThisHub = message.hubId == hubId;
-                final isCrossHubVisible = visibleHubIds.isNotEmpty &&
-                    (visibleHubIds.contains(hubId) || visibleHubIds.any((id) => hubIds.contains(id)));
-
-                if (isFromThisHub || isCrossHubVisible) {
-                  return message;
+                final data = doc.data() as Map<String, dynamic>;
+                var messageData = {'id': doc.id, ...data};
+                
+                // Populate senderPhotoUrl if missing (same as single-hub feed)
+                final senderId = messageData['senderId'] as String?;
+                if (senderId != null && 
+                    (messageData['senderPhotoUrl'] == null || 
+                     (messageData['senderPhotoUrl'] as String).isEmpty)) {
+                  try {
+                    final userDoc = await _feedFirestore
+                        .collection(FirestorePathUtils.getUsersCollection())
+                        .doc(senderId)
+                        .get();
+                    if (!userDoc.exists) {
+                      final unprefixedDoc = await _feedFirestore
+                          .collection('users')
+                          .doc(senderId)
+                          .get();
+                      if (unprefixedDoc.exists) {
+                        final userData = unprefixedDoc.data();
+                        final photoUrl = userData?['photoUrl'] as String?;
+                        if (photoUrl != null && photoUrl.isNotEmpty) {
+                          messageData['senderPhotoUrl'] = photoUrl;
+                        }
+                      }
+                    } else {
+                      final userData = userDoc.data();
+                      final photoUrl = userData?['photoUrl'] as String?;
+                      if (photoUrl != null && photoUrl.isNotEmpty) {
+                        messageData['senderPhotoUrl'] = photoUrl;
+                      }
+                    }
+                  } catch (e) {
+                    Logger.warning('Error fetching sender photo for ${doc.id}', error: e, tag: 'FeedService');
+                  }
                 }
-                return null;
+                
+                messages.add(ChatMessage.fromJson(messageData));
               } on Exception catch (e) {
                 Logger.warning('Error parsing message ${doc.id}', error: e, tag: 'FeedService');
-                return null;
               }
-            })
-            .whereType<ChatMessage>()
-            .toList();
-      });
-    }).toList();
-
-    // Merge streams using CombineLatestStream or similar
-    // For now, use a simpler approach: combine all streams and merge results
-    yield* Stream.periodic(const Duration(seconds: 2), (_) async {
-      final allPosts = <ChatMessage>[];
-
-      // Get latest from each stream
-      for (final stream in streams) {
-        try {
-          final posts = await stream.first.timeout(const Duration(seconds: 1));
-          allPosts.addAll(posts);
-        } on Exception catch (e) {
-          Logger.warning('Error fetching hub feed', error: e, tag: 'FeedService');
-        }
+            }
+            
+            // Update hub messages map
+            hubMessages[hubId]?.clear();
+            for (final msg in messages) {
+              hubMessages[hubId]?[msg.id] = msg;
+            }
+            hubReady[hubId] = true;
+            emitCombined();
+          } catch (e) {
+            Logger.error('Error processing hub feed for $hubId', error: e, tag: 'FeedService');
+            hubReady[hubId] = true; // Mark as ready even on error to allow emission
+            emitCombined();
+          }
+        },
+        onError: (error) {
+          Logger.error('Error in hub feed stream for $hubId', error: error, tag: 'FeedService');
+          hubReady[hubId] = true; // Mark as ready even on error to allow emission
+          emitCombined();
+        },
+      );
+      
+      subscriptions.add(subscription);
+    }
+    
+    // Clean up when stream is cancelled
+    controller.onCancel = () {
+      for (final subscription in subscriptions) {
+        subscription.cancel();
       }
-
-      // Remove duplicates (same message ID)
-      final uniquePosts = <String, ChatMessage>{};
-      for (final post in allPosts) {
-        if (!uniquePosts.containsKey(post.id)) {
-          uniquePosts[post.id] = post;
-        }
+      if (!controller.isClosed) {
+        controller.close();
       }
-
-      // Sort by timestamp and limit
-      final sorted = uniquePosts.values.toList()
-        ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-      return sorted.take(limit).toList();
-    }).asyncMap((future) => future);
+    };
+    
+    return controller.stream;
   }
 
   /// Get comments/replies for a post (with threading support)

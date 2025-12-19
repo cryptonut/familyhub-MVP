@@ -589,7 +589,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Syncing with:',
                                 style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                               ),
@@ -692,7 +692,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Sync your FamilyHub events with your device calendar (Google, Apple, Outlook)',
               style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),

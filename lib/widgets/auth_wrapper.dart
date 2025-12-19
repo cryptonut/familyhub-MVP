@@ -244,7 +244,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text(
+                      content: Text(
                         'Cannot load data from Firestore. Please sign out and sign back in, or check your connection.',
                         style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                       ),
@@ -269,7 +269,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
               if (mounted && e.toString().toLowerCase().contains('unavailable')) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: const Text(
+                    content: Text(
                       'Firestore is unavailable. Sign out and try again.',
                       style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                     ),

@@ -13,8 +13,8 @@
 | **Phase 2: Extended Family** | ✅ Complete | ~95% | Medium |
 | **Phase 3: Homeschooling** | ✅ Complete | ~95% | Medium |
 | **Phase 4: Co-Parenting** | ✅ Complete | ~95% | Medium |
-| **Phase 5: Feed Redesign** | 🚧 In Progress | ~50% | **HIGH** |
-| **Phase 6: Budgeting** | ✅ Core Complete | ~85% | Low (polish) |
+| **Phase 5: Feed Redesign** | 🚧 In Progress | ~75% | **HIGH** |
+| **Phase 6: Budgeting** | ✅ Complete | ~100% | Low (polish) |
 | **Phase 7: Pets Hub** | 🚧 Design Phase | ~5% | Medium |
 
 ---
@@ -162,7 +162,7 @@
 
 ---
 
-## 🚧 **PHASE 5: SOCIAL FEED REDESIGN** (~50%)
+## 🚧 **PHASE 5: SOCIAL FEED REDESIGN** (~75%)
 
 ### Completed
 - [x] Extended ChatMessage model with feed fields (PostType, PollOption, UrlPreview, engagement metrics)
@@ -171,19 +171,23 @@
 - [x] PostCard component (text posts with engagement)
 - [x] PollCard component (poll posts with voting)
 - [x] PostDetailScreen (post detail with comments)
-
-### Completed
 - [x] URL Preview Service (fetch metadata, generate preview cards) ✅
 - [x] URL preview integration in FeedService ✅
+- [x] FeedScreen "All" tab fix - now shows same messages as ChatWidget preview ✅
+  - Fixed data source discrepancy: FeedScreen now uses ChatService for family feed to match ChatWidget behavior
+- [x] Comment Threading (enhanced - nested replies) ✅
+  - UI now supports full depth (3 levels) instead of 2
+  - Backend already supported maxDepth=3, UI was limiting it
+- [x] Cross-Hub Integration (multi-hub feed aggregation) ✅
+  - Replaced polling-based approach (2-second intervals) with real-time stream merging
+  - Uses StreamController pattern similar to ChatService for efficient real-time updates
 
-### In Progress
-- [ ] Comment Threading (enhanced - nested replies)
-- [ ] Cross-Hub Integration (multi-hub feed aggregation)
+### Remaining
 - [ ] Integration with existing chat screens (replace or add toggle)
 
 ---
 
-## ✅ **PHASE 6: FAMILY BUDGETING SYSTEM** (~85%)
+## ✅ **PHASE 6: FAMILY BUDGETING SYSTEM** (~100%)
 
 ### Completed
 - [x] Core budget creation and management
@@ -191,10 +195,17 @@
 - [x] Category management
 - [x] Granular budget items with progress tracking
 - [x] Delete functionality
-
-### Remaining
-- [ ] Advanced analytics (charts)
-- [ ] Recurring transactions (infrastructure ready)
+- [x] Advanced analytics (charts) ✅
+  - CategorySpendingChart (pie chart) implemented and integrated
+  - SpendingTrendsChart (line chart) implemented and integrated
+  - Both gated behind premium check
+- [x] Recurring transactions ✅
+  - RecurringTransaction model created
+  - RecurringTransactionService created (CRUD operations, processing)
+  - UI integrated into BudgetDetailScreen
+  - Free tier limit (5 max) enforced
+  - Full create/edit dialogs with all fields (RecurringTransactionEditDialog)
+  - Background job integration (registered in BackgroundSyncService, runs daily) (infrastructure ready)
 - [ ] Premium features (individual/project budgets - infrastructure ready)
 
 ---
@@ -234,5 +245,5 @@
 
 ---
 
-**Last Updated:** December 19, 2025 (Latest: Dark mode screens 100% complete, documentation updated)
+**Last Updated:** December 19, 2025 (Latest: FeedScreen "All" tab fix, MessageExpirationService errors fixed, TransformLayer errors fixed)
 

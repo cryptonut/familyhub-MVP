@@ -385,7 +385,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               color: Colors.green,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Best Value',
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.onPrimary,

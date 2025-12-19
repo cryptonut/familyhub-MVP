@@ -325,7 +325,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Family Members',
                           style: TextStyle(
                             fontSize: 12,

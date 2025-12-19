@@ -96,7 +96,7 @@ class _GrantPremiumTestScreenState extends State<GrantPremiumTestScreen> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'This tool grants premium subscription access for testing purposes. Enter either an email address or user ID.',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),

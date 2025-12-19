@@ -235,7 +235,7 @@ class _MigrationScreenState extends State<MigrationScreen> {
             Expanded(
               child: Card(
                 child: _logs.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'No logs yet. Click "Run Migration" to start.',
                           style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),

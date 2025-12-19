@@ -163,7 +163,7 @@ class _RequestPayoutDialogState extends State<RequestPayoutDialog> {
             foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: _isProcessing
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(

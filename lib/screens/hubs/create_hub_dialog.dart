@@ -380,7 +380,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
                             color: Colors.green,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
+                          child: Text(
                             'FREE',
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onPrimary,

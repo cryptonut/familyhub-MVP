@@ -12,6 +12,9 @@ import '../../widgets/budget_item_edit_dialog.dart';
 import '../../widgets/premium_feature_gate.dart';
 import '../../widgets/budget/category_spending_chart.dart';
 import '../../widgets/budget/spending_trends_chart.dart';
+import '../../services/recurring_transaction_service.dart';
+import '../../models/recurring_transaction.dart';
+import '../../widgets/recurring_transaction_edit_dialog.dart';
 import 'package:intl/intl.dart';
 
 /// Budget detail screen with items, progress, and adherence
@@ -31,6 +34,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
   final BudgetItemService _itemService = BudgetItemService();
   final BudgetAnalyticsService _analyticsService = BudgetAnalyticsService();
   final SubscriptionService _subscriptionService = SubscriptionService();
+  final RecurringTransactionService _recurringService = RecurringTransactionService();
   
   List<BudgetItem> _items = [];
   BudgetProgressMetrics? _progressMetrics;
@@ -38,6 +42,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
   bool _isPremium = false;
   List<CategorySpending> _categoryBreakdown = [];
   Map<DateTime, double> _spendingTrends = {};
+  List<RecurringTransaction> _recurringTransactions = [];
 
   @override
   void initState() {
@@ -87,10 +92,17 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
         }
       }
       
+      // Load recurring transactions
+      final recurring = await _recurringService.getRecurringTransactions(
+        budgetId: widget.budget.id,
+        activeOnly: false,
+      );
+      
       if (mounted) {
         setState(() {
           _items = items;
           _progressMetrics = progressMetrics;
+          _recurringTransactions = recurring;
           _isLoading = false;
         });
       }
@@ -331,6 +343,134 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildRecurringTransactionCard(
+    RecurringTransaction recurring,
+    ThemeData theme,
+    NumberFormat currencyFormat,
+  ) {
+    final nextOccurrence = recurring.nextOccurrence ?? recurring.startDate;
+    final isOverdue = nextOccurrence.isBefore(DateTime.now());
+    
+    return ModernCard(
+      margin: const EdgeInsets.only(bottom: AppTheme.spacingSM),
+      child: ListTile(
+        title: Text(
+          recurring.description,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: recurring.isActive ? null : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text('${currencyFormat.format(recurring.amount)} • ${recurring.frequency.name}'),
+            Text(
+              'Next: ${DateFormat('MMM d, y').format(nextOccurrence)}${isOverdue ? ' (Overdue)' : ''}',
+              style: TextStyle(
+                color: isOverdue ? theme.colorScheme.error : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            if (!recurring.isActive)
+              Text(
+                'Inactive',
+                style: TextStyle(
+                  color: theme.colorScheme.error,
+                  fontSize: 12,
+                ),
+              ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, size: 20),
+              onPressed: () => _showEditRecurringDialog(recurring),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, size: 20),
+              onPressed: () => _showDeleteRecurringDialog(recurring),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCreateRecurringDialog() async {
+    if (!mounted) return;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => RecurringTransactionEditDialog(
+        budgetId: widget.budget.id,
+      ),
+    );
+    
+    if (result == true) {
+      _loadData();
+    }
+  }
+
+  Future<void> _showEditRecurringDialog(RecurringTransaction recurring) async {
+    if (!mounted) return;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => RecurringTransactionEditDialog(
+        recurring: recurring,
+        budgetId: widget.budget.id,
+      ),
+    );
+    
+    if (result == true) {
+      _loadData();
+    }
+  }
+
+  Future<void> _showDeleteRecurringDialog(RecurringTransaction recurring) async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Recurring Transaction?'),
+        content: Text('This will stop automatically creating transactions for "${recurring.description}". Existing transactions will not be deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _recurringService.deleteRecurringTransaction(
+          budgetId: widget.budget.id,
+          recurringId: recurring.id,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Recurring transaction deleted')),
+          );
+          _loadData();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting: $e')),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -641,7 +781,42 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                       ),
                     ],
 
+                    // Recurring Transactions Section
+                    const SizedBox(height: AppTheme.spacingLG),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Recurring Transactions',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: () => _showCreateRecurringDialog(),
+                          tooltip: 'Add Recurring Transaction',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppTheme.spacingSM),
+                    if (_recurringTransactions.isEmpty)
+                      ModernCard(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppTheme.spacingMD),
+                          child: Text(
+                            'No recurring transactions. Add one to automatically create transactions on a schedule.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      ..._recurringTransactions.map((recurring) => _buildRecurringTransactionCard(recurring, theme, currencyFormat)),
+
                     // Budget Items Section
+                    const SizedBox(height: AppTheme.spacingLG),
                     Text(
                       'Budget Items',
                       style: theme.textTheme.titleLarge?.copyWith(

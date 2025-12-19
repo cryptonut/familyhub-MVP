@@ -86,7 +86,7 @@ class _JoinFamilyScreenState extends State<JoinFamilyScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Enter the invitation code provided by a family member to join their family hub.',
                 style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                 textAlign: TextAlign.center,

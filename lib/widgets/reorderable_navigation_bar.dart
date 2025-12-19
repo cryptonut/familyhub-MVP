@@ -58,6 +58,11 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
     }
   }
 
+  /// Validate that an Offset contains finite values (not NaN or infinity)
+  bool _isValidOffset(Offset offset) {
+    return offset.dx.isFinite && offset.dy.isFinite;
+  }
+
   Future<void> _loadOrder() async {
     // If parent provided initialOrder, use it to sync
     if (widget.initialOrder != null && widget.initialOrder!.length == widget.destinations.length) {
@@ -356,7 +361,9 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
                             children: [
                               Transform.translate(
                                 offset: isDragging && _dragOffset != null
-                                    ? Offset(_dragOffset!.dx - 24, _dragOffset!.dy - 24)
+                                    ? _isValidOffset(_dragOffset!)
+                                        ? Offset(_dragOffset!.dx - 24, _dragOffset!.dy - 24)
+                                        : Offset.zero
                                     : Offset.zero,
                                 child: Transform.scale(
                                   scale: isDragging ? 1.5 : 1.0, // Make dragged icon 50% larger
@@ -395,7 +402,7 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
                                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(
+                                    child: Icon(
                                       Icons.lock,
                                       size: 10,
                                       color: Theme.of(context).colorScheme.onPrimary,

@@ -1324,19 +1324,23 @@ class AuthService {
           Logger.warning('getFamilyMembers: Prefixed query failed, using fallback', error: e, tag: 'AuthService');
           final allUsersSnapshot = await _firestore
               .collection(prefixedCollection)
-              .limit(100)
               .get(GetOptions(source: Source.server));
-          
+
           prefixedSnapshot = allUsersSnapshot;
         }
         
         for (var doc in prefixedSnapshot.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          final docFamilyId = data['familyId'] as String?;
-          if (docFamilyId == currentUserModel.familyId && !seenUserIds.contains(doc.id)) {
-            allFamilyMembers.add(UserModel.fromJson(data));
-            seenUserIds.add(doc.id);
-            Logger.debug('  Found in $prefixedCollection: ${data['displayName']} (${doc.id})', tag: 'AuthService');
+          try {
+            final data = doc.data() as Map<String, dynamic>;
+            final docFamilyId = data['familyId'] as String?;
+            if (docFamilyId == currentUserModel.familyId && !seenUserIds.contains(doc.id)) {
+              final userModel = UserModel.fromJson({'uid': doc.id, ...data});
+              allFamilyMembers.add(userModel);
+              seenUserIds.add(doc.id);
+              Logger.debug('  Found in $prefixedCollection: ${userModel.displayName} (${doc.id})', tag: 'AuthService');
+            }
+          } catch (e, st) {
+            Logger.warning('getFamilyMembers: Error parsing user ${doc.id}', error: e, stackTrace: st, tag: 'AuthService');
           }
         }
       } catch (e, st) {
@@ -1358,19 +1362,23 @@ class AuthService {
             Logger.warning('getFamilyMembers: Unprefixed query failed, using fallback', error: e, tag: 'AuthService');
             final allUsersSnapshot = await _firestore
                 .collection(unprefixedCollection)
-                .limit(100)
                 .get(GetOptions(source: Source.server));
-            
+
             unprefixedSnapshot = allUsersSnapshot;
           }
           
           for (var doc in unprefixedSnapshot.docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final docFamilyId = data['familyId'] as String?;
-            if (docFamilyId == currentUserModel.familyId && !seenUserIds.contains(doc.id)) {
-              allFamilyMembers.add(UserModel.fromJson(data));
-              seenUserIds.add(doc.id);
-              Logger.debug('  Found in $unprefixedCollection: ${data['displayName']} (${doc.id})', tag: 'AuthService');
+            try {
+              final data = doc.data() as Map<String, dynamic>;
+              final docFamilyId = data['familyId'] as String?;
+              if (docFamilyId == currentUserModel.familyId && !seenUserIds.contains(doc.id)) {
+                final userModel = UserModel.fromJson({'uid': doc.id, ...data});
+                allFamilyMembers.add(userModel);
+                seenUserIds.add(doc.id);
+                Logger.debug('  Found in $unprefixedCollection: ${userModel.displayName} (${doc.id})', tag: 'AuthService');
+              }
+            } catch (e, st) {
+              Logger.warning('getFamilyMembers: Error parsing user ${doc.id}', error: e, stackTrace: st, tag: 'AuthService');
             }
           }
         } catch (e, st) {

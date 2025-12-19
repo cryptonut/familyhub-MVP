@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/chat_message.dart';
 import '../../services/auth_service.dart';
 import '../../services/feed_service.dart';
+import '../../services/chat_service.dart';
 import '../../services/hub_service.dart';
 import '../../utils/app_theme.dart';
 import 'poll_card.dart';
@@ -27,6 +28,7 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> {
   final FeedService _feedService = FeedService();
+  final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
   final HubService _hubService = HubService();
   final ScrollController _scrollController = ScrollController();
@@ -49,13 +51,15 @@ class _FeedScreenState extends State<FeedScreen> {
     super.dispose();
   }
 
+  List<String>? _allHubIds; // For aggregating all hubs in "All" feed
+
   Future<void> _loadCurrentUser() async {
     final userModel = await _authService.getCurrentUserModel();
     if (mounted) {
       setState(() {
         _currentUserId = userModel?.uid;
       });
-      // Load available hubs for cross-hub sharing
+      // Load available hubs for cross-hub sharing and aggregation
       await _loadAvailableHubs();
     }
   }
@@ -69,6 +73,11 @@ class _FeedScreenState extends State<FeedScreen> {
             'id': hub.id,
             'name': hub.name,
           },).toList();
+          
+          // For "All" feed (no hubId/hubIds specified), aggregate all user's hubs
+          if (widget.hubId == null && widget.hubIds == null) {
+            _allHubIds = hubs.map((hub) => hub.id).toList();
+          }
         });
       }
     } on Exception {
@@ -84,6 +93,31 @@ class _FeedScreenState extends State<FeedScreen> {
         _searchController.clear();
       }
     });
+  }
+
+  /// Get the appropriate messages stream based on context
+  /// For family feed (no hubId/hubIds specified), use ChatService to show all messages like ChatWidget
+  /// For hub feeds, use FeedService to show feed-style posts
+  Stream<List<ChatMessage>> _getMessagesStream() {
+    // If showing family feed (no hubId/hubIds explicitly passed), use ChatService to show all messages
+    // This matches what ChatWidget shows on the home screen
+    // Note: ChatService.getMessagesStream() only queries families/{familyId}/messages,
+    // so hub messages (stored in hubs/{hubId}/messages) won't appear - they're in separate collections
+    if (widget.hubId == null && widget.hubIds == null) {
+      // Use ChatService.getMessagesStream() and reverse order (newest first for feed style)
+      return _chatService.getMessagesStream().map((messages) {
+        // Reverse to show newest first (feed style)
+        return messages.reversed.toList();
+      });
+    }
+    
+    // For hub feeds, use FeedService (feed-style, top-level posts)
+    return _feedService.getFeedStream(
+      hubId: widget.hubId,
+      hubIds: widget.hubIds ?? _allHubIds,
+      limit: 20,
+      includeReplies: false,
+    );
   }
 
   @override
@@ -136,12 +170,7 @@ class _FeedScreenState extends State<FeedScreen> {
           setState(() {});
         },
         child: StreamBuilder<List<ChatMessage>>(
-          stream: _feedService.getFeedStream(
-            hubId: widget.hubId,
-            hubIds: widget.hubIds,
-            limit: 20,
-            includeReplies: false,
-          ),
+          stream: _getMessagesStream(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());

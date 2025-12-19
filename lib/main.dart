@@ -372,6 +372,23 @@ void _initializeBackgroundSync() {
           throw TimeoutException('Background sync initialization timed out');
         },
       );
+      
+      // Register background tasks
+      await BackgroundSyncService.registerPeriodicSync().timeout(
+        AppConstants.backgroundTaskTimeout,
+        onTimeout: () {
+          throw TimeoutException('Periodic sync registration timed out');
+        },
+      );
+      
+      await BackgroundSyncService.registerRecurringTransactionProcessing().timeout(
+        AppConstants.backgroundTaskTimeout,
+        onTimeout: () {
+          throw TimeoutException('Recurring transaction processing registration timed out');
+        },
+      );
+      
+      Logger.info('✓ Background sync service initialized', tag: 'main');
       Logger.info('✓ Background sync service initialized', tag: 'main');
     } catch (e, st) {
       Logger.warning('⚠ Background sync service initialization error', error: e, stackTrace: st, tag: 'main');

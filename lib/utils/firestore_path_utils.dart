@@ -95,5 +95,15 @@ class FirestorePathUtils {
   static String getHubSubcollectionPath(String hubId, String subcollection) {
     return getCollectionPath('hubs/$hubId/$subcollection');
   }
+  
+  /// Get a budget subcollection path with prefix
+  /// 
+  /// [familyId] - The family ID
+  /// [budgetId] - The budget ID
+  /// [subcollection] - The subcollection name (e.g., 'transactions', 'categories', 'recurringTransactions')
+  /// Returns: 'dev_families/$familyId/budgets/$budgetId/transactions' or 'families/$familyId/budgets/$budgetId/transactions' (prod)
+  static String getBudgetSubcollectionPath(String familyId, String budgetId, String subcollection) {
+    return getCollectionPath('families/$familyId/budgets/$budgetId/$subcollection');
+  }
 }
 

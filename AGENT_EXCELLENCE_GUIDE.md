@@ -907,6 +907,20 @@ Get-Process -Name "java","gradle" | Stop-Process -Force
 
 ### 🛠️ Useful Debugging Commands
 
+**🚨 CRITICAL: Terminal Timeout Issues**
+
+**If terminal commands timeout in Cursor, use separate PowerShell windows:**
+```powershell
+# ✅ CORRECT: Use separate window for commands that might timeout
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; [your-command]"
+
+# ✅ CORRECT: Use monitor_logcat.ps1 for log monitoring
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; .\monitor_logcat.ps1"
+
+# ❌ WRONG: Running in Cursor's integrated terminal (will timeout)
+# [your-command]
+```
+
 **PowerShell:**
 ```powershell
 # Check current directory
@@ -941,6 +955,23 @@ flutter pub outdated
 
 **CRITICAL: When running Flutter apps, you MUST monitor the output:**
 
+**🚨 CRITICAL: Cursor Terminal Timeout Issues**
+
+**Cursor's integrated terminal frequently times out or corrupts, making it unreliable for monitoring.**
+- **ALWAYS use separate PowerShell windows** for commands that need monitoring
+- **ALWAYS use `monitor_logcat.ps1` script** for logcat monitoring (found in project root)
+- **NEVER rely on Cursor's integrated terminal** for long-running commands or real-time monitoring
+- **Use `Start-Process powershell`** to open separate windows that won't timeout
+
+**This applies to:**
+- App runs (`flutter run`)
+- Build commands (`flutter build`)
+- Log monitoring (`adb logcat`)
+- Any long-running command
+- Any command where you need to see real-time output
+
+**If a terminal command times out, it's because you should have used a separate PowerShell window.**
+
 ## 🚨 MANDATORY APP RUN SEQUENCE
 
 **YOU CANNOT SKIP THESE STEPS. YOU MUST REPORT COMPLETION OF EACH STEP:**
@@ -957,17 +988,25 @@ adb -s DEVICE_ID logcat -c
 ```
 **REPORT:** "Logs cleared"
 
-**Step 3: Start Log Monitoring (in separate terminal or background)**
+**Step 3: Start Log Monitoring (MUST use separate PowerShell window)**
 ```powershell
-adb -s DEVICE_ID logcat Flutter:I *:S
-```
-**REPORT:** "Log monitoring started"
+# ✅ CORRECT: Use the monitor_logcat.ps1 script in a separate PowerShell window
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; .\monitor_logcat.ps1"
 
-**Step 4: Run App**
-```powershell
-flutter run --flavor qa -t lib/main.dart -d DEVICE_ID
+# OR manually:
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; adb -s DEVICE_ID logcat Flutter:I *:S"
 ```
-**REPORT:** "App build started. Monitoring output..."
+**REPORT:** "Log monitoring started in separate PowerShell window"
+
+**Step 4: Run App (MUST use separate PowerShell window to see output)**
+```powershell
+# ✅ CORRECT: Run in separate PowerShell window so you can see the output
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; flutter run --flavor qa -d DEVICE_ID"
+
+# ❌ WRONG: Running in background without visible output
+# flutter run --flavor qa -d DEVICE_ID  # This will timeout in Cursor terminal
+```
+**REPORT:** "App build started in separate PowerShell window. Monitoring output..."
 
 **Step 5: WAIT AND WATCH**
 - **DO NOT** proceed until you see "BUILD SUCCEEDED" or similar success message
@@ -982,13 +1021,27 @@ flutter run --flavor qa -t lib/main.dart -d DEVICE_ID
 
 ---
 
-**Alternative: If you need background execution, you MUST still monitor:**
+**🚨 CRITICAL: Always Use Separate PowerShell Windows**
+
+**The Cursor integrated terminal WILL timeout. Always use separate windows:**
 
 ```powershell
-# ✅ CORRECT: If you need background, monitor via logs
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; flutter run --flavor qa -t lib/main.dart -d DEVICE_ID"
-# Then monitor: adb logcat or check the PowerShell window
+# ✅ CORRECT: Always use Start-Process for commands that need monitoring
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; flutter run --flavor qa -d DEVICE_ID"
+
+# ✅ CORRECT: Use monitor_logcat.ps1 script for log monitoring
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; .\monitor_logcat.ps1"
+
+# ❌ WRONG: Running in Cursor's integrated terminal (will timeout)
+# flutter run --flavor qa -d DEVICE_ID
+
+# ❌ WRONG: Running in background without visible output
+# flutter run --flavor qa -d DEVICE_ID  # (is_background: true)
 ```
+
+**Available Scripts:**
+- `monitor_logcat.ps1` - Real-time logcat monitoring with filtering
+- `get_app_logs.ps1` - Get recent app logs (not real-time)
 
 **VERIFICATION CHECKLIST when running apps:**
 - [ ] Did I see "Launching lib/main.dart..." in output?

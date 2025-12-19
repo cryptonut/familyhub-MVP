@@ -320,7 +320,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             child: events.length > 1
                                 ? Text(
                                     '${events.length}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: Theme.of(context).colorScheme.onPrimary,
                                       fontSize: 8,
                                       fontWeight: FontWeight.bold,

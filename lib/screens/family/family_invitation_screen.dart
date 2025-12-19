@@ -310,7 +310,7 @@ Best regards''';
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Unable to load or create a family invitation code.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
@@ -387,7 +387,7 @@ Best regards''';
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'Share this invitation code with your family members so they can join your family hub.',
                         style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         textAlign: TextAlign.center,

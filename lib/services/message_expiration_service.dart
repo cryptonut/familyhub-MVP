@@ -62,46 +62,67 @@ class MessageExpirationService {
           .limit(100) // Process in batches
           .get();
       
+      if (familiesSnapshot.docs.isEmpty) {
+        // No families to check - this is normal, not an error
+        return;
+      }
+      
       for (var familyDoc in familiesSnapshot.docs) {
-        final familyId = familyDoc.id;
-        final messagesPath = FirestorePathUtils.getFamilySubcollectionPath(familyId, 'messages');
-        
-        // Query messages with expiration before now
-        final expiredMessages = await _firestore
-            .collection(messagesPath)
-            .where('expiresAt', isLessThan: Timestamp.fromDate(now))
-            .where('isEncrypted', isEqualTo: true)
-            .limit(500) // Firestore batch limit
-            .get();
-        
-        if (expiredMessages.docs.isNotEmpty) {
-          // Delete expired messages in batches
-          final batch = _firestore.batch();
-          var batchCount = 0;
+        try {
+          final familyId = familyDoc.id;
+          final messagesPath = FirestorePathUtils.getFamilySubcollectionPath(familyId, 'messages');
           
-          for (var doc in expiredMessages.docs) {
-            batch.delete(doc.reference);
-            batchCount++;
+          // Query messages with expiration before now
+          final expiredMessages = await _firestore
+              .collection(messagesPath)
+              .where('expiresAt', isLessThan: Timestamp.fromDate(now))
+              .where('isEncrypted', isEqualTo: true)
+              .limit(500) // Firestore batch limit
+              .get();
+          
+          if (expiredMessages.docs.isNotEmpty) {
+            // Delete expired messages in batches
+            var batch = _firestore.batch();
+            var batchCount = 0;
             
-            // Commit batch every 500 operations
-            if (batchCount >= 500) {
-              await batch.commit();
-              batchCount = 0;
+            for (var doc in expiredMessages.docs) {
+              batch.delete(doc.reference);
+              batchCount++;
+              
+              // Commit batch every 500 operations
+              if (batchCount >= 500) {
+                await batch.commit();
+                batch = _firestore.batch(); // Create new batch
+                batchCount = 0;
+              }
             }
+            
+            if (batchCount > 0) {
+              await batch.commit();
+            }
+            
+            Logger.info(
+              'Deleted ${expiredMessages.docs.length} expired messages from family $familyId',
+              tag: 'MessageExpirationService',
+            );
           }
-          
-          if (batchCount > 0) {
-            await batch.commit();
-          }
-          
-          Logger.info(
-            'Deleted ${expiredMessages.docs.length} expired messages from family $familyId',
+        } catch (e, stackTrace) {
+          // Log individual family errors but continue processing others
+          Logger.error(
+            'Error checking messages for family ${familyDoc.id}',
+            error: e,
+            stackTrace: stackTrace,
             tag: 'MessageExpirationService',
           );
         }
       }
-    } catch (e) {
-      Logger.error('Error checking family messages', error: e, tag: 'MessageExpirationService');
+    } catch (e, stackTrace) {
+      Logger.error(
+        'Error checking family messages',
+        error: e,
+        stackTrace: stackTrace,
+        tag: 'MessageExpirationService',
+      );
     }
   }
   
@@ -114,46 +135,67 @@ class MessageExpirationService {
           .limit(100) // Process in batches
           .get();
       
+      if (hubsSnapshot.docs.isEmpty) {
+        // No hubs to check - this is normal, not an error
+        return;
+      }
+      
       for (var hubDoc in hubsSnapshot.docs) {
-        final hubId = hubDoc.id;
-        final messagesPath = FirestorePathUtils.getHubSubcollectionPath(hubId, 'messages');
-        
-        // Query messages with expiration before now
-        final expiredMessages = await _firestore
-            .collection(messagesPath)
-            .where('expiresAt', isLessThan: Timestamp.fromDate(now))
-            .where('isEncrypted', isEqualTo: true)
-            .limit(500) // Firestore batch limit
-            .get();
-        
-        if (expiredMessages.docs.isNotEmpty) {
-          // Delete expired messages in batches
-          final batch = _firestore.batch();
-          var batchCount = 0;
+        try {
+          final hubId = hubDoc.id;
+          final messagesPath = FirestorePathUtils.getHubSubcollectionPath(hubId, 'messages');
           
-          for (var doc in expiredMessages.docs) {
-            batch.delete(doc.reference);
-            batchCount++;
+          // Query messages with expiration before now
+          final expiredMessages = await _firestore
+              .collection(messagesPath)
+              .where('expiresAt', isLessThan: Timestamp.fromDate(now))
+              .where('isEncrypted', isEqualTo: true)
+              .limit(500) // Firestore batch limit
+              .get();
+          
+          if (expiredMessages.docs.isNotEmpty) {
+            // Delete expired messages in batches
+            var batch = _firestore.batch();
+            var batchCount = 0;
             
-            // Commit batch every 500 operations
-            if (batchCount >= 500) {
-              await batch.commit();
-              batchCount = 0;
+            for (var doc in expiredMessages.docs) {
+              batch.delete(doc.reference);
+              batchCount++;
+              
+              // Commit batch every 500 operations
+              if (batchCount >= 500) {
+                await batch.commit();
+                batch = _firestore.batch(); // Create new batch
+                batchCount = 0;
+              }
             }
+            
+            if (batchCount > 0) {
+              await batch.commit();
+            }
+            
+            Logger.info(
+              'Deleted ${expiredMessages.docs.length} expired messages from hub $hubId',
+              tag: 'MessageExpirationService',
+            );
           }
-          
-          if (batchCount > 0) {
-            await batch.commit();
-          }
-          
-          Logger.info(
-            'Deleted ${expiredMessages.docs.length} expired messages from hub $hubId',
+        } catch (e, stackTrace) {
+          // Log individual hub errors but continue processing others
+          Logger.error(
+            'Error checking messages for hub ${hubDoc.id}',
+            error: e,
+            stackTrace: stackTrace,
             tag: 'MessageExpirationService',
           );
         }
       }
-    } catch (e) {
-      Logger.error('Error checking hub messages', error: e, tag: 'MessageExpirationService');
+    } catch (e, stackTrace) {
+      Logger.error(
+        'Error checking hub messages',
+        error: e,
+        stackTrace: stackTrace,
+        tag: 'MessageExpirationService',
+      );
     }
   }
   

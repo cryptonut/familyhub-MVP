@@ -371,7 +371,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                     ],
                                   ),
                                 ),
-                                const Icon(
+                                Icon(
                                   Icons.chevron_right,
                                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                 ),
@@ -405,7 +405,7 @@ class _WalletScreenState extends State<WalletScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Total Balance',
             style: TextStyle(
               fontSize: 16,
@@ -428,7 +428,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   const SizedBox(width: 8),
                   Text(
                     '${_completedJobs.length} completed, ${_createdJobs.length} created',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.7),
                     ),
