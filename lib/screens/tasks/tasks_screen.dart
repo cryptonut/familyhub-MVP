@@ -491,7 +491,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
       case 'low':
         return Colors.green;
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
     }
   }
   
@@ -702,9 +702,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey.shade700
-                : Colors.grey.shade300,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             width: 0.5, // Thinner border
           ),
         ),
@@ -1049,7 +1047,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         // Compact filter controls - collapsible
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          color: Colors.grey[50],
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1065,7 +1063,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                     Icon(
                       _completedFiltersExpanded ? Icons.expand_less : Icons.expand_more,
                       size: 18,
-                      color: Colors.grey[700],
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -1073,7 +1071,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
-                        color: Colors.grey[700],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                     const Spacer(),
@@ -1087,7 +1085,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                         child: const Text(
                           'Active',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onPrimary,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1104,7 +1102,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                       children: [
                         Text(
                           'Completed by:',
-                          style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                          style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                         ),
                         const SizedBox(width: 6),
                         Expanded(
@@ -1139,7 +1137,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                       children: [
                         Text(
                           'Time period:',
-                          style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                          style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                         ),
                         const SizedBox(width: 6),
                         Expanded(
@@ -1332,10 +1330,10 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                       color: Colors.orange,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
+                    child: Text(
                       'BLOCKED',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1355,14 +1353,14 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                       Logger.debug('_buildTasksList: Task ${task.id} createdBy=${task.createdBy}, name=$creatorName', tag: 'TasksScreen');
                       return Row(
                         children: [
-                          Icon(Icons.person_outline, size: 14, color: Colors.grey[600]),
+                          Icon(Icons.person_outline, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               'Created by: $creatorName',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[600],
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                 fontStyle: FontStyle.italic,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -1430,7 +1428,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                          Icon(Icons.calendar_today, size: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                           const SizedBox(width: 4),
                           Text(
                             app_date_utils.AppDateUtils.formatDate(task.dueDate!),
@@ -1439,7 +1437,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                               color: task.dueDate!.isBefore(DateTime.now()) &&
                                       !task.isCompleted
                                   ? Colors.red
-                                  : Colors.grey[600],
+                                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ],

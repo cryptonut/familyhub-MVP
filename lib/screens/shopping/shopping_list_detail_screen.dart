@@ -1008,7 +1008,7 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Center(
@@ -1036,11 +1036,11 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
         break;
       case ShoppingItemStatus.cancelled:
         icon = Icons.remove_circle;
-        color = Colors.grey;
+        color = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
         break;
       default:
         icon = Icons.help;
-        color = Colors.grey;
+        color = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
     }
 
     return Icon(icon, color: color, size: 40);
@@ -1113,7 +1113,7 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
         // Cancel button
         IconButton(
           icon: const Icon(Icons.remove_circle_outline),
-          color: Colors.grey,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
           tooltip: 'Cancel',
           onPressed: () => _markItemStatus(item, ShoppingItemStatus.cancelled),
         ),

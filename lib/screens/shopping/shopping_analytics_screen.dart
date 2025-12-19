@@ -192,7 +192,7 @@ class _ShoppingAnalyticsScreenState extends State<ShoppingAnalyticsScreen> {
               label,
               style: TextStyle(
                 fontSize: 14, // Slightly larger label
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -248,7 +248,7 @@ class _ShoppingAnalyticsScreenState extends State<ShoppingAnalyticsScreen> {
                     const SizedBox(height: 4),
                     LinearProgressIndicator(
                       value: percentage,
-                      backgroundColor: Colors.grey[200],
+                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                     ),
                   ],
                 ),
