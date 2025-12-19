@@ -450,7 +450,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                             const SizedBox(height: AppTheme.spacingXS),
                             LinearProgressIndicator(
                               value: _progressMetrics!.itemProgress / 100,
-                              backgroundColor: Colors.grey[300],
+                              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                               valueColor: AlwaysStoppedAnimation<Color>(
                                 AppTheme.primaryColor,
                               ),
@@ -477,7 +477,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                               const SizedBox(height: AppTheme.spacingXS),
                               LinearProgressIndicator(
                                 value: _progressMetrics!.dollarProgress / 100,
-                                backgroundColor: Colors.grey[300],
+                                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   _getAdherenceColor(_progressMetrics!.budgetAdherence),
                                 ),

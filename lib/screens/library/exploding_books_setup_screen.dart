@@ -176,7 +176,7 @@ class _ExplodingBooksSetupScreenState extends State<ExplodingBooksSetupScreen> {
                 },
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(color: Colors.grey.shade300),
+                  side: BorderSide(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                 ),
               ),
               const SizedBox(height: AppTheme.spacingLG),

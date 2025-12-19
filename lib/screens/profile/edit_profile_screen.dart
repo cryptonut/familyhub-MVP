@@ -192,7 +192,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 8),
             const Text(
               'Your birthday helps us remind your family members',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),
             const SizedBox(height: 16),
             ListTile(
@@ -203,15 +203,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     : 'Not set',
                 style: TextStyle(
                   color: _selectedBirthday != null 
-                      ? Colors.black87 
-                      : Colors.grey[600],
+                      ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87)
+                      : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
               trailing: const Icon(Icons.calendar_today),
               onTap: _selectBirthday,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: Colors.grey[300]!),
+                side: BorderSide(color: Theme.of(context).colorScheme.surfaceContainerHighest),
               ),
             ),
             const SizedBox(height: 8),

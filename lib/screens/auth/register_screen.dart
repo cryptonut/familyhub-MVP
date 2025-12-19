@@ -108,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             duration: const Duration(seconds: 5),
             action: SnackBarAction(
               label: 'OK',
-              textColor: Colors.white,
+              textColor: Theme.of(context).colorScheme.onPrimary,
               onPressed: () {},
             ),
           ),
@@ -259,7 +259,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 'You\'ll join this family when you create your account',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[700],
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                 ),
                               ),
                             ],
@@ -279,7 +279,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 8),
                 const Text(
                   'If you have a family invitation code, enter it below to join an existing family.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -322,7 +322,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 8),
                   const Text(
                     'Select your role in the family (usually Father or Mother)',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(

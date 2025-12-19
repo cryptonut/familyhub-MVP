@@ -243,7 +243,7 @@ class _WidgetConfigurationScreenState extends State<WidgetConfigurationScreen> {
           Text(
             _getSizeDescription(_selectedSize),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
           ),
         ],
@@ -378,7 +378,7 @@ class _WidgetConfigurationScreenState extends State<WidgetConfigurationScreen> {
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -387,7 +387,7 @@ class _WidgetConfigurationScreenState extends State<WidgetConfigurationScreen> {
                     '• Android: Long-press home screen → Widgets → Family Hub\n'
                     '• iOS: Long-press home screen → + → Family Hub',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                     textAlign: TextAlign.center,
                   ),

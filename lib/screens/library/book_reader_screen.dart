@@ -349,7 +349,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
+                    border: Border.all(color: Theme.of(context).colorScheme.outline),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -404,7 +404,7 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey),
+            Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
           ],
         ),
       ),

@@ -261,7 +261,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
             padding: EdgeInsets.all(8.0),
             child: Text(
               'No dependencies. This task can be started immediately.',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 12),
             ),
           )
         else

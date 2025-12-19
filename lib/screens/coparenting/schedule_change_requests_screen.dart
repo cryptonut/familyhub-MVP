@@ -98,7 +98,7 @@ class _ScheduleChangeRequestsScreenState extends State<ScheduleChangeRequestsScr
       case ScheduleChangeStatus.rejected:
         return Colors.red;
       case ScheduleChangeStatus.cancelled:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
     }
   }
 

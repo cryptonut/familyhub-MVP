@@ -71,7 +71,7 @@ class PostCard extends StatelessWidget {
                             ? post.senderName[0].toUpperCase()
                             : '?',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),

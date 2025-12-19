@@ -326,7 +326,7 @@ class _ManageRelationshipsScreenState extends State<ManageRelationshipsScreen> {
                               Text(permission.displayName),
                               Text(
                                 permission.description,
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                               ),
                             ],
                           ),
@@ -501,7 +501,7 @@ class _ManageRelationshipsScreenState extends State<ManageRelationshipsScreen> {
                             Text(permission.displayName),
                             Text(
                               permission.description,
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                             ),
                           ],
                         ),

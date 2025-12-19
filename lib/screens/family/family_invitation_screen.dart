@@ -63,7 +63,7 @@ class _FamilyInvitationScreenState extends State<FamilyInvitationScreen> {
             duration: const Duration(seconds: 5),
             action: SnackBarAction(
               label: 'Fix Now',
-              textColor: Colors.white,
+              textColor: Theme.of(context).colorScheme.onPrimary,
               onPressed: () async {
                 try {
                   final fixedCode = await authService.forceInitializeFamilyId();
@@ -106,7 +106,7 @@ class _FamilyInvitationScreenState extends State<FamilyInvitationScreen> {
             duration: const Duration(seconds: 5),
             action: SnackBarAction(
               label: 'Retry',
-              textColor: Colors.white,
+              textColor: Theme.of(context).colorScheme.onPrimary,
               onPressed: () {
                 _loadInvitationCode();
               },
@@ -313,7 +313,7 @@ Best regards''';
                         const Text(
                           'Unable to load or create a family invitation code.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         ),
                         const SizedBox(height: 32),
                         ElevatedButton.icon(
@@ -389,7 +389,7 @@ Best regards''';
                       const SizedBox(height: 16),
                       const Text(
                         'Share this invitation code with your family members so they can join your family hub.',
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                        style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 32),
@@ -433,7 +433,7 @@ Best regards''';
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           textStyle: const TextStyle(fontSize: 16),
                           backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
                         ),
                       ),
                       const SizedBox(height: 12),

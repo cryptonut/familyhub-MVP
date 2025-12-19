@@ -113,7 +113,7 @@ class _ChildProfilesScreenState extends State<ChildProfilesScreen> {
                                   Icon(
                                     Icons.arrow_forward_ios,
                                     size: 16,
-                                    color: Colors.grey[600],
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                   ),
                                 ],
                               ),

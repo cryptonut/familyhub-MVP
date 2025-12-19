@@ -250,7 +250,7 @@ class _UATScreenState extends State<UATScreen> {
               label: const Text('Pass'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.successColor,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
           ],
@@ -333,7 +333,7 @@ class _UATScreenState extends State<UATScreen> {
               label: const Text('Pass'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.successColor,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
           ],
@@ -414,7 +414,7 @@ class _UATScreenState extends State<UATScreen> {
                         color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
+                            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.05),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),

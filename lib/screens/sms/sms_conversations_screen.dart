@@ -224,7 +224,7 @@ class _SmsConversationsScreenState extends State<SmsConversationsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.sms, size: 64, color: Colors.grey),
+              Icon(Icons.sms, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
               const SizedBox(height: AppTheme.spacingLG),
               const Text(
                 'SMS Permissions Required',

@@ -503,7 +503,7 @@ class _ExtendedFamilyHubScreenState extends State<ExtendedFamilyHubScreen> {
                       birthday.user.displayName.isNotEmpty
                           ? birthday.user.displayName[0].toUpperCase()
                           : '?',
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                     ),
                   ),
                   title: Text(birthday.user.displayName),
@@ -516,7 +516,7 @@ class _ExtendedFamilyHubScreenState extends State<ExtendedFamilyHubScreen> {
                   ),
                   trailing: Icon(
                     Icons.cake,
-                    color: daysUntil <= 7 ? Colors.orange : Colors.grey,
+                    color: daysUntil <= 7 ? Colors.orange : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
                 );
               }),
