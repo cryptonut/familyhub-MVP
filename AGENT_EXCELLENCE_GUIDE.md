@@ -16,8 +16,98 @@
 2. **Understand the workflow** - Don't skip steps or assume you know better
 3. **Verify, don't assume** - Never claim something works without verification
 4. **Monitor, don't background** - When running builds/apps, you MUST see the output
+5. **NEVER REMOVE FUNCTIONALITY** - See critical rule below
 
 **If you skip reading this guide or ignore its principles, you WILL waste human time and create frustration. This is unacceptable.**
+
+---
+
+## 🔴 CRITICAL RULE: NEVER REMOVE FUNCTIONALITY WITHOUT EXPLICIT AGREEMENT
+
+**THIS IS NON-NEGOTIABLE. VIOLATING THIS RULE IS UNACCEPTABLE.**
+
+### The Rule
+**NEVER remove, disable, or break existing user-facing functionality without EXPLICIT user agreement.**
+
+### What This Means
+- ❌ **DO NOT** remove features to "fix" bugs
+- ❌ **DO NOT** remove features to "improve" code consistency
+- ❌ **DO NOT** remove features because they seem redundant
+- ❌ **DO NOT** remove features to solve technical problems
+- ❌ **DO NOT** assume a feature is "wrong" and remove it
+- ❌ **DO NOT** replace one feature with another without asking
+
+### What You MUST Do Instead
+
+**When fixing bugs that conflict with features:**
+1. **ASK THE USER FIRST** - "I found a data consistency issue. The feed view uses different data than the chat view. How would you like me to fix this?"
+2. **PRESERVE ALL FUNCTIONALITY** - Fix the bug while keeping all features working
+3. **PROVIDE OPTIONS** - "I can fix this by: A) Making feed use same data source, B) Documenting the difference, C) Providing both options"
+4. **WAIT FOR AGREEMENT** - Do not proceed until user explicitly agrees
+
+**When you think a feature should be removed:**
+1. **ASK THE USER** - "I notice X and Y seem to do the same thing. Should I consolidate them?"
+2. **EXPLAIN THE TRADE-OFFS** - What will users lose? What will they gain?
+3. **WAIT FOR EXPLICIT AGREEMENT** - "Yes, remove X" or "No, keep both"
+
+**When refactoring:**
+1. **PRESERVE ALL FUNCTIONALITY** - Refactoring means changing HOW, not WHAT
+2. **VERIFY NOTHING BROKE** - Test that all features still work
+3. **IF SOMETHING MUST BREAK** - Ask user first, get agreement
+
+### Examples of Violations
+
+❌ **WRONG:** "Fixed data consistency by changing FeedScreen to ChatScreen"
+- **Why wrong:** Removed feed functionality without asking
+- **Right approach:** "Fixed data consistency by making FeedScreen use ChatService stream, preserving both views"
+
+❌ **WRONG:** "Removed duplicate feature X because Y does the same thing"
+- **Why wrong:** Assumed they're duplicates without asking
+- **Right approach:** "I notice X and Y seem similar. Should I consolidate them, or do they serve different purposes?"
+
+❌ **WRONG:** "Simplified code by removing unused feature"
+- **Why wrong:** Assumed it's unused without verification
+- **Right approach:** "I found feature X that appears unused. Should I remove it, or is it needed?"
+
+### The Only Exception
+
+**You may remove functionality ONLY if:**
+1. The user EXPLICITLY tells you to remove it
+2. The user says "remove X" or "delete Y" or "get rid of Z"
+3. The user explicitly agrees to your proposal to remove something
+
+**Even then:**
+- Double-check: "Just to confirm, you want me to remove X?"
+- Document what was removed and why
+- Provide a way to restore it if needed (git history)
+
+### Why This Rule Exists
+
+**Real Incident (December 19, 2025):**
+- An agent removed FeedScreen functionality to "fix" a data consistency issue
+- Users lost access to feed-style view they were using
+- This caused confusion and workflow disruption
+- The fix was simple (one line), but the impact was high
+- **This must never happen again**
+
+See `FUNCTIONALITY_REMOVAL_INCIDENT_REPORT.md` for full details.
+
+### Remember
+
+**User-facing functionality is sacred.**
+- Users depend on features working
+- Removing features breaks user workflows
+- Technical problems should be solved technically, not by removing features
+- When in doubt, ASK. When not in doubt, ASK ANYWAY.
+
+**This rule applies to:**
+- UI features
+- Navigation options
+- Buttons and actions
+- Display modes (feed vs chat, list vs grid, etc.)
+- Any functionality users can see or interact with
+
+---
 
 ---
 
@@ -204,6 +294,7 @@ todo_write({
    - Fix root cause, not symptoms
    - One change at a time
    - Verify fix works before moving on
+   - **CRITICAL: Preserve all existing functionality** (see "Never Remove Functionality" rule above)
 
 ### 🛠️ The Debugging Hierarchy
 
