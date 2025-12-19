@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/chat_message.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/date_utils.dart' as date_utils;
+import '../chat/private_chat_screen.dart';
 
 /// Card widget for displaying a feed post (X/Twitter-style)
 class PostCard extends StatelessWidget {
@@ -12,6 +13,7 @@ class PostCard extends StatelessWidget {
     required this.onComment,
     this.currentUserId,
     this.onTap,
+    this.onAvatarTap,
   });
 
   final ChatMessage post;
@@ -19,6 +21,7 @@ class PostCard extends StatelessWidget {
   final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback? onTap;
+  final VoidCallback? onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -41,25 +44,40 @@ class PostCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar
-            CircleAvatar(
-              radius: 23,
-              backgroundImage: post.senderPhotoUrl != null
-                  ? NetworkImage(post.senderPhotoUrl!)
-                  : null,
-              backgroundColor: theme.colorScheme.primary,
-              child: post.senderPhotoUrl == null
-                  ? Text(
-                      post.senderName.isNotEmpty
-                          ? post.senderName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+            // Avatar (clickable to open private chat)
+            GestureDetector(
+              onTap: onAvatarTap ?? () {
+                // Default: Navigate to private chat with sender
+                if (post.senderId != currentUserId) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => PrivateChatScreen(
+                        recipientId: post.senderId,
+                        recipientName: post.senderName,
                       ),
-                    )
-                  : null,
+                    ),
+                  );
+                }
+              },
+              child: CircleAvatar(
+                radius: 23,
+                backgroundImage: post.senderPhotoUrl != null
+                    ? NetworkImage(post.senderPhotoUrl!)
+                    : null,
+                backgroundColor: theme.colorScheme.primary,
+                child: post.senderPhotoUrl == null
+                    ? Text(
+                        post.senderName.isNotEmpty
+                            ? post.senderName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      )
+                    : null,
+              ),
             ),
             const SizedBox(width: 12),
             // Content

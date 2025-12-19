@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/chat_message.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/date_utils.dart' as date_utils;
+import '../chat/private_chat_screen.dart';
 
 /// Card widget for displaying a poll post
 class PollCard extends StatelessWidget {
@@ -41,14 +42,30 @@ class PollCard extends StatelessWidget {
               // Author info
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundImage: post.senderPhotoUrl != null
-                        ? NetworkImage(post.senderPhotoUrl!)
-                        : null,
-                    child: post.senderPhotoUrl == null
-                        ? Text(post.senderName[0].toUpperCase())
-                        : null,
+                  // Avatar (clickable to open private chat)
+                  GestureDetector(
+                    onTap: () {
+                      // Navigate to private chat with sender
+                      if (post.senderId != currentUserId) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => PrivateChatScreen(
+                              recipientId: post.senderId,
+                              recipientName: post.senderName,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundImage: post.senderPhotoUrl != null
+                          ? NetworkImage(post.senderPhotoUrl!)
+                          : null,
+                      child: post.senderPhotoUrl == null
+                          ? Text(post.senderName[0].toUpperCase())
+                          : null,
+                    ),
                   ),
                   const SizedBox(width: AppTheme.spacingSM),
                   Expanded(

@@ -2560,11 +2560,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       currentUserName: _chatService.currentUserName,
       maxHeight: 400, // Max height for embedded chat
       onViewFullChat: () {
-        // Navigate to full chat screen (ChatScreen) - use ChatService stream, not FeedService
+        // Navigate to ChatTabsScreen (has "All" feed + individual tabs)
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ChatScreen(),
+            builder: (context) => const ChatTabsScreen(),
           ),
         );
       },

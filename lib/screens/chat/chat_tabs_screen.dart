@@ -224,9 +224,9 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
       body: TabBarView(
         controller: _tabController,
         children: [
-          // "All" tab - shows full chat (same as preview)
-          ChatScreen(),
-          // Individual member tabs - shows private chat
+          // "All" tab - shows FEED (not bubbles)
+          const FeedScreen(),
+          // Individual member tabs - shows private chat (bubble style)
           ..._familyMembers.map((member) {
             return PrivateChatScreen(
               recipientId: member.uid,
