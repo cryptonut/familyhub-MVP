@@ -177,7 +177,7 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> with TickerPr
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey[200],
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: SelectableText(
@@ -386,7 +386,7 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> with TickerPr
                             ? member.displayName[0].toUpperCase()
                             : member.email[0].toUpperCase(),
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontSize: 12,
                         ),
                       ),
@@ -409,7 +409,7 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> with TickerPr
                               member.email,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[600],
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                               ),
                             ),
                         ],
@@ -472,7 +472,7 @@ class _InviteMembersDialogState extends State<InviteMembersDialog> with TickerPr
             textAlign: TextAlign.center,
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 16),

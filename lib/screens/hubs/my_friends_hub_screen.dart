@@ -319,7 +319,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
                   '${_members.length}',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 if (_isHubCreator) ...[
@@ -348,7 +348,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
               child: Center(
                 child: Text(
                   'No members yet',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
               ),
             ),
@@ -390,7 +390,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
                                   member.displayName.isNotEmpty
                                       ? member.displayName[0].toUpperCase()
                                       : member.email[0].toUpperCase(),
-                                  style: const TextStyle(color: Colors.white),
+                                  style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                                 )
                               : null,
                         ),
@@ -441,7 +441,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
               child: Center(
                 child: Text(
                   'No upcoming events',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
               ),
             ),
@@ -452,7 +452,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
                 child: ListTile(
                   leading: CircleAvatar(
                     backgroundColor: _parseColor(event.color),
-                    child: const Icon(Icons.event, color: Colors.white),
+                    child: Icon(Icons.event, color: Theme.of(context).colorScheme.onPrimary),
                   ),
                   title: Text(event.title),
                   subtitle: Text(
@@ -485,7 +485,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
               child: Center(
                 child: Text(
                   'No upcoming birthdays in the next month',
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
               ),
             ),
@@ -496,7 +496,7 @@ class _MyFriendsHubScreenState extends State<MyFriendsHubScreen> {
                 child: ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: Colors.pink,
-                    child: Icon(Icons.cake, color: Colors.white),
+                    child: Icon(Icons.cake, color: Theme.of(context).colorScheme.onPrimary),
                   ),
                   title: Text(birthday['name'] as String),
                   subtitle: Text(

@@ -224,13 +224,13 @@ class _HubInviteScreenState extends State<HubInviteScreen> {
                                       Icon(
                                         Icons.person,
                                         size: 16,
-                                        color: Colors.grey[600],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Invited by ${_invite!.inviterName}',
                                         style: TextStyle(
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                         ),
                                       ),
                                     ],
@@ -242,13 +242,13 @@ class _HubInviteScreenState extends State<HubInviteScreen> {
                                         Icon(
                                           Icons.email,
                                           size: 16,
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
                                           _invite!.email!,
                                           style: TextStyle(
-                                            color: Colors.grey[600],
+                                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                           ),
                                         ),
                                       ],
@@ -270,7 +270,7 @@ class _HubInviteScreenState extends State<HubInviteScreen> {
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: Colors.white,
+                                      color: Theme.of(context).colorScheme.onPrimary,
                                     ),
                                   )
                                 : const Text(

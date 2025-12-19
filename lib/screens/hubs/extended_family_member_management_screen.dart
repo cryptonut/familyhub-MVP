@@ -135,7 +135,7 @@ class _ExtendedFamilyMemberManagementScreenState
                         Text(level.displayName),
                         Text(
                           level.description,
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         ),
                       ],
                     ),
@@ -162,7 +162,7 @@ class _ExtendedFamilyMemberManagementScreenState
                         Text(role.displayName),
                         Text(
                           role.description,
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         ),
                       ],
                     ),
@@ -268,7 +268,7 @@ class _ExtendedFamilyMemberManagementScreenState
                         Text(level.displayName),
                         Text(
                           level.description,
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         ),
                       ],
                     ),
@@ -294,7 +294,7 @@ class _ExtendedFamilyMemberManagementScreenState
                         Text(role.displayName),
                         Text(
                           role.description,
-                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                         ),
                       ],
                     ),
@@ -404,7 +404,7 @@ class _ExtendedFamilyMemberManagementScreenState
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                              Icon(Icons.people_outline, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                               const SizedBox(height: 16),
                               Text(
                                 'No members yet',
@@ -416,7 +416,7 @@ class _ExtendedFamilyMemberManagementScreenState
                                     ? 'Tap the button above to invite extended family members'
                                     : 'Wait for the hub creator to invite members',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey[600]),
+                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                               ),
                             ],
                           ),

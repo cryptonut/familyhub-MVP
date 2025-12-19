@@ -105,7 +105,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
               duration: const Duration(seconds: 5),
               action: SnackBarAction(
                 label: 'View Options',
-                textColor: Colors.white,
+                textColor: Theme.of(context).colorScheme.onPrimary,
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -195,7 +195,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? Theme.of(context).primaryColor.withOpacity(0.1)
-                            : Colors.grey[200],
+                            : Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: isSelected
@@ -210,7 +210,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
                             iconData['icon'] as IconData,
                             color: isSelected
                                 ? Theme.of(context).primaryColor
-                                : Colors.grey[700],
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -219,7 +219,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
                               fontSize: 10,
                               color: isSelected
                                   ? Theme.of(context).primaryColor
-                                  : Colors.grey[700],
+                                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -346,7 +346,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           border: Border.all(
-            color: isSelected ? color : Colors.grey[300]!,
+            color: isSelected ? color : Theme.of(context).colorScheme.surfaceContainerHighest,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(8),
@@ -354,7 +354,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
         ),
         child: Row(
           children: [
-            Icon(icon, color: isDisabled ? Colors.grey : color),
+            Icon(icon, color: isDisabled ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5) : color),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -366,7 +366,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
                         title,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: isDisabled ? Colors.grey : null,
+                          color: isDisabled ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5) : null,
                         ),
                       ),
                       if (isFree) ...[
@@ -383,7 +383,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
                           child: const Text(
                             'FREE',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
@@ -395,7 +395,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
                         Icon(
                           Icons.workspace_premium,
                           size: 16,
-                          color: isDisabled ? Colors.grey : Colors.amber,
+                          color: isDisabled ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5) : Colors.amber,
                         ),
                       ],
                     ],
@@ -405,7 +405,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
                     description,
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDisabled ? Colors.grey : Colors.grey[700],
+                      color: isDisabled ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -414,7 +414,7 @@ class _CreateHubDialogState extends State<CreateHubDialog> {
             if (isSelected)
               Icon(Icons.check_circle, color: color)
             else
-              Icon(Icons.radio_button_unchecked, color: Colors.grey),
+              Icon(Icons.radio_button_unchecked, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
           ],
         ),
       ),
