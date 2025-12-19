@@ -35,10 +35,24 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
     try {
       _recurringPayments = await _recurringPaymentService.getCreatedRecurringPayments();
       _familyMembers = await _authService.getFamilyMembers();
-      
+
       Logger.debug('_loadData: Loaded ${_familyMembers.length} family members', tag: 'RecurringPaymentsScreen');
       for (var member in _familyMembers) {
         Logger.debug('  - ${member.displayName} (${member.uid})', tag: 'RecurringPaymentsScreen');
+      }
+
+      // DEBUG: Search for Lilly Case specifically
+      if (_familyMembers.isEmpty) {
+        Logger.warning('_loadData: Family members list is empty, searching for Lilly Case...', tag: 'RecurringPaymentsScreen');
+        final lillyUsers = await _authService.findUsersByDisplayName('Lilly Case');
+        if (lillyUsers.isNotEmpty) {
+          Logger.warning('_loadData: Found Lilly Case in database but not in family members!', tag: 'RecurringPaymentsScreen');
+          for (var user in lillyUsers) {
+            Logger.warning('  Lilly Case: ${user.displayName}, familyId=${user.familyId}, uid=${user.uid}', tag: 'RecurringPaymentsScreen');
+          }
+        } else {
+          Logger.warning('_loadData: Lilly Case not found in database at all!', tag: 'RecurringPaymentsScreen');
+        }
       }
       
       // Build user names map

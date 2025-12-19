@@ -1393,6 +1393,20 @@ class AuthService {
       }
 
       Logger.debug('getFamilyMembers: Found ${allFamilyMembers.length} total family members', tag: 'AuthService');
+
+      // DEBUG: Look for Lilly Case specifically
+      bool foundLilly = false;
+      for (var member in allFamilyMembers) {
+        if (member.displayName.contains('Lilly') || member.displayName.contains('Case')) {
+          foundLilly = true;
+          Logger.debug('getFamilyMembers: FOUND LILLY CASE - ${member.displayName} (${member.uid})', tag: 'AuthService');
+          Logger.debug('  Lilly Case attributes: familyId=${member.familyId}, email=${member.email}, uid=${member.uid}', tag: 'AuthService');
+        }
+      }
+      if (!foundLilly) {
+        Logger.warning('getFamilyMembers: LILLY CASE NOT FOUND in family members list!', tag: 'AuthService');
+      }
+
       if (allFamilyMembers.isEmpty) {
         Logger.warning('getFamilyMembers: RETURNING EMPTY LIST - this will cause the error message!', tag: 'AuthService');
         Logger.warning('getFamilyMembers: Check if user has familyId: ${currentUserModel.familyId}', tag: 'AuthService');
@@ -1417,6 +1431,39 @@ class AuthService {
     } catch (e) {
       Logger.warning('Error getting user by ID', error: e, tag: 'AuthService');
       return null;
+    }
+  }
+
+  /// DEBUG: Find user by display name (for troubleshooting)
+  Future<List<UserModel>> findUsersByDisplayName(String displayName) async {
+    try {
+      final collection = FirestorePathUtils.getUsersCollection();
+      Logger.debug('findUsersByDisplayName: Searching for "$displayName" in $collection', tag: 'AuthService');
+
+      // Get all users (since we can't query by displayName without index)
+      final snapshot = await _firestore.collection(collection).get();
+      final matchingUsers = <UserModel>[];
+
+      for (var doc in snapshot.docs) {
+        try {
+          final data = doc.data() as Map<String, dynamic>;
+          final userDisplayName = data['displayName'] as String? ?? '';
+          if (userDisplayName.toLowerCase().contains(displayName.toLowerCase())) {
+            final userModel = UserModel.fromJson({'uid': doc.id, ...data});
+            matchingUsers.add(userModel);
+            Logger.debug('  Found: ${userModel.displayName} (${userModel.uid})', tag: 'AuthService');
+            Logger.debug('    familyId: ${userModel.familyId}, email: ${userModel.email}', tag: 'AuthService');
+          }
+        } catch (e) {
+          Logger.warning('Error parsing user ${doc.id}', error: e, tag: 'AuthService');
+        }
+      }
+
+      Logger.debug('findUsersByDisplayName: Found ${matchingUsers.length} users matching "$displayName"', tag: 'AuthService');
+      return matchingUsers;
+    } catch (e, st) {
+      Logger.error('findUsersByDisplayName: Error searching for users', error: e, stackTrace: st, tag: 'AuthService');
+      return [];
     }
   }
 
