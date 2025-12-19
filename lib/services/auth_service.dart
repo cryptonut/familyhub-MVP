@@ -1538,6 +1538,58 @@ class AuthService {
     }
   }
 
+  /// TEMPORARY: Direct database check for current user's family status
+  Future<void> debugCurrentUserFamilyStatus() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        Logger.error('DEBUG: No authenticated user!', tag: 'AuthService');
+        return;
+      }
+
+      Logger.error('=== DEBUG CURRENT USER FAMILY STATUS ===', tag: 'AuthService');
+      Logger.error('User ID: ${currentUser.uid}', tag: 'AuthService');
+      Logger.error('User Email: ${currentUser.email}', tag: 'AuthService');
+
+      // Check cached model
+      final cachedModel = await getCurrentUserModel();
+      Logger.error('Cached Model - DisplayName: ${cachedModel?.displayName}', tag: 'AuthService');
+      Logger.error('Cached Model - FamilyId: ${cachedModel?.familyId ?? "NULL"}', tag: 'AuthService');
+
+      // Check database directly
+      final collection = FirestorePathUtils.getUsersCollection();
+      Logger.error('Checking collection: $collection', tag: 'AuthService');
+
+      final doc = await _firestore.collection(collection).doc(currentUser.uid).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        Logger.error('Database Document EXISTS', tag: 'AuthService');
+        Logger.error('DB DisplayName: ${data['displayName'] ?? "NULL"}', tag: 'AuthService');
+        Logger.error('DB Email: ${data['email'] ?? "NULL"}', tag: 'AuthService');
+        Logger.error('DB FamilyId: ${data['familyId'] ?? "NULL"}', tag: 'AuthService');
+        Logger.error('DB CreatedAt: ${data['createdAt'] ?? "NULL"}', tag: 'AuthService');
+      } else {
+        Logger.error('Database Document DOES NOT EXIST!', tag: 'AuthService');
+      }
+
+      // Check all users in collection
+      Logger.error('Checking all users in collection...', tag: 'AuthService');
+      final allUsers = await _firestore.collection(collection).get();
+      Logger.error('Total users in collection: ${allUsers.docs.length}', tag: 'AuthService');
+
+      for (var userDoc in allUsers.docs) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        final familyId = userData['familyId'] as String?;
+        Logger.error('  User ${userDoc.id}: familyId=${familyId ?? "NULL"}, displayName=${userData['displayName'] ?? "NULL"}', tag: 'AuthService');
+      }
+
+      Logger.error('=== END DEBUG ===', tag: 'AuthService');
+
+    } catch (e, st) {
+      Logger.error('DEBUG FAILED', error: e, stackTrace: st, tag: 'AuthService');
+    }
+  }
+
   /// DEBUG: Find user by display name (for troubleshooting)
   Future<List<UserModel>> findUsersByDisplayName(String displayName) async {
     try {

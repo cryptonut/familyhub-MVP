@@ -33,6 +33,9 @@ class _RecurringPaymentsScreenState extends State<RecurringPaymentsScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      // DEBUG: Check current user family status first
+      await _authService.debugCurrentUserFamilyStatus();
+
       _recurringPayments = await _recurringPaymentService.getCreatedRecurringPayments();
       _familyMembers = await _authService.getFamilyMembers();
 
