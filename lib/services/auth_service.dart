@@ -1294,9 +1294,28 @@ class AuthService {
   Future<List<UserModel>> getFamilyMembers() async {
     try {
       final currentUserModel = await getCurrentUserModel();
-      if (currentUserModel == null || currentUserModel.familyId == null) {
-        Logger.warning('getFamilyMembers: No current user model or familyId', tag: 'AuthService');
+      if (currentUserModel == null) {
+        Logger.error('getFamilyMembers: No current user model - user not authenticated!', tag: 'AuthService');
         return [];
+      }
+
+      if (currentUserModel.familyId == null || currentUserModel.familyId!.isEmpty) {
+        Logger.warning('getFamilyMembers: Current user has no familyId - cannot find family members', tag: 'AuthService');
+        Logger.warning('getFamilyMembers: User: ${currentUserModel.displayName} (${currentUserModel.uid})', tag: 'AuthService');
+        Logger.warning('getFamilyMembers: This user needs to be assigned to a family first', tag: 'AuthService');
+
+        // Try to find this user in the database and see if they have a familyId there
+        final dbFamilyId = await _checkAndFixUserFamilyId(currentUserModel.uid);
+        if (dbFamilyId != null && dbFamilyId.isNotEmpty) {
+          Logger.warning('getFamilyMembers: Found familyId in database, updating cached model', tag: 'AuthService');
+          // Update the current user model with the correct familyId
+          currentUserModel.familyId = dbFamilyId;
+          Logger.warning('getFamilyMembers: RETRYING with corrected familyId: $dbFamilyId', tag: 'AuthService');
+          // Continue with the corrected familyId
+        } else {
+          Logger.error('getFamilyMembers: No familyId found in database either - cannot proceed', tag: 'AuthService');
+          return [];
+        }
       }
 
       Logger.debug('getFamilyMembers: Querying for familyId: "${currentUserModel.familyId}"', tag: 'AuthService');
@@ -1351,6 +1370,30 @@ class AuthService {
         }
       } catch (e, st) {
         Logger.warning('getFamilyMembers: Error querying prefixed collection', error: e, stackTrace: st, tag: 'AuthService');
+
+        // NUCLEAR OPTION: If all queries fail, try to get ALL users and filter client-side
+        Logger.warning('getFamilyMembers: ATTEMPTING NUCLEAR OPTION - getting all users from $prefixedCollection', tag: 'AuthService');
+        try {
+          final allUsersSnapshot = await _firestore.collection(prefixedCollection).get();
+          Logger.warning('getFamilyMembers: Nuclear option found ${allUsersSnapshot.docs.length} total users', tag: 'AuthService');
+
+          for (var doc in allUsersSnapshot.docs) {
+            try {
+              final data = doc.data() as Map<String, dynamic>;
+              final docFamilyId = data['familyId'] as String?;
+              if (docFamilyId == currentUserModel.familyId && !seenUserIds.contains(doc.id)) {
+                final userModel = UserModel.fromJson({'uid': doc.id, ...data});
+                allFamilyMembers.add(userModel);
+                seenUserIds.add(doc.id);
+                Logger.debug('  Nuclear ✓ Added: ${userModel.displayName} (${doc.id})', tag: 'AuthService');
+              }
+            } catch (e, st) {
+              Logger.warning('getFamilyMembers: Nuclear option error parsing user ${doc.id}', error: e, stackTrace: st, tag: 'AuthService');
+            }
+          }
+        } catch (nuclearError, nuclearSt) {
+          Logger.error('getFamilyMembers: NUCLEAR OPTION FAILED - complete failure to load family members', error: nuclearError, stackTrace: nuclearSt, tag: 'AuthService');
+        }
       }
       
       // Also query unprefixed collection if using prefix (for backward compatibility)
@@ -1389,6 +1432,30 @@ class AuthService {
           }
         } catch (e, st) {
           Logger.warning('getFamilyMembers: Error querying unprefixed collection', error: e, stackTrace: st, tag: 'AuthService');
+
+          // NUCLEAR OPTION for unprefixed collection
+          Logger.warning('getFamilyMembers: ATTEMPTING NUCLEAR OPTION for unprefixed collection', tag: 'AuthService');
+          try {
+            final allUsersSnapshot = await _firestore.collection(unprefixedCollection).get();
+            Logger.warning('getFamilyMembers: Nuclear unprefixed found ${allUsersSnapshot.docs.length} total users', tag: 'AuthService');
+
+            for (var doc in allUsersSnapshot.docs) {
+              try {
+                final data = doc.data() as Map<String, dynamic>;
+                final docFamilyId = data['familyId'] as String?;
+                if (docFamilyId == currentUserModel.familyId && !seenUserIds.contains(doc.id)) {
+                  final userModel = UserModel.fromJson({'uid': doc.id, ...data});
+                  allFamilyMembers.add(userModel);
+                  seenUserIds.add(doc.id);
+                  Logger.debug('  Nuclear unprefixed ✓ Added: ${userModel.displayName} (${doc.id})', tag: 'AuthService');
+                }
+              } catch (e, st) {
+                Logger.warning('getFamilyMembers: Nuclear unprefixed error parsing user ${doc.id}', error: e, stackTrace: st, tag: 'AuthService');
+              }
+            }
+          } catch (nuclearError, nuclearSt) {
+            Logger.error('getFamilyMembers: NUCLEAR OPTION for unprefixed FAILED', error: nuclearError, stackTrace: nuclearSt, tag: 'AuthService');
+          }
         }
       }
 
@@ -1430,6 +1497,43 @@ class AuthService {
       });
     } catch (e) {
       Logger.warning('Error getting user by ID', error: e, tag: 'AuthService');
+      return null;
+    }
+  }
+
+  /// Check if user has familyId in database and return it if found
+  Future<String?> _checkAndFixUserFamilyId(String userId) async {
+    try {
+      final collection = FirestorePathUtils.getUsersCollection();
+      Logger.debug('_checkAndFixUserFamilyId: Checking user $userId in $collection', tag: 'AuthService');
+
+      final doc = await _firestore.collection(collection).doc(userId).get();
+      if (!doc.exists) {
+        Logger.error('_checkAndFixUserFamilyId: User document does not exist in $collection!', tag: 'AuthService');
+        Logger.error('_checkAndFixUserFamilyId: This suggests the user was never properly saved to the database.', tag: 'AuthService');
+        return null;
+      }
+
+      final data = doc.data() as Map<String, dynamic>;
+      final familyId = data['familyId'] as String?;
+      final displayName = data['displayName'] as String? ?? '';
+      final email = data['email'] as String? ?? '';
+
+      Logger.warning('_checkAndFixUserFamilyId: User exists in database:', tag: 'AuthService');
+      Logger.warning('  User: $displayName ($userId)', tag: 'AuthService');
+      Logger.warning('  Email: $email', tag: 'AuthService');
+      Logger.warning('  FamilyId: ${familyId ?? "NULL - THIS IS THE PROBLEM!"}', tag: 'AuthService');
+
+      if (familyId == null || familyId.isEmpty) {
+        Logger.error('_checkAndFixUserFamilyId: User has no familyId in database!', tag: 'AuthService');
+        Logger.error('_checkAndFixUserFamilyId: This user needs to be assigned to a family.', tag: 'AuthService');
+        return null;
+      }
+
+      Logger.warning('_checkAndFixUserFamilyId: Found valid familyId in database: $familyId', tag: 'AuthService');
+      return familyId;
+    } catch (e, st) {
+      Logger.error('_checkAndFixUserFamilyId: Error checking user in database', error: e, stackTrace: st, tag: 'AuthService');
       return null;
     }
   }
