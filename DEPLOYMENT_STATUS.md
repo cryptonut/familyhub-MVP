@@ -1,17 +1,20 @@
 # Deployment Status - Infrastructure Fixes & Recurring Payments v2.4.0
 
 **Date:** December 19, 2025
-**Status:** ✅ Committed to Develop, Ready for QA Deployment
+**Status:** ✅ Deployed to QA Testers via Firebase App Distribution
 
 ---
 
 ## ✅ **CURRENT DEPLOYMENT STATUS**
 
-### **Infrastructure Fixes - COMPLETED**
+### **Infrastructure Fixes - COMPLETED & DEPLOYED**
 1. **Code Committed**: All Firebase and recurring payments fixes committed to `develop` branch
-2. **Branch Status**: ✅ `develop` branch updated and ready
+2. **Branch Status**: ✅ `develop` branch updated and merged to `release/qa`
 3. **Testing**: ✅ Verified working on development device
-4. **Merge Status**: ⏳ Ready to merge to `release/qa` branch
+4. **Build Status**: ✅ QA APK built successfully (295.7MB)
+5. **Deployment**: ✅ Deployed to Firebase App Distribution (Release 1.0.1-test #8)
+6. **Distribution**: ✅ Sent to qa-testers group (2 testers)
+7. **Release Notes**: ✅ Added comprehensive release notes
 
 ---
 
@@ -42,11 +45,27 @@
 
 ## 🚀 **NEXT STEPS FOR DEPLOYMENT**
 
-### **Immediate Actions Required:**
-1. **Merge to QA**: `git checkout release/qa && git merge develop`
-2. **Build QA Flavor**: `flutter build apk --flavor qa --release`
-3. **Deploy to Firebase**: `firebase appdistribution:distribute build/app/outputs/flutter-apk/app-qa-release.apk --app [app-id] --groups qa-testers`
-4. **Test Verification**: QA testers verify Recurring Payments screen works
+### **Deployment Actions Completed:**
+1. **Merge to QA**: ✅ `git checkout release/qa && git merge develop` - Fast-forward merge successful
+2. **Push to Origin**: ✅ `git push origin release/qa` - Pushed to remote repository
+3. **Build QA Flavor**: ✅ `flutter build apk --flavor qa --release` - Built 295.7MB APK
+4. **Deploy to Firebase**: ✅ `firebase appdistribution:distribute` to FamilyHub Test app
+5. **Distribution**: ✅ Sent to qa-testers group (2 testers)
+
+### **Firebase App Distribution Details:**
+- **App ID**: `1:559662117534:android:3c73d6ef5d0ddf6ee7c18f`
+- **Package Name**: `com.example.familyhub_mvp.test` (QA flavor)
+- **Release**: `1.0.1-test (8)`
+- **Console URL**: https://console.firebase.google.com/project/family-hub-71ff0/appdistribution/app/android:com.example.familyhub_mvp.test/releases/36d0jp4h24t6o
+- **Tester Link**: https://appdistribution.firebase.google.com/testerapps/1:559662117534:android:3c73d6ef5d0ddf6ee7c18f/releases/36d0jp4h24t6o
+
+### **Next Steps - QA Testing:**
+QA testers will verify:
+1. ✅ Recurring Payments screen loads without errors
+2. ✅ Family members appear in dropdown (Simon, Kate, Lilly, Paul)
+3. ✅ Can create recurring payments for pocket money
+4. ✅ No Firebase index errors in logs
+5. ✅ All other app functionality remains intact
 
 ### **Expected QA Testing Results:**
 - ✅ Recurring Payments screen loads without errors
