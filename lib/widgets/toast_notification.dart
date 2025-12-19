@@ -25,22 +25,22 @@ class ToastNotification {
     switch (type) {
       case ToastType.success:
         backgroundColor = Colors.green;
-        textColor = Colors.white;
+        textColor = Theme.of(context).colorScheme.onPrimary;
         defaultIcon = Icons.check_circle;
         break;
       case ToastType.error:
         backgroundColor = Colors.red;
-        textColor = Colors.white;
+        textColor = Theme.of(context).colorScheme.onPrimary;
         defaultIcon = Icons.error;
         break;
       case ToastType.warning:
         backgroundColor = Colors.orange;
-        textColor = Colors.white;
+        textColor = Theme.of(context).colorScheme.onPrimary;
         defaultIcon = Icons.warning;
         break;
       case ToastType.info:
         backgroundColor = Colors.blue;
-        textColor = Colors.white;
+        textColor = Theme.of(context).colorScheme.onPrimary;
         defaultIcon = Icons.info;
         break;
     }
@@ -78,7 +78,7 @@ class ToastNotification {
                   borderRadius: BorderRadius.circular(AppTheme.radiusMD),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
+                      color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.2),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),

@@ -76,14 +76,14 @@ class SwipeableListItem extends StatelessWidget {
         children: [
           Icon(
             action.icon,
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onPrimary,
             size: 24,
           ),
           const SizedBox(width: AppTheme.spacingSM),
           Text(
             action.label,
             style: const TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),

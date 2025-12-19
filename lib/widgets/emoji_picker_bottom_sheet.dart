@@ -33,7 +33,7 @@ class EmojiPickerBottomSheet extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.only(bottom: AppTheme.spacingMD),
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(2),
             ),
           ),

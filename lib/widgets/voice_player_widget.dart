@@ -106,8 +106,8 @@ class _VoicePlayerWidgetState extends State<VoicePlayerWidget> {
       padding: const EdgeInsets.all(AppTheme.spacingSM),
       decoration: BoxDecoration(
         color: widget.isCurrentUser
-            ? Colors.white.withOpacity(0.2)
-            : Colors.black.withOpacity(0.05),
+            ? widget.theme.colorScheme.onPrimary.withValues(alpha: 0.2)
+            : widget.theme.colorScheme.shadow.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(AppTheme.radiusMD),
       ),
       child: Row(
@@ -122,13 +122,13 @@ class _VoicePlayerWidgetState extends State<VoicePlayerWidget> {
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        widget.isCurrentUser ? Colors.white : widget.theme.colorScheme.primary,
+                        widget.isCurrentUser ? widget.theme.colorScheme.onPrimary : widget.theme.colorScheme.primary,
                       ),
                     ),
                   )
                 : Icon(
                     _isPlaying ? Icons.pause : Icons.play_arrow,
-                    color: widget.isCurrentUser ? Colors.white : widget.theme.colorScheme.primary,
+                    color: widget.isCurrentUser ? widget.theme.colorScheme.onPrimary : widget.theme.colorScheme.primary,
                   ),
           ),
           const SizedBox(width: AppTheme.spacingSM),
@@ -140,10 +140,10 @@ class _VoicePlayerWidgetState extends State<VoicePlayerWidget> {
                     ? _position.inSeconds / _duration.inSeconds
                     : 0,
                 backgroundColor: widget.isCurrentUser
-                    ? Colors.white.withOpacity(0.3)
-                    : Colors.grey.shade300,
+                    ? widget.theme.colorScheme.onPrimary.withValues(alpha: 0.3)
+                    : widget.theme.colorScheme.surfaceContainerHighest,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  widget.isCurrentUser ? Colors.white : widget.theme.colorScheme.primary,
+                  widget.isCurrentUser ? widget.theme.colorScheme.onPrimary : widget.theme.colorScheme.primary,
                 ),
               ),
             ),
@@ -152,7 +152,7 @@ class _VoicePlayerWidgetState extends State<VoicePlayerWidget> {
             _formatDuration(_position),
             style: widget.theme.textTheme.bodySmall?.copyWith(
               color: widget.isCurrentUser
-                  ? Colors.white.withOpacity(0.9)
+                  ? widget.theme.colorScheme.onPrimary.withValues(alpha: 0.9)
                   : widget.theme.colorScheme.onSurface,
             ),
           ),

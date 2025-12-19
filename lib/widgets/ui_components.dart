@@ -292,7 +292,7 @@ class Badge extends StatelessWidget {
       child: Text(
         text,
         style: TextStyle(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.onPrimary,
           fontSize: fontSize ?? 12,
           fontWeight: FontWeight.bold,
         ),

@@ -129,7 +129,7 @@ class _BudgetItemTile extends StatelessWidget {
 
     // If not complete, show pending status
     if (!isComplete) {
-      statusColor = Colors.grey;
+      statusColor = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
       statusIcon = Icons.pending;
       statusText = 'Pending';
     }

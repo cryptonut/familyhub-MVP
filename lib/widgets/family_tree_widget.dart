@@ -70,7 +70,7 @@ class _FamilyTreeWidgetState extends State<FamilyTreeWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.people_outline, size: 64, color: Colors.grey),
+            Icon(Icons.people_outline, size: 64, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(
               'No family members yet',
@@ -80,7 +80,7 @@ class _FamilyTreeWidgetState extends State<FamilyTreeWidget> {
             Text(
               'Invite extended family members to see the family tree',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
             ),
           ],
         ),
@@ -192,7 +192,7 @@ class _FamilyTreeWidgetState extends State<FamilyTreeWidget> {
     switch (privacy) {
       case PrivacyLevel.minimal:
         icon = Icons.lock_outline;
-        color = Colors.grey;
+        color = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
         break;
       case PrivacyLevel.standard:
         icon = Icons.lock_open;

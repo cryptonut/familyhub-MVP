@@ -392,13 +392,13 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
                                   child: Container(
                                     padding: const EdgeInsets.all(2),
                                     decoration: BoxDecoration(
-                                      color: Colors.grey,
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
                                       Icons.lock,
                                       size: 10,
-                                      color: Colors.white,
+                                      color: Theme.of(context).colorScheme.onPrimary,
                                     ),
                                   ),
                                 ),

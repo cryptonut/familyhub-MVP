@@ -204,7 +204,7 @@ class _TaskDependencyWidgetState extends State<TaskDependencyWidget> {
                     child: Text(
                       'BLOCKED',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -226,7 +226,7 @@ class _TaskDependencyWidgetState extends State<TaskDependencyWidget> {
             child: Text(
               'No dependencies. This task can be started immediately.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
             ),
           )
@@ -240,7 +240,7 @@ class _TaskDependencyWidgetState extends State<TaskDependencyWidget> {
                   depTask?.isCompleted == true
                       ? Icons.check_circle
                       : Icons.radio_button_unchecked,
-                  color: depTask?.isCompleted == true ? Colors.green : Colors.grey,
+                  color: depTask?.isCompleted == true ? Colors.green : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
                 title: Text(depTask?.title ?? 'Unknown Task'),
                 subtitle: Column(

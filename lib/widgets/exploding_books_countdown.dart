@@ -35,7 +35,7 @@ class ExplodingBooksCountdown extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(2),
       ),
       child: Stack(
@@ -58,7 +58,7 @@ class ExplodingBooksCountdown extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: progress > 0.5 ? Colors.white : Colors.black87,
+                  color: progress > 0.5 ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                 ),
               ),
             ),
@@ -160,7 +160,7 @@ class ExplodingBooksCountdownExpanded extends StatelessWidget {
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
               value: progress.clamp(0.0, 1.0),
-              backgroundColor: Colors.grey[300],
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               valueColor: AlwaysStoppedAnimation<Color>(progressColor),
               minHeight: 6,
             ),

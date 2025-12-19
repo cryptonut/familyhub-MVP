@@ -102,7 +102,7 @@ class _RelationshipDialogState extends State<RelationshipDialog> {
               widget.user.displayName.isNotEmpty
                   ? widget.user.displayName[0].toUpperCase()
                   : widget.user.email[0].toUpperCase(),
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
             ),
           ),
           const SizedBox(width: 12),
@@ -125,7 +125,7 @@ class _RelationshipDialogState extends State<RelationshipDialog> {
                 child: Text(
                   'Only the family creator or Admins can edit relationships.',
                   style: TextStyle(
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -168,7 +168,7 @@ class _RelationshipDialogState extends State<RelationshipDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -176,7 +176,7 @@ class _RelationshipDialogState extends State<RelationshipDialog> {
                       ? RelationshipUtils.getRelationshipLabel(_selectedRelationship)
                       : 'Not set',
                   style: TextStyle(
-                    color: Colors.grey[700],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ),
@@ -186,7 +186,7 @@ class _RelationshipDialogState extends State<RelationshipDialog> {
                 'Current: ${RelationshipUtils.getRelationshipLabel(widget.user.relationship)}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
               ),
             ],

@@ -246,13 +246,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
                     SnackBar(
                       content: const Text(
                         'Cannot load data from Firestore. Please sign out and sign back in, or check your connection.',
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                       ),
                       backgroundColor: Colors.orange,
                       duration: const Duration(seconds: 8),
                       action: SnackBarAction(
                         label: 'Sign Out',
-                        textColor: Colors.white,
+                        textColor: Theme.of(context).colorScheme.onPrimary,
                         onPressed: () async {
                           await authService.signOut();
                         },
@@ -271,13 +271,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
                   SnackBar(
                     content: const Text(
                       'Firestore is unavailable. Sign out and try again.',
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                     ),
                     backgroundColor: Colors.red,
                     duration: const Duration(seconds: 8),
                     action: SnackBarAction(
                       label: 'Sign Out',
-                      textColor: Colors.white,
+                      textColor: Theme.of(context).colorScheme.onPrimary,
                       onPressed: () async {
                         await authService.signOut();
                       },

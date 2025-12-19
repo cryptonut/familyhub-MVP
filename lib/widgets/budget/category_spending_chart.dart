@@ -81,7 +81,8 @@ class CategorySpendingChart extends StatelessWidget {
   Color _getContrastColor(Color color) {
     // Calculate luminance to determine if text should be black or white
     final luminance = color.computeLuminance();
-    return luminance > 0.5 ? Colors.black : Colors.white;
+    final theme = Theme.of(context);
+    return luminance > 0.5 ? theme.colorScheme.onSurface : theme.colorScheme.onPrimary;
   }
 }
 
