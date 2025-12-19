@@ -67,7 +67,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ? Center(
                       child: Text(
                         'No scores yet. Be the first to play!',
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                       ),
                     )
                   : ListView.builder(
@@ -106,11 +106,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             leading: Stack(
               children: [
                 CircleAvatar(
-                  backgroundColor: isMe ? Colors.blue : Colors.grey[300],
+                  backgroundColor: isMe ? Colors.blue : Theme.of(context).colorScheme.surfaceContainerHighest,
                   child: Text(
                     user?.displayName[0].toUpperCase() ?? '?',
                     style: TextStyle(
-                      color: isMe ? Colors.white : Colors.grey[800],
+                      color: isMe ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -122,7 +122,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(2),
                       decoration: const BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -131,7 +131,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         color: rank == 1
                             ? Colors.amber
                             : rank == 2
-                                ? Colors.grey[400]!
+                                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
                                 : Colors.brown[300]!,
                       ),
                     ),
@@ -179,15 +179,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     color: rank == 1
                         ? Colors.amber
                         : rank == 2
-                            ? Colors.grey[600]
+                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
                             : rank == 3
                                 ? Colors.brown[400]
-                                : Colors.grey[700],
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
                 Text(
                   '${stats.winsChess}C ${stats.winsScramble}S',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
               ],
             ),

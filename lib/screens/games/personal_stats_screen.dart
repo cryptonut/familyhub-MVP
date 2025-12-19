@@ -152,7 +152,7 @@ class _PersonalStatsScreenState extends State<PersonalStatsScreen> {
                                   style: const TextStyle(
                                     fontSize: 32,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: Theme.of(context).colorScheme.onPrimary,
                                   ),
                                 ),
                               ),
@@ -178,7 +178,7 @@ class _PersonalStatsScreenState extends State<PersonalStatsScreen> {
                                       'Total Wins',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey[600],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                       ),
                                     ),
                                   ],
@@ -200,7 +200,7 @@ class _PersonalStatsScreenState extends State<PersonalStatsScreen> {
                                         'Day Streak',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                         ),
                                       ),
                                     ],
@@ -233,7 +233,7 @@ class _PersonalStatsScreenState extends State<PersonalStatsScreen> {
                                 color: Theme.of(context).colorScheme.surfaceVariant,
                                 border: Border(
                                   bottom: BorderSide(
-                                    color: Colors.grey.shade300,
+                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                     width: 1,
                                   ),
                                 ),
@@ -246,7 +246,7 @@ class _PersonalStatsScreenState extends State<PersonalStatsScreen> {
                                       'Game',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.grey[800],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                                       ),
                                     ),
                                   ),
@@ -255,7 +255,7 @@ class _PersonalStatsScreenState extends State<PersonalStatsScreen> {
                                       'Score/Time',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.grey[800],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
@@ -274,7 +274,7 @@ class _PersonalStatsScreenState extends State<PersonalStatsScreen> {
                                 decoration: BoxDecoration(
                                   border: Border(
                                     bottom: BorderSide(
-                                      color: Colors.grey.shade200,
+                                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                       width: 1,
                                     ),
                                   ),
@@ -308,7 +308,7 @@ class _PersonalStatsScreenState extends State<PersonalStatsScreen> {
                                           fontWeight: FontWeight.bold,
                                           color: value > 0
                                               ? Theme.of(context).colorScheme.primary
-                                              : Colors.grey,
+                                              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                         ),
                                       ),
                                     ),

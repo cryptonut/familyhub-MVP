@@ -92,7 +92,7 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey[800],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                         ),
                       ),
                     ),
@@ -181,7 +181,7 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.grey[800],
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                                 ),
                               ),
                               TextButton(
@@ -205,7 +205,7 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
                                 child: Center(
                                   child: Text(
                                     'No scores yet. Be the first to play!',
-                                    style: TextStyle(color: Colors.grey[600]),
+                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                                   ),
                                 ),
                               ),
@@ -292,7 +292,7 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
       ],
@@ -337,13 +337,13 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
                   description,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: Colors.grey[400]),
+          Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
         ],
       ),
     );
@@ -362,11 +362,11 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
           padding: EdgeInsets.zero,
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: isMe ? Colors.blue : Colors.grey[300],
+              backgroundColor: isMe ? Colors.blue : Theme.of(context).colorScheme.surfaceContainerHighest,
               child: Text(
                 user?.displayName[0].toUpperCase() ?? '?',
                 style: TextStyle(
-                  color: isMe ? Colors.white : Colors.grey[800],
+                  color: isMe ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -391,7 +391,7 @@ class _GamesHomeScreenState extends State<GamesHomeScreen> {
                   '#${_leaderboard.indexOf(stats) + 1}',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.grey[700],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ],

@@ -111,7 +111,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
         Text(
           'Joined ${_user!.createdAt.year}',
           style: TextStyle(
-            color: Colors.grey[600],
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
       ],
@@ -198,7 +198,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
       ],
@@ -259,7 +259,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                     Text(
                       'High Score: $highScore',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         fontSize: 12,
                       ),
                     )
@@ -267,7 +267,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                     Text(
                       '$wins Wins',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         fontSize: 12,
                       ),
                     ),
