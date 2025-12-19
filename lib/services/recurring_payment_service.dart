@@ -135,17 +135,25 @@ class RecurringPaymentService {
     final familyId = userModel.familyId;
     if (familyId == null) return [];
 
+    // TEMPORARY WORKAROUND: Fetch all and filter client-side to avoid index requirement
+    Logger.warning('getCreatedRecurringPayments: Using temporary workaround - fetching all recurring payments', tag: 'RecurringPaymentService');
     final snapshot = await _firestore
         .collection('families')
         .doc(familyId)
         .collection('recurringPayments')
-        .where('fromUserId', isEqualTo: currentUserId)
-        .orderBy('createdAt', descending: true)
         .get();
 
-    return snapshot.docs
+    // Filter by fromUserId and sort by createdAt client-side
+    final userPayments = snapshot.docs
         .map((doc) => RecurringPayment.fromJson({'id': doc.id, ...doc.data()}))
+        .where((payment) => payment.fromUserId == currentUserId)
         .toList();
+
+    // Sort by createdAt descending
+    userPayments.sort((a, b) => (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now()));
+
+    Logger.warning('getCreatedRecurringPayments: Found ${userPayments.length} payments using workaround', tag: 'RecurringPaymentService');
+    return userPayments;
   }
 
   /// Process recurring payments that are due
