@@ -236,3 +236,54 @@ This document tracks all addressable issues found during systematic screen-by-sc
 - Remaining work is primarily verification and minor improvements
 - Most screens follow correct patterns (in-memory filtering, proper empty states)
 
+---
+
+## Firebase & Infrastructure Issues (Session Dec 19, 2025)
+
+### ✅ COMPLETED - Critical Infrastructure Fixes
+
+1. **Firebase Rules Deployment Issues**
+   - **Issue**: Rules deployment failing due to index conflicts and unused function warnings
+   - **Fix**: Cleaned up Firestore rules, removed unused `isGameParticipant` function
+   - **Status**: ✅ Fixed - Rules deployed successfully
+
+2. **Recurring Payments Screen - Index Error**
+   - **Issue**: Screen showed "unable to load family members" but was actually failing on recurring payments query
+   - **Root Cause**: Missing composite index for `recurringPayments` collection (fromUserId + createdAt)
+   - **Fix**: Implemented temporary workaround - fetch all payments, filter/sort client-side
+   - **Impact**: Screen now loads successfully, can create recurring payments
+   - **Status**: ✅ Fixed with workaround (index creation pending)
+
+3. **Family Members Loading Investigation**
+   - **Issue**: Initial assumption was family members not loading
+   - **Discovery**: Family data is correct - user has 4 family members (Simon, Kate, Lilly, Paul)
+   - **Root Cause**: Screen failure was upstream (recurring payments query)
+   - **Fix**: Added comprehensive debug logging for future troubleshooting
+   - **Status**: ✅ Verified working - family members load correctly
+
+### 🔧 Technical Details
+
+**Firebase Rules Status:**
+- ✅ Firestore rules: Deployed successfully
+- ✅ Storage rules: Up-to-date
+- ✅ User collection: Has proper indexes for familyId queries
+- ⚠️ Missing: recurringPayments composite index (workaround in place)
+
+**Recurring Payments Workaround:**
+- Query changed from indexed database filtering to client-side filtering
+- Performance impact: Minimal (small dataset)
+- Functionality: Fully restored
+- Future optimization: Create proper composite index
+
+**Debug Infrastructure Added:**
+- Comprehensive user family status logging
+- Auto-recovery logic for missing familyId
+- Exception handling with fallbacks
+- Detailed error reporting for troubleshooting
+
+### 📊 Session Impact
+- **Infrastructure**: Firebase deployment pipeline working
+- **User Experience**: Recurring Payments screen fully functional
+- **Debugging**: Enhanced logging for future issues
+- **Performance**: Temporary workaround, room for optimization
+

@@ -1,7 +1,59 @@
-# Deployment Status - Chess PvP Fixes v2.3.0
+# Deployment Status - Infrastructure Fixes & Recurring Payments v2.4.0
 
-**Date:** December 6, 2025  
-**Status:** ✅ Deployed to QA, Ready for Production
+**Date:** December 19, 2025
+**Status:** ✅ Committed to Develop, Ready for QA Deployment
+
+---
+
+## ✅ **CURRENT DEPLOYMENT STATUS**
+
+### **Infrastructure Fixes - COMPLETED**
+1. **Code Committed**: All Firebase and recurring payments fixes committed to `develop` branch
+2. **Branch Status**: ✅ `develop` branch updated and ready
+3. **Testing**: ✅ Verified working on development device
+4. **Merge Status**: ⏳ Ready to merge to `release/qa` branch
+
+---
+
+## 📋 **RELEASE SUMMARY**
+
+### Version: v2.4.0
+### Branch Flow: `develop` → `release/qa` → `main`
+
+### **Critical Infrastructure Fixes:**
+- ✅ **Firebase Rules Deployment**: Fixed deployment pipeline, cleaned up unused functions
+- ✅ **Recurring Payments Screen**: Fixed critical bug preventing screen from loading
+- ✅ **Family Members Loading**: Verified working, added comprehensive debug logging
+- ✅ **Database Indexes**: Added missing indexes, implemented workarounds where needed
+
+### **Root Cause Analysis:**
+- **Initial Issue**: "Unable to load family members" error in Recurring Payments screen
+- **Root Cause**: Missing composite index for recurringPayments collection queries
+- **Impact**: Screen completely unusable, users couldn't set up pocket money payments
+- **Resolution**: Temporary client-side filtering workaround + comprehensive debugging
+
+### **Technical Details:**
+- **Firestore Rules**: Deployed successfully, all collections covered
+- **Database Integrity**: Verified - 4 family members (Simon, Kate, Lilly, Paul)
+- **Performance**: Temporary workaround for one query (room for optimization)
+- **Debug Infrastructure**: Enhanced error reporting and auto-recovery logic
+
+---
+
+## 🚀 **NEXT STEPS FOR DEPLOYMENT**
+
+### **Immediate Actions Required:**
+1. **Merge to QA**: `git checkout release/qa && git merge develop`
+2. **Build QA Flavor**: `flutter build apk --flavor qa --release`
+3. **Deploy to Firebase**: `firebase appdistribution:distribute build/app/outputs/flutter-apk/app-qa-release.apk --app [app-id] --groups qa-testers`
+4. **Test Verification**: QA testers verify Recurring Payments screen works
+
+### **Expected QA Testing Results:**
+- ✅ Recurring Payments screen loads without errors
+- ✅ Family members appear in dropdown (Simon, Kate, Lilly, Paul)
+- ✅ Can create recurring payments for pocket money
+- ✅ No Firebase index errors in logs
+- ✅ All other app functionality remains intact
 
 ---
 
