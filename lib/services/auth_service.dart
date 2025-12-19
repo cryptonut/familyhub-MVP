@@ -1302,6 +1302,8 @@ class AuthService {
       Logger.debug('getFamilyMembers: Querying for familyId: "${currentUserModel.familyId}"', tag: 'AuthService');
       Logger.debug('getFamilyMembers: Current user ID: ${currentUserModel.uid}', tag: 'AuthService');
       Logger.debug('getFamilyMembers: Current user email: ${currentUserModel.email}', tag: 'AuthService');
+      Logger.debug('getFamilyMembers: Current user displayName: ${currentUserModel.displayName}', tag: 'AuthService');
+      Logger.debug('getFamilyMembers: Using flavor prefix: $prefixedCollection', tag: 'AuthService');
       
       final prefixedCollection = FirestorePathUtils.getUsersCollection();
       final unprefixedCollection = 'users';
@@ -1329,15 +1331,19 @@ class AuthService {
           prefixedSnapshot = allUsersSnapshot;
         }
         
+        Logger.debug('getFamilyMembers: Found ${prefixedSnapshot.docs.length} docs in $prefixedCollection', tag: 'AuthService');
         for (var doc in prefixedSnapshot.docs) {
           try {
             final data = doc.data() as Map<String, dynamic>;
             final docFamilyId = data['familyId'] as String?;
+            Logger.debug('  Doc ${doc.id}: familyId="$docFamilyId", displayName="${data['displayName']}"', tag: 'AuthService');
             if (docFamilyId == currentUserModel.familyId && !seenUserIds.contains(doc.id)) {
               final userModel = UserModel.fromJson({'uid': doc.id, ...data});
               allFamilyMembers.add(userModel);
               seenUserIds.add(doc.id);
-              Logger.debug('  Found in $prefixedCollection: ${userModel.displayName} (${doc.id})', tag: 'AuthService');
+              Logger.debug('  ✓ Added from $prefixedCollection: ${userModel.displayName} (${doc.id})', tag: 'AuthService');
+            } else {
+              Logger.debug('  ✗ Skipped doc ${doc.id}: familyId mismatch or already seen', tag: 'AuthService');
             }
           } catch (e, st) {
             Logger.warning('getFamilyMembers: Error parsing user ${doc.id}', error: e, stackTrace: st, tag: 'AuthService');
@@ -1387,6 +1393,11 @@ class AuthService {
       }
 
       Logger.debug('getFamilyMembers: Found ${allFamilyMembers.length} total family members', tag: 'AuthService');
+      if (allFamilyMembers.isEmpty) {
+        Logger.warning('getFamilyMembers: RETURNING EMPTY LIST - this will cause the error message!', tag: 'AuthService');
+        Logger.warning('getFamilyMembers: Check if user has familyId: ${currentUserModel.familyId}', tag: 'AuthService');
+        Logger.warning('getFamilyMembers: Check if user document exists and has correct familyId', tag: 'AuthService');
+      }
       return allFamilyMembers;
     } catch (e, stackTrace) {
       Logger.error('getFamilyMembers: Unexpected error', error: e, stackTrace: stackTrace, tag: 'AuthService');
