@@ -125,22 +125,11 @@ FamilyHub can sync events with your device calendar (Google Calendar, Apple Cale
 3. Play and compete on the leaderboard!
 
 ### Video Calls (Agora Integration)
-- **Hub-based video calls**: Start calls within any hub
-- **Multi-participant support**: Grid layout for 2+ participants
-- **Creator control**: Hub creators can enable/disable video calls
-- **Push notifications**: Receive call invitations via FCM
-- **Background handling**: Auto-mute when minimized, return via notification
+**Status:** ⏸️ **ON HOLD** - Feature currently deferred
 
-![Video Call Interface](docs/screenshots/Screenshot_20251128_215139.jpg)
-*Video call screen with participant grid and controls*
+Video call functionality is currently on hold. The infrastructure exists but is not active.
 
-**To start a video call:**
-1. Open a hub (e.g., Family Hub, My Friends)
-2. Tap the video camera icon in the app bar
-3. Hub members receive push notifications to join
-4. Full-screen video call with mute/video controls
-
-**Note**: Video calls require Agora App ID and Certificate (configure in `lib/services/video_call_service.dart`)
+**Note**: Video calls require Agora App ID and Certificate configuration. Feature will be reactivated in a future release.
 
 ### Family Photo Albums
 - **Shared gallery**: Upload and organize family photos in albums
