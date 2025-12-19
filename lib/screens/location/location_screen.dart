@@ -295,7 +295,7 @@ class _LocationScreenState extends State<LocationScreen> {
           backgroundColor: Colors.blue,
           child: Text(
             member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
           ),
         ),
         title: Text(
@@ -318,13 +318,13 @@ class _LocationScreenState extends State<LocationScreen> {
                   'Last seen: ${app_date_utils.AppDateUtils.getRelativeTime(member.lastSeen!)}',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
             ] else
               const Text(
                 'Location not available',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
               ),
           ],
         ),
@@ -391,17 +391,17 @@ class _LocationScreenState extends State<LocationScreen> {
               const SizedBox(height: 8),
               Text(
                 'Latitude: ${member.latitude!.toStringAsFixed(6)}',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
               ),
               Text(
                 'Longitude: ${member.longitude!.toStringAsFixed(6)}',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
               ),
               if (member.lastSeen != null) ...[
                 const SizedBox(height: 4),
                 Text(
                   'Last updated: ${app_date_utils.AppDateUtils.formatDateTime(member.lastSeen!)}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                 ),
               ],
               const SizedBox(height: 12),

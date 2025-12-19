@@ -64,7 +64,7 @@ class _RefundNotificationDialogState extends State<RefundNotificationDialog> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
             child: const Text('Yes, Cancel'),
           ),
@@ -273,7 +273,7 @@ class _RefundNotificationDialogState extends State<RefundNotificationDialog> {
                 label: const Text('Cancel Job'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
@@ -287,7 +287,7 @@ class _RefundNotificationDialogState extends State<RefundNotificationDialog> {
                 label: const Text('Relist Job'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
@@ -301,7 +301,7 @@ class _RefundNotificationDialogState extends State<RefundNotificationDialog> {
                 label: const Text('Edit & Relist Job'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),

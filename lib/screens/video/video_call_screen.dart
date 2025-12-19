@@ -130,7 +130,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Stack(
           children: [
@@ -153,7 +153,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.7),
+                      Theme.of(context).colorScheme.shadow.withValues(alpha: 0.7),
                     ],
                   ),
                 ),
@@ -164,13 +164,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       icon: _isMuted ? Icons.mic_off : Icons.mic,
                       label: _isMuted ? 'Unmute' : 'Mute',
                       onPressed: _toggleMute,
-                      color: _isMuted ? Colors.red : Colors.white,
+                      color: _isMuted ? Colors.red : Theme.of(context).colorScheme.onPrimary,
                     ),
                     _buildControlButton(
                       icon: _isVideoEnabled ? Icons.videocam : Icons.videocam_off,
                       label: _isVideoEnabled ? 'Video Off' : 'Video On',
                       onPressed: _toggleVideo,
-                      color: _isVideoEnabled ? Colors.white : Colors.red,
+                      color: _isVideoEnabled ? Theme.of(context).colorScheme.onPrimary : Colors.red,
                     ),
                     _buildControlButton(
                       icon: Icons.call_end,
@@ -234,7 +234,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         return Container(
           margin: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: Colors.grey[900],
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Stack(
@@ -261,7 +261,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       const SizedBox(height: 8),
                       Text(
                         user?.displayName ?? 'You',
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                       ),
                     ],
                   ),
@@ -288,7 +288,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return Container(
       margin: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
       child: AgoraVideoView(
@@ -305,7 +305,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
-    Color color = Colors.white,
+    Color color = Theme.of(context).colorScheme.onPrimary,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -324,7 +324,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(color: Colors.white, fontSize: 12),
+          style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontSize: 12),
         ),
       ],
     );

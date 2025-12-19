@@ -177,7 +177,7 @@ class _ReorderNavigationScreenState extends State<ReorderNavigationScreen> {
           if (_hasChanges)
             TextButton(
               onPressed: _saveOrder,
-              child: const Text('Save', style: TextStyle(color: Colors.white)),
+              child: Text('Save', style: TextStyle(color: Theme.of(context).colorScheme.onPrimary)),
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -222,15 +222,15 @@ class _ReorderNavigationScreenState extends State<ReorderNavigationScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: item.isLocked
-            ? const Icon(Icons.lock, color: Colors.grey)
-            : const Icon(Icons.drag_handle, color: Colors.grey),
+            ? Icon(Icons.lock, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))
+            : Icon(Icons.drag_handle, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
         title: Text(item.label),
         trailing: item.isLocked
             ? const Chip(
                 label: Text('Locked'),
                 labelStyle: TextStyle(fontSize: 10),
               )
-            : const Icon(Icons.reorder, color: Colors.grey),
+            : Icon(Icons.reorder, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
         enabled: !item.isLocked,
       ),
     );

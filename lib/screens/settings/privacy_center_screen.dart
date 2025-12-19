@@ -163,7 +163,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                           children: [
                             Icon(
                               _isMasterToggleOn ? Icons.share : Icons.block,
-                              color: _isMasterToggleOn ? Colors.green : Colors.grey,
+                              color: _isMasterToggleOn ? Colors.green : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                               size: 32,
                             ),
                             const SizedBox(width: 16),
@@ -184,7 +184,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                                         : 'No active sharing',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: Colors.grey[600],
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                     ),
                                   ),
                                 ],
@@ -208,7 +208,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[800],
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                           ),
                         ),
                       ),
@@ -228,7 +228,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                             label: const Text('Turn Off All Sharing'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
@@ -247,7 +247,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Colors.grey[800],
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -258,7 +258,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
                                 child: Center(
                                   child: Text(
                                     'No recent activity',
-                                    style: TextStyle(color: Colors.grey[600]),
+                                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                                   ),
                                 ),
                               ),
@@ -331,7 +331,7 @@ class _PrivacyCenterScreenState extends State<PrivacyCenterScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(dateFormat.format(activity.timestamp)),
-        trailing: Icon(Icons.chevron_right, color: Colors.grey[400]),
+        trailing: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
       ),
     );
   }

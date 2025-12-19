@@ -530,7 +530,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                     children: [
                       Icon(
                         isEnabled ? Icons.sync : Icons.sync_disabled,
-                        color: isEnabled ? Colors.green : Colors.grey,
+                        color: isEnabled ? Colors.green : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         size: 28,
                       ),
                       const SizedBox(width: 12),
@@ -550,7 +550,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                                 'Last synced: ${_formatLastSynced(lastSynced)}',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[600],
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                 ),
                               )
                             else if (isEnabled)
@@ -558,7 +558,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                                 'Not synced yet',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[600],
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                 ),
                               ),
                           ],
@@ -573,7 +573,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                       else
                         Chip(
                           label: const Text('Inactive'),
-                          backgroundColor: Colors.grey.shade200,
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                         ),
                     ],
                   ),
@@ -591,7 +591,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                             children: [
                               const Text(
                                 'Syncing with:',
-                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -610,14 +610,14 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                                     Icon(
                                       Icons.schedule,
                                       size: 14,
-                                      color: Colors.grey[600],
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
                                       'Last synced: ${_formatLastSynced(lastSynced)}',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey[600],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                       ),
                                     ),
                                   ],
@@ -694,7 +694,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
             const SizedBox(height: 8),
             const Text(
               'Sync your FamilyHub events with your device calendar (Google, Apple, Outlook)',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),
             const SizedBox(height: 16),
             
@@ -895,7 +895,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                   radius: 20,
                   child: Text(
                     '$step',
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontSize: 16),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -919,7 +919,7 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                 description,
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.grey[600],
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -1079,10 +1079,10 @@ class _CalendarSyncSettingsScreenState extends State<CalendarSyncSettingsScreen>
                       const SizedBox(width: 8),
                       Chip(
                         label: Text('$eventCount events'),
-                        backgroundColor: hasEvents ? Colors.green.shade100 : Colors.grey.shade200,
+                        backgroundColor: hasEvents ? Colors.green.shade100 : Theme.of(context).colorScheme.surfaceContainerHighest,
                         labelStyle: TextStyle(
                           fontSize: 11,
-                          color: hasEvents ? Colors.green.shade900 : Colors.grey.shade700,
+                          color: hasEvents ? Colors.green.shade900 : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                     ],

@@ -74,7 +74,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
                 task.description,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[700],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 16),
@@ -116,7 +116,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
             _buildInfoRow(
               'Created',
               '${dateFormat.format(task.createdAt)} at ${timeFormat.format(task.createdAt)}',
-              Colors.grey[700]!,
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             ),
             
             // Completed Date
@@ -158,7 +158,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
                     ? Colors.green
                     : task.claimStatus == 'pending'
                         ? Colors.orange
-                        : Colors.grey[700]!,
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ],
             
@@ -176,7 +176,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
                     ? Colors.orange
                     : task.approvedBy != null
                         ? Colors.green
-                        : Colors.grey[700]!,
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ],
             
@@ -234,7 +234,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
                       _buildInfoRow(
                         'Note',
                         task.refundNote!,
-                        Colors.grey[700]!,
+                        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ],
                     if (task.refundedAt != null) ...[
@@ -242,7 +242,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
                       _buildInfoRow(
                         'Refunded At',
                         '${dateFormat.format(task.refundedAt!)} at ${timeFormat.format(task.refundedAt!)}',
-                        Colors.grey[700]!,
+                        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ],
                   ],
@@ -286,7 +286,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
                   label: const Text('Refund Job'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                 ),
@@ -341,7 +341,7 @@ class _ViewTaskScreenState extends State<ViewTaskScreen> {
       case 'low':
         return Colors.green;
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
     }
   }
 }

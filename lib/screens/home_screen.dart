@@ -430,7 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isDark ? Colors.grey[800] : Colors.grey[300],
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -455,10 +455,10 @@ class _HomeScreenState extends State<HomeScreen> {
         constraints: const BoxConstraints(maxWidth: 200, minWidth: 150),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isDark ? Colors.grey[800] : Colors.grey[300],
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isDark ? Colors.grey[700]! : Colors.grey[400]!,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             width: 1,
           ),
         ),
@@ -472,7 +472,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: theme.colorScheme.onSurface,
             size: 20,
           ),
-          dropdownColor: isDark ? Colors.grey[900] : Colors.white,
+          dropdownColor: Theme.of(context).colorScheme.surface,
           menuMaxHeight: 300,
           style: TextStyle(
             color: theme.colorScheme.onSurface,
@@ -533,7 +533,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Container(
                 height: 1,
                 margin: const EdgeInsets.symmetric(vertical: 4),
-                color: isDark ? Colors.grey[700] : Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             // Existing hubs
@@ -710,7 +710,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () => Navigator.pop(context, 'fix_family'),
             ),
             ListTile(
-              leading: const Icon(Icons.bug_report, color: Colors.grey),
+              leading: Icon(Icons.bug_report, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
               title: const Text('Debug User Info'),
               onTap: () => Navigator.pop(context, 'debug'),
             ),
@@ -1065,7 +1065,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
               ),
               child: const Text('Continue'),
             ),
@@ -1257,7 +1257,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   : 'Update Family ID'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
           ],
@@ -1556,7 +1556,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onPressed: () => Navigator.pop(context, true),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.blue,
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                                 ),
                                 child: const Text('Sign Out & Refresh'),
                               ),

@@ -188,7 +188,7 @@ class _RefundJobDialogState extends State<RefundJobDialog> {
           onPressed: _isProcessing ? null : _processRefund,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
           child: _isProcessing
               ? const SizedBox(
@@ -196,7 +196,7 @@ class _RefundJobDialogState extends State<RefundJobDialog> {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
                   ),
                 )
               : const Text('Process Refund'),
