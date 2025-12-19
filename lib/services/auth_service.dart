@@ -1004,7 +1004,7 @@ class AuthService {
     // Verify the familyId from Firestore directly (not from cache)
     Logger.debug('=== GETTING FAMILY INVITATION CODE ===', tag: 'AuthService');
     Logger.debug('User ID: ${user.uid}', tag: 'AuthService');
-    Logger.debug('UserModel familyId: ${effectiveFamilyId}', tag: 'AuthService');
+    Logger.debug('UserModel familyId: ${currentUserModel.familyId}', tag: 'AuthService');
     
     // Read directly from Firestore to ensure we have the latest value
     final userDoc = await _firestore.collection(FirestorePathUtils.getUsersCollection()).doc(user.uid).get(GetOptions(source: Source.server));
@@ -1012,7 +1012,7 @@ class AuthService {
       final docData = userDoc.data();
       final docFamilyId = docData?['familyId'] as String?;
       Logger.debug('Firestore document familyId: "$docFamilyId"', tag: 'AuthService');
-      Logger.debug('FamilyId from model matches document: ${effectiveFamilyId == docFamilyId}', tag: 'AuthService');
+      Logger.debug('FamilyId from model matches document: ${currentUserModel.familyId == docFamilyId}', tag: 'AuthService');
       
       if (docFamilyId != null && docFamilyId.isNotEmpty) {
         return docFamilyId;
@@ -1022,8 +1022,8 @@ class AuthService {
     }
     
     // If user already has a familyId, return it
-    if (effectiveFamilyId != null && effectiveFamilyId!.isNotEmpty) {
-      return effectiveFamilyId;
+    if (currentUserModel.familyId != null && currentUserModel.familyId!.isNotEmpty) {
+      return currentUserModel.familyId!;
     }
     
     // User doesn't have a familyId, create one
@@ -1300,7 +1300,7 @@ class AuthService {
       }
 
       // Use the familyId from the model, or try to recover it from database if missing
-      String? effectiveFamilyId = effectiveFamilyId;
+      String? effectiveFamilyId = currentUserModel.familyId;
 
       if (effectiveFamilyId == null || effectiveFamilyId.isEmpty) {
         Logger.warning('getFamilyMembers: Current user has no familyId - cannot find family members', tag: 'AuthService');
@@ -1338,7 +1338,7 @@ class AuthService {
         try {
           prefixedSnapshot = await _firestore
               .collection(prefixedCollection)
-              .where('familyId', isEqualTo: effectiveFamilyId)
+              .where('familyId', isEqualTo: currentUserModel.familyId)
               .get(GetOptions(source: Source.server));
         } catch (e) {
           // If query fails (e.g., missing index), use fallback
@@ -1404,7 +1404,7 @@ class AuthService {
           try {
             unprefixedSnapshot = await _firestore
                 .collection(unprefixedCollection)
-                .where('familyId', isEqualTo: effectiveFamilyId)
+                .where('familyId', isEqualTo: currentUserModel.familyId)
                 .get(GetOptions(source: Source.server));
           } catch (e) {
             // If query fails, use fallback
@@ -1575,7 +1575,7 @@ class AuthService {
   /// This is typically the user with the earliest createdAt date in the family
   Future<UserModel?> getFamilyCreator() async {
     final currentUserModel = await getCurrentUserModel();
-    if (currentUserModel == null || effectiveFamilyId == null) {
+    if (currentUserModel == null || currentUserModel.familyId == null) {
       return null;
     }
 
@@ -1583,7 +1583,7 @@ class AuthService {
       // Try with index first (if it exists)
       final snapshot = await _firestore
           .collection(FirestorePathUtils.getUsersCollection())
-          .where('familyId', isEqualTo: effectiveFamilyId)
+          .where('familyId', isEqualTo: currentUserModel.familyId)
           .orderBy('createdAt', descending: false)
           .limit(1)
           .get(GetOptions(source: Source.server));
@@ -1597,7 +1597,7 @@ class AuthService {
       
       final snapshot = await _firestore
           .collection('users')
-          .where('familyId', isEqualTo: effectiveFamilyId)
+          .where('familyId', isEqualTo: currentUserModel.familyId)
           .get(GetOptions(source: Source.server));
 
       if (snapshot.docs.isEmpty) return null;
@@ -1651,7 +1651,7 @@ class AuthService {
     }
     
     final targetFamilyId = targetUserData['familyId'] as String?;
-    if (targetFamilyId != effectiveFamilyId) {
+    if (targetFamilyId != currentUserModel.familyId) {
       throw PermissionException('Cannot update relationships for users outside your family', code: 'family-mismatch');
     }
     
@@ -1712,7 +1712,7 @@ class AuthService {
     }
     
     final targetFamilyId = targetUserData['familyId'] as String?;
-    if (targetFamilyId != effectiveFamilyId) {
+    if (targetFamilyId != currentUserModel.familyId) {
       throw PermissionException('Cannot assign roles to users outside your family', code: 'family-mismatch');
     }
     
