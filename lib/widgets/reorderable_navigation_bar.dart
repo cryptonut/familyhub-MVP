@@ -149,10 +149,10 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Navigation order saved'),
-            duration: Duration(seconds: 1),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Navigation order saved'),
+            duration: const Duration(seconds: 1),
+            backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
       }
@@ -375,13 +375,13 @@ class _ReorderableNavigationBarState extends State<ReorderableNavigationBar> {
                                   child: Container(
                                     padding: const EdgeInsets.all(2),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue,
+                                      color: Theme.of(context).colorScheme.primary,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(
+                                    child: Icon(
                                       Icons.drag_handle,
                                       size: 10,
-                                      color: Colors.white,
+                                      color: Theme.of(context).colorScheme.onPrimary,
                                     ),
                                   ),
                                 ),

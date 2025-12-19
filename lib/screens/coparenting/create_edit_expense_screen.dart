@@ -298,9 +298,9 @@ class _CreateEditExpenseScreenState extends State<CreateEditExpenseScreen> {
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Expense created successfully'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Expense created successfully'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
       }
@@ -558,7 +558,7 @@ class _CreateEditExpenseScreenState extends State<CreateEditExpenseScreen> {
           color: Theme.of(context).scaffoldBackgroundColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, -2),
             ),
@@ -576,8 +576,8 @@ class _CreateEditExpenseScreenState extends State<CreateEditExpenseScreen> {
                 : const Icon(Icons.check),
             label: Text(widget.expense == null ? 'Add Expense' : 'Update Expense'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),

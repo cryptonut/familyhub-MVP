@@ -1,10 +1,23 @@
 # Agent Excellence Guide 🚀
 ## How to Be the Agent That Gets It Done
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Created:** January 2025  
+**Last Updated:** December 2025  
 **For:** Future AI Coding Agents Working on Family Hub MVP  
 **Purpose:** Share the mindset, workflow, and strategies that enable exceptional performance
+
+---
+
+## 🚨 CRITICAL: READ THIS FIRST
+
+**BEFORE YOU TAKE ANY ACTION:**
+1. **Re-read this guide** - Especially the sections relevant to your task
+2. **Understand the workflow** - Don't skip steps or assume you know better
+3. **Verify, don't assume** - Never claim something works without verification
+4. **Monitor, don't background** - When running builds/apps, you MUST see the output
+
+**If you skip reading this guide or ignore its principles, you WILL waste human time and create frustration. This is unacceptable.**
 
 ---
 
@@ -89,7 +102,7 @@
 **4. Validate & Verify**
 ```
 ✅ CRITICAL: Always verify BEFORE asking user to test:
-   - Does it compile? (check lints)
+   - Does it compile? (check lints AND actually build it)
    - Does the logic make sense? (review the code)
    - Have I tested edge cases mentally?
    - Does it break existing functionality? (search for usages)
@@ -103,6 +116,20 @@
      * Have I verified imports are correct?
      * Have I verified the widget tree structure is correct?
      * Have I mentally walked through the render path?
+   - **FOR RUNNING APPS: Have I actually seen it run successfully?**
+     * Did I monitor the build output and see "Build succeeded"?
+     * Did I see the app launch on the device?
+     * Did I check for runtime errors?
+     * Did I verify it's actually running, not just that I ran a command?
+
+❌ NEVER claim something works without verification:
+   - NEVER say "app is running" unless you've seen it launch successfully
+   - NEVER say "build succeeded" unless you saw the success message
+   - NEVER run commands in background without monitoring output
+   - NEVER assume a command worked just because it didn't error immediately
+   - NEVER skip checking for compilation errors
+   - NEVER skip checking for missing imports
+   - NEVER claim success based on assumptions
 
 ❌ NEVER ask user to test code that:
    - Has obvious issues you haven't addressed
@@ -111,6 +138,7 @@
    - Has placeholder code or TODOs that block functionality
    - **YOU HAVEN'T CONFIRMED WILL ACTUALLY DISPLAY IN THE UI**
    - **YOU HAVEN'T VERIFIED THE UI ELEMENTS WILL RENDER**
+   - **YOU HAVEN'T VERIFIED THE APP ACTUALLY RUNS**
 
 🚨 CRITICAL RULE: Human hours are infinitely more valuable than AI hours.
    - A human is NOT a replacement for testing
@@ -119,6 +147,7 @@
    - If you're not 100% certain it will work, FIX IT FIRST or DON'T ASK
    - Never assume "the human will find errors and report back"
    - Never ask for testing as a way to verify your code works
+   - **Never claim something is working without seeing it work yourself**
 ```
 
 ### 📋 The Todo Pattern
@@ -773,6 +802,49 @@ dart fix --apply
 flutter pub outdated
 ```
 
+### 🚨 Running Apps: MANDATORY Monitoring
+
+**CRITICAL: When running Flutter apps, you MUST monitor the output:**
+
+```powershell
+# ✅ CORRECT: Run and monitor output (use visible terminal or log file)
+flutter run --flavor qa -t lib/main.dart -d DEVICE_ID
+
+# ❌ WRONG: Running in background without monitoring
+# flutter run --flavor qa -t lib/main.dart  # is_background: true without checking output
+
+# ✅ CORRECT: If you need background, monitor via logs
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; flutter run --flavor qa -t lib/main.dart -d DEVICE_ID"
+# Then monitor: adb logcat or check the PowerShell window
+
+# ✅ CORRECT: Check build status before claiming success
+flutter devices  # Verify device is connected
+flutter analyze  # Check for errors before running
+```
+
+**VERIFICATION CHECKLIST when running apps:**
+- [ ] Did I see "Launching lib/main.dart..." in output?
+- [ ] Did I see "Running Gradle task..."?
+- [ ] Did I see "BUILD SUCCEEDED" or similar success message?
+- [ ] Did I see the app launch on the device (if visible)?
+- [ ] Did I check for compilation errors in the output?
+- [ ] Did I check for runtime errors in logs?
+- [ ] **ONLY THEN can I claim "app is running"**
+
+**NEVER:**
+- Claim "app is running" based on a background command without seeing output
+- Claim "build succeeded" without seeing the success message
+- Skip monitoring build output
+- Assume a command worked just because it didn't error immediately
+- Say "the app should build now" - verify it actually did
+
+**MANDATORY WORKFLOW:**
+1. Run the build command
+2. **Monitor the output** until you see success or failure
+3. **Fix any errors** that appear
+4. **Verify success** by seeing "BUILD SUCCEEDED" or app launching
+5. **Only then** report success to the user
+
 ---
 
 ## Git Workflow Best Practices {#git-workflow}
@@ -823,10 +895,25 @@ Longer description if needed explaining:
 
 **4. Branch Strategy**
 ```
-✅ Follow the project's branch strategy:
-- develop branch for ongoing work
-- Feature branches for larger changes
-- Don't commit directly to main/master
+🚨 CRITICAL: All development work MUST be done in the develop branch
+
+✅ CORRECT Workflow:
+1. Switch to develop branch: git checkout develop
+2. Create feature branch if needed: git checkout -b feature/description
+3. Make changes and commit to develop (or feature branch, then merge to develop)
+4. Test thoroughly in develop
+5. Merge develop to release/qa: git checkout release/qa && git merge develop
+6. Build and distribute from release/qa
+
+❌ WRONG: Working directly in release/qa branch
+❌ WRONG: Committing directly to main/master
+❌ WRONG: Merging release/qa to develop (develop is the source of truth)
+
+✅ Branch Purposes:
+- develop: All ongoing development work
+- release/qa: QA testing releases (synced from develop)
+- main/master: Production releases only
+- feature/*: Large features (merge to develop when complete)
 ```
 
 ### 🔄 Handling Git Issues
@@ -918,6 +1005,7 @@ git commit -m "Descriptive message"
 ### 🌟 The Agent's Creed
 
 **I am an Agent of Excellence. I:**
+- **Re-read this guide before starting any task**
 - Take ownership of outcomes, not just tasks
 - Solve problems, not just execute instructions
 - Write code that others will thank me for
@@ -927,6 +1015,9 @@ git commit -m "Descriptive message"
 - **Verify my code will work BEFORE asking humans to test**
 - **Respect human time as infinitely more valuable than AI time**
 - **Never use humans as debugging tools or testers for unverified code**
+- **Never claim something works without seeing it work myself**
+- **Always monitor build/app output - never assume success**
+- **Check for errors before claiming success - every single time**
 
 ### 🎯 Success Indicators
 
@@ -952,11 +1043,13 @@ git commit -m "Descriptive message"
 ## Quick Reference Checklist
 
 ### Before Starting Work
+- [ ] **RE-READ THIS GUIDE** - Especially sections relevant to your task
 - [ ] Understand the request fully
 - [ ] Check current codebase state
 - [ ] Read related documentation
 - [ ] Verify workspace location
 - [ ] Check git status
+- [ ] **Understand: Verification is mandatory, not optional**
 
 ### During Implementation
 - [ ] Make small, testable changes
@@ -968,7 +1061,11 @@ git commit -m "Descriptive message"
 - [ ] Update todos as you go
 
 ### Before Finishing
-- [ ] Verify it compiles (check lints)
+- [ ] Verify it compiles (check lints AND actually build it)
+- [ ] **If running an app: Monitor the build output and see it succeed**
+- [ ] **If running an app: Verify it actually launches on the device**
+- [ ] **If running an app: Check for runtime errors in logs**
+- [ ] **NEVER claim "app is running" unless you've seen it launch successfully**
 - [ ] Verify it works (mentally walk through the code)
 - [ ] **Compare structure with similar working code - ensure it matches**
 - [ ] **For UI screens: Verify structure matches working screens (no unnecessary wrappers)**
@@ -986,9 +1083,12 @@ git commit -m "Descriptive message"
 - [ ] Update documentation
 - [ ] Commit logical units
 - [ ] Update progress tracker
-- [ ] **Run with logcat monitoring when testing on dev phone**
+- [ ] **When running apps: Use visible output, not background processes**
+- [ ] **When running apps: Monitor build output until you see success**
+- [ ] **When running apps: Verify the app actually launches before claiming success**
 - [ ] **ONLY ask user to test if you've verified the code will actually work and display correctly**
 - [ ] **NEVER ask user to test as a way to verify your code - verify it yourself first**
+- [ ] **NEVER claim something is working without seeing it work yourself**
 
 ### When Stuck
 - [ ] Gather all available information

@@ -282,8 +282,8 @@ class _UploadBookFileSheetState extends State<UploadBookFileSheet> {
                   label: const Text('Upload Book'),
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   ),
                 ),
               ),

@@ -47,6 +47,8 @@ class AuthService {
   static final Map<String, Future<UserModel?>> _pendingUserModelQueries = <String, Future<UserModel?>>{};
   static UserModel? _cachedUserModel;
   static String? _cachedUserId;
+  static DateTime? _cacheTimestamp; // Track when cache was created
+  static const Duration _cacheExpirationDuration = Duration(minutes: 5); // Cache expires after 5 minutes
   static bool _isInitializingChannel = false;
   static DateTime? _lastChannelInitTime;
 
@@ -59,13 +61,23 @@ class AuthService {
       Logger.debug('No Firebase Auth user - returning null', tag: 'AuthService');
       _cachedUserModel = null;
       _cachedUserId = null;
+      _cacheTimestamp = null;
       return null;
     }
     
-    // CRITICAL FIX: Return cached result if available and user hasn't changed
-    if (_cachedUserModel != null && _cachedUserId == user.uid) {
-      Logger.debug('Returning cached user model for ${user.uid}', tag: 'AuthService');
+    // CRITICAL FIX: Return cached result if available, user hasn't changed, and cache hasn't expired
+    if (_cachedUserModel != null && 
+        _cachedUserId == user.uid && 
+        _cacheTimestamp != null &&
+        DateTime.now().difference(_cacheTimestamp!) < _cacheExpirationDuration) {
+      Logger.debug('Returning cached user model for ${user.uid} (cache age: ${DateTime.now().difference(_cacheTimestamp!).inSeconds}s)', tag: 'AuthService');
       return _cachedUserModel;
+    } else if (_cachedUserModel != null && _cachedUserId == user.uid) {
+      // Cache expired - clear it
+      Logger.debug('User model cache expired for ${user.uid}, refreshing...', tag: 'AuthService');
+      _cachedUserModel = null;
+      _cachedUserId = null;
+      _cacheTimestamp = null;
     }
     
     // CRITICAL FIX: If a query is already in progress for this user, wait for it instead of starting a new one
@@ -85,6 +97,7 @@ class AuthService {
       if (result != null) {
         _cachedUserModel = result;
         _cachedUserId = user.uid;
+        _cacheTimestamp = DateTime.now(); // Store cache timestamp
       }
     }).catchError((e) {
       _pendingUserModelQueries.remove(user.uid);
@@ -822,6 +835,7 @@ class AuthService {
   static void clearUserModelCache() {
     _cachedUserModel = null;
     _cachedUserId = null;
+    _cacheTimestamp = null;
     Logger.debug('User model cache cleared', tag: 'AuthService');
   }
 
@@ -830,6 +844,7 @@ class AuthService {
     // Clear cached user model on sign out
     _cachedUserModel = null;
     _cachedUserId = null;
+    _cacheTimestamp = null;
     _pendingUserModelQueries.clear();
     
     try {

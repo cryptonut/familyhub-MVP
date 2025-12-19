@@ -197,7 +197,7 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
             label: const Text('Invite New Members'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
           ),
         if (_members.isNotEmpty) ...[
@@ -403,7 +403,7 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ],
           ),
@@ -440,8 +440,8 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
                         ),
                         child: Text(
                           '$_pendingScheduleChanges',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -472,7 +472,7 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ],
           ),
@@ -509,8 +509,8 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
                         ),
                         child: Text(
                           '$_pendingExpenses',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -541,7 +541,7 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ],
           ),
@@ -586,7 +586,7 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ],
           ),
@@ -631,7 +631,7 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ],
           ),
@@ -676,7 +676,7 @@ class _CoparentingHubScreenState extends State<CoparentingHubScreen> {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ],
           ),

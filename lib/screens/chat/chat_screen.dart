@@ -31,12 +31,15 @@ class _ChatScreenState extends State<ChatScreen> {
   final AuthService _authService = AuthService();
   VoiceRecordingService? _voiceService;
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
   Timer? _recordingTimer;
   bool _isRecording = false;
   Duration _recordingDuration = Duration.zero;
   String? _familyId;
+  bool _isSearching = false;
+  String? _searchQuery;
   
   VoiceRecordingService get voiceService {
     _voiceService ??= VoiceRecordingService();
@@ -46,10 +49,21 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _searchController.dispose();
     _scrollController.dispose();
     _recordingTimer?.cancel();
     _voiceService?.dispose();
     super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchQuery = null;
+        _searchController.clear();
+      }
+    });
   }
 
   void _scrollToBottom() {
@@ -279,7 +293,39 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Family Chat'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search messages...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.isEmpty ? null : value.toLowerCase();
+                  });
+                },
+              )
+            : const Text('Family Chat'),
+        actions: [
+          if (_isSearching)
+            IconButton(
+              icon: const Icon(Icons.clear),
+              onPressed: _toggleSearch,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: _toggleSearch,
+            ),
+        ],
       ),
       body: SafeArea(
         child: StreamBuilder<List<ChatMessage>>(
@@ -324,10 +370,18 @@ class _ChatScreenState extends State<ChatScreen> {
               );
             }
 
-            final messages = snapshot.data ?? [];
+            final allMessages = snapshot.data ?? [];
+            
+            // Filter messages by search query if active
+            final messages = _searchQuery != null && _searchQuery!.isNotEmpty
+                ? allMessages.where((message) {
+                    return message.content.toLowerCase().contains(_searchQuery!) ||
+                        message.senderName.toLowerCase().contains(_searchQuery!);
+                  }).toList()
+                : allMessages;
 
-            // Only scroll if we have new messages and widget is mounted
-            if (messages.isNotEmpty && mounted) {
+            // Only scroll if we have new messages and widget is mounted (and not searching)
+            if (allMessages.isNotEmpty && mounted && !_isSearching) {
               // Use a delayed callback to avoid window access issues
               Future.microtask(() {
                 if (mounted) {
@@ -341,9 +395,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: messages.isEmpty
                       ? EmptyState(
-                          icon: Icons.chat_bubble_outline,
-                          title: 'No messages yet',
-                          message: 'Start the conversation!',
+                          icon: _searchQuery != null && _searchQuery!.isNotEmpty
+                              ? Icons.search_off
+                              : Icons.chat_bubble_outline,
+                          title: _searchQuery != null && _searchQuery!.isNotEmpty
+                              ? 'No matching messages'
+                              : 'No messages yet',
+                          message: _searchQuery != null && _searchQuery!.isNotEmpty
+                              ? 'Try a different search term'
+                              : 'Start the conversation!',
                         )
                       : ListView.builder(
                           controller: _scrollController,

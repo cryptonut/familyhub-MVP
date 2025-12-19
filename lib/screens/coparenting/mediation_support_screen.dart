@@ -83,7 +83,7 @@ class _MediationSupportScreenState extends State<MediationSupportScreen> {
                   Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ],
               ),
@@ -121,7 +121,7 @@ class _MediationSupportScreenState extends State<MediationSupportScreen> {
                   Icon(
                     Icons.download,
                     size: 20,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ],
               ),
@@ -159,7 +159,7 @@ class _MediationSupportScreenState extends State<MediationSupportScreen> {
                   Icon(
                     Icons.download,
                     size: 20,
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ],
               ),

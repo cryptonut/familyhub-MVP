@@ -30,8 +30,11 @@ class _FeedScreenState extends State<FeedScreen> {
   final AuthService _authService = AuthService();
   final HubService _hubService = HubService();
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   String? _currentUserId;
   List<Map<String, String>> _availableHubs = [];
+  bool _isSearching = false;
+  String? _searchQuery;
 
   @override
   void initState() {
@@ -42,6 +45,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -72,18 +76,59 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchQuery = null;
+        _searchController.clear();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Feed'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search messages...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.isEmpty ? null : value.toLowerCase();
+                  });
+                },
+              )
+            : const Text('Feed'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() {});
-            },
-          ),
+          if (_isSearching)
+            IconButton(
+              icon: const Icon(Icons.clear),
+              onPressed: _toggleSearch,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: _toggleSearch,
+            ),
+          if (!_isSearching)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                setState(() {});
+              },
+            ),
         ],
       ),
       body: RefreshIndicator(
@@ -128,7 +173,15 @@ class _FeedScreenState extends State<FeedScreen> {
               );
             }
 
-            final posts = snapshot.data ?? [];
+            final allPosts = snapshot.data ?? [];
+            
+            // Filter posts by search query if active
+            final posts = _searchQuery != null && _searchQuery!.isNotEmpty
+                ? allPosts.where((post) {
+                    return post.content.toLowerCase().contains(_searchQuery!) ||
+                        post.senderName.toLowerCase().contains(_searchQuery!);
+                  }).toList()
+                : allPosts;
 
             if (posts.isEmpty) {
               return Center(
@@ -136,18 +189,24 @@ class _FeedScreenState extends State<FeedScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.chat_bubble_outline,
+                      _searchQuery != null && _searchQuery!.isNotEmpty
+                          ? Icons.search_off
+                          : Icons.chat_bubble_outline,
                       size: 64,
                       color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: AppTheme.spacingMD),
                     Text(
-                      'No posts yet',
+                      _searchQuery != null && _searchQuery!.isNotEmpty
+                          ? 'No matching posts'
+                          : 'No posts yet',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: AppTheme.spacingSM),
                     Text(
-                      'Be the first to post!',
+                      _searchQuery != null && _searchQuery!.isNotEmpty
+                          ? 'Try a different search term'
+                          : 'Be the first to post!',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                           ),

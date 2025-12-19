@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../models/child_profile.dart';
 import '../../models/user_model.dart';
 import '../../services/coparenting_service.dart';
 import '../../services/auth_service.dart';
@@ -28,7 +29,7 @@ class _CreateScheduleChangeRequestScreenState extends State<CreateScheduleChange
   final AuthService _authService = AuthService();
   final _reasonController = TextEditingController();
   
-  List<UserModel> _members = [];
+  List<ChildProfile> _childProfiles = [];
   String? _selectedChildId;
   DateTime? _requestedDate;
   DateTime? _swapWithDate;
@@ -55,20 +56,12 @@ class _CreateScheduleChangeRequestScreenState extends State<CreateScheduleChange
     });
 
     try {
-      final hub = await _hubService.getHub(widget.hubId);
-      final members = <UserModel>[];
-      if (hub != null) {
-        for (final memberId in hub.memberIds) {
-          final user = await _authService.getUserModel(memberId);
-          if (user != null) {
-            members.add(user);
-          }
-        }
-      }
+      // Load child profiles for child dropdown
+      final childProfiles = await _service.getChildProfiles(widget.hubId);
 
       if (mounted) {
         setState(() {
-          _members = members;
+          _childProfiles = childProfiles;
           _isLoading = false;
         });
       }
@@ -173,9 +166,9 @@ class _CreateScheduleChangeRequestScreenState extends State<CreateScheduleChange
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Schedule change request created successfully'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Schedule change request created successfully'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
       }
@@ -217,10 +210,10 @@ class _CreateScheduleChangeRequestScreenState extends State<CreateScheduleChange
                         border: OutlineInputBorder(),
                         helperText: 'Select the child for this request',
                       ),
-                      items: _members.map((member) {
+                      items: _childProfiles.map((child) {
                         return DropdownMenuItem(
-                          value: member.uid,
-                          child: Text(member.displayName),
+                          value: child.id,
+                          child: Text(child.name),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -328,7 +321,7 @@ class _CreateScheduleChangeRequestScreenState extends State<CreateScheduleChange
           color: Theme.of(context).scaffoldBackgroundColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, -2),
             ),
@@ -346,8 +339,8 @@ class _CreateScheduleChangeRequestScreenState extends State<CreateScheduleChange
                 : const Icon(Icons.send),
             label: const Text('Submit Request'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),

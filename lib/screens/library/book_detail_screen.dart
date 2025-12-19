@@ -167,7 +167,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                         width: 120,
                         height: 180,
                         decoration: BoxDecoration(
-                          color: Colors.grey[200],
+                          color: theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: widget.book.coverUrl != null
@@ -240,7 +240,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                 'Be the First to Rate This Book!',
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   fontStyle: FontStyle.italic,
-                                  color: Colors.grey[600],
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                 ),
                               ),
                           ],

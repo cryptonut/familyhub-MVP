@@ -171,7 +171,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                     radius: isTopThree ? 24 : 20,
                                     backgroundColor: isTopThree
                                         ? _getRankColor(entry.rank)
-                                        : Colors.grey[300],
+                                        : Theme.of(context).colorScheme.surfaceContainerHighest,
                                     child: entry.userPhotoUrl != null
                                         ? ClipOval(
                                             child: CachedNetworkImage(
@@ -185,8 +185,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                                 : '?',
                                             style: TextStyle(
                                               color: isTopThree
-                                                  ? Colors.white
-                                                  : Colors.black87,
+                                                  ? Theme.of(context).colorScheme.onPrimary
+                                                  : Theme.of(context).colorScheme.onSurface,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -198,7 +198,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(2),
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
+                                          color: Theme.of(context).colorScheme.surface,
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
@@ -257,7 +257,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                   ? Chip(
                                       label: const Text('You'),
                                       backgroundColor: theme.colorScheme.primary,
-                                      labelStyle: const TextStyle(color: Colors.white),
+                                      labelStyle: TextStyle(
+                                        color: Theme.of(context).colorScheme.onPrimary,
+                                      ),
                                     )
                                   : null,
                             ),
@@ -275,11 +277,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       case 1:
         return Colors.amber;
       case 2:
-        return Colors.grey[400]!;
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4);
       case 3:
         return Colors.brown[300]!;
       default:
-        return Colors.grey[300]!;
+        return Theme.of(context).colorScheme.surfaceContainerHighest;
     }
   }
 }

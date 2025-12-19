@@ -749,6 +749,53 @@ class BookService {
     }
   }
 
+  /// Check if a book is available (has user-uploaded content OR can be accessed from online sources)
+  /// Returns true if book can be read within the app
+  Future<bool> isBookAvailable(String hubId, Book book) async {
+    try {
+      // First check for user-uploaded content (fastest check - local Firestore query)
+      final uploadedContent = await getUserUploadedBook(hubId, book.id);
+      if (uploadedContent != null) {
+        return true;
+      }
+
+      // Project Gutenberg books (gutenberg_ prefix) are guaranteed available
+      // Our search already filters for EPUB/HTML format, so they're always readable
+      if (book.id.startsWith('gutenberg_')) {
+        return true;
+      }
+
+      // For Open Library books, check if content URL exists (this does API calls)
+      // This is more expensive but necessary to ensure availability
+      final content = await getBookContentUrl(book);
+      return content != null;
+    } catch (e) {
+      Logger.warning('Error checking book availability for ${book.title}', error: e, tag: 'BookService');
+      return false; // On error, assume not available to be safe
+    }
+  }
+
+  /// Filter list of books to only include available ones
+  /// Checks availability in parallel for performance
+  Future<List<Book>> filterAvailableBooks(String hubId, List<Book> books) async {
+    try {
+      // Check availability in parallel
+      final availabilityChecks = await Future.wait(
+        books.map((book) => isBookAvailable(hubId, book).then((available) => MapEntry(book, available))),
+      );
+
+      // Filter to only available books
+      return availabilityChecks
+          .where((entry) => entry.value == true)
+          .map((entry) => entry.key)
+          .toList();
+    } catch (e) {
+      Logger.error('Error filtering available books', error: e, tag: 'BookService');
+      // On error, return empty list to be safe (don't show unavailable books)
+      return [];
+    }
+  }
+
   /// Save user-uploaded book reference to Firestore
   Future<void> saveUserUploadedBook(
     String hubId,

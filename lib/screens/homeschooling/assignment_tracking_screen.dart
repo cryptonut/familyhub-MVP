@@ -91,6 +91,23 @@ class _AssignmentTrackingScreenState extends State<AssignmentTrackingScreen> {
     }
   }
 
+  String _getEmptyStateMessage() {
+    // Provide context-aware empty state messages based on active filters
+    if (_selectedStudentId != null && _selectedStatus != null) {
+      final student = _getStudent(_selectedStudentId!);
+      final statusLabel = _getStatusLabel(_selectedStatus!);
+      return 'No $statusLabel assignments for ${student?.name ?? "this student"}';
+    } else if (_selectedStudentId != null) {
+      final student = _getStudent(_selectedStudentId!);
+      return 'No assignments for ${student?.name ?? "this student"}';
+    } else if (_selectedStatus != null) {
+      final statusLabel = _getStatusLabel(_selectedStatus!);
+      return 'No $statusLabel assignments';
+    } else {
+      return 'Create your first assignment';
+    }
+  }
+
   String _getStatusLabel(AssignmentStatus status) {
     switch (status) {
       case AssignmentStatus.pending:
@@ -205,29 +222,29 @@ class _AssignmentTrackingScreenState extends State<AssignmentTrackingScreen> {
                     ? EmptyState(
                         icon: Icons.assignment_outlined,
                         title: 'No Assignments',
-                        message: _selectedStudentId != null
-                            ? 'No assignments for this student'
-                            : 'Create your first assignment',
-                        action: ElevatedButton.icon(
-                          onPressed: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CreateEditAssignmentScreen(
-                                  hubId: widget.hubId,
-                                  students: _students,
-                                ),
-                              ),
-                            );
-                            if (result == true) {
-                              // Wait a moment for Firestore to process, then refresh
-                              await Future.delayed(const Duration(milliseconds: 500));
-                              _loadData();
-                            }
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Create Assignment'),
-                        ),
+                        message: _getEmptyStateMessage(),
+                        action: (_selectedStudentId == null && _selectedStatus == null)
+                            ? ElevatedButton.icon(
+                                onPressed: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CreateEditAssignmentScreen(
+                                        hubId: widget.hubId,
+                                        students: _students,
+                                      ),
+                                    ),
+                                  );
+                                  if (result == true) {
+                                    // Wait a moment for Firestore to process, then refresh
+                                    await Future.delayed(const Duration(milliseconds: 500));
+                                    _loadData();
+                                  }
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('Create Assignment'),
+                              )
+                            : null,
                       )
                     : RefreshIndicator(
                         onRefresh: _loadData,

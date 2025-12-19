@@ -30,6 +30,8 @@ class _SmsConversationsScreenState extends State<SmsConversationsScreen> {
   bool _isLoading = true;
   bool _hasPermissions = false;
   String? _searchQuery;
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -37,6 +39,12 @@ class _SmsConversationsScreenState extends State<SmsConversationsScreen> {
     if (Platform.isAndroid && Config.current.enableSmsFeature) {
       _initialize();
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _initialize() async {
@@ -149,14 +157,48 @@ class _SmsConversationsScreenState extends State<SmsConversationsScreen> {
       customMessage: 'Upgrade to Premium to send and receive SMS messages from within the app.',
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('SMS'),
+          title: _isSearching
+              ? TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Search conversations...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value.isEmpty ? null : value;
+                    });
+                  },
+                )
+              : const Text('SMS'),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () {
-                // TODO: Implement search
-              },
-            ),
+            if (_isSearching)
+              IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  setState(() {
+                    _isSearching = false;
+                    _searchQuery = null;
+                    _searchController.clear();
+                  });
+                },
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.search),
+                onPressed: () {
+                  setState(() {
+                    _isSearching = true;
+                  });
+                },
+              ),
           ],
         ),
         body: _buildBody(),
@@ -212,8 +254,12 @@ class _SmsConversationsScreenState extends State<SmsConversationsScreen> {
     if (_filteredConversations.isEmpty) {
       return EmptyState(
         icon: Icons.sms_outlined,
-        title: 'No SMS conversations',
-        message: 'Start a new conversation to begin messaging',
+        title: _searchQuery != null && _searchQuery!.isNotEmpty
+            ? 'No matching conversations'
+            : 'No SMS conversations',
+        message: _searchQuery != null && _searchQuery!.isNotEmpty
+            ? 'Try a different search term'
+            : 'Start a new conversation to begin messaging',
         action: ElevatedButton.icon(
           onPressed: () {
             Navigator.of(context).push(

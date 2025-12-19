@@ -372,7 +372,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
       await _loadTasks(forceRefresh: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Job claim submitted. Waiting for approval.'),
             backgroundColor: Colors.blue,
           ),
@@ -404,9 +404,9 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
       await _loadTasks(forceRefresh: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Claim approved'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Claim approved'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           ),
         );
       }
@@ -428,7 +428,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
       await _loadTasks(forceRefresh: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Claim rejected'),
             backgroundColor: Colors.orange,
           ),
@@ -458,9 +458,9 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
       await _loadTasks(forceRefresh: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Job approved!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           ),
         );
       }
@@ -522,9 +522,13 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
           label: const Text('Approve Job?'),
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
+            textStyle: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
           ),
         );
       } else {
@@ -563,8 +567,8 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
         ),
       );
     } else if (!task.isClaimed && !task.hasPendingClaim) {
@@ -592,8 +596,8 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
         ),
       );
     } else {
@@ -605,8 +609,8 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
         ),
       );
     }
@@ -677,9 +681,9 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
             
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Text('Job created successfully!'),
-                  backgroundColor: Colors.green,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                   duration: Duration(seconds: 2),
                 ),
               );
@@ -993,6 +997,50 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
     return filtered;
   }
 
+  bool _hasActiveFilters() {
+    return _searchQuery.isNotEmpty ||
+        _priorityFilter != 'All' ||
+        _statusFilter != 'All' ||
+        _completedFilter != 'Anyone' ||
+        _timePeriodFilter != 'All';
+  }
+
+  String _getEmptyStateMessage(bool isCompleted) {
+    if (!_hasActiveFilters()) {
+      return '';
+    }
+
+    final List<String> activeFilters = [];
+    
+    if (_searchQuery.isNotEmpty) {
+      activeFilters.add('matching "${_searchQuery}"');
+    }
+    
+    if (_priorityFilter != 'All') {
+      activeFilters.add('with ${_priorityFilter.toLowerCase()} priority');
+    }
+    
+    if (!isCompleted && _statusFilter != 'All') {
+      activeFilters.add('with ${_statusFilter.toLowerCase()} status');
+    }
+    
+    if (isCompleted) {
+      if (_completedFilter != 'Anyone') {
+        activeFilters.add('completed by you');
+      }
+      if (_timePeriodFilter != 'All') {
+        activeFilters.add('from the last ${_timePeriodFilter.toLowerCase()}');
+      }
+    }
+    
+    if (activeFilters.isEmpty) {
+      return '';
+    }
+    
+    final filterText = activeFilters.join(', ');
+    return 'No ${isCompleted ? 'completed jobs' : 'active jobs'} $filterText';
+  }
+
   Widget _buildCompletedTasksList() {
     final filteredTasks = _getFilteredCompletedTasks();
     
@@ -1160,14 +1208,33 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
       return EmptyState(
         icon: isCompleted ? Icons.check_circle_outline : Icons.assignment_outlined,
         title: isCompleted ? 'No completed jobs' : 'No active jobs',
-        action: TextButton.icon(
-          onPressed: () async {
-            Logger.debug('Manual refresh from empty state', tag: 'TasksScreen');
-            await _loadTasks(forceRefresh: true);
-          },
-          icon: const Icon(Icons.refresh),
-          label: const Text('Refresh'),
-        ),
+        message: _getEmptyStateMessage(isCompleted),
+        action: _hasActiveFilters() 
+            ? TextButton.icon(
+                onPressed: () {
+                  // Clear all filters
+                  setState(() {
+                    _searchQuery = '';
+                    _searchController.clear();
+                    _priorityFilter = 'All';
+                    _statusFilter = 'All';
+                    if (isCompleted) {
+                      _completedFilter = 'Anyone';
+                      _timePeriodFilter = 'All';
+                    }
+                  });
+                },
+                icon: const Icon(Icons.clear_all),
+                label: const Text('Clear Filters'),
+              )
+            : TextButton.icon(
+                onPressed: () async {
+                  Logger.debug('Manual refresh from empty state', tag: 'TasksScreen');
+                  await _loadTasks(forceRefresh: true);
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh'),
+              ),
       );
     }
 
@@ -1607,7 +1674,7 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                     await _loadTasks(forceRefresh: true);
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
+                        SnackBar(
                           content: Text('Force complete attempted. Check console for details.'),
                           backgroundColor: Colors.orange,
                         ),
@@ -1674,9 +1741,9 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                         await _loadTasks(forceRefresh: true);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text('Stuck task deleted'),
-                              backgroundColor: Colors.green,
+                              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                             ),
                           );
                         }
@@ -1723,9 +1790,9 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                         await _loadTasks(forceRefresh: true);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text('Duplicate document deleted'),
-                              backgroundColor: Colors.green,
+                              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                             ),
                           );
                         }
@@ -1773,9 +1840,9 @@ class _TasksScreenState extends State<TasksScreen> with TickerProviderStateMixin
                         await _loadTasks(forceRefresh: true);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text('Duplicates deleted'),
-                              backgroundColor: Colors.green,
+                              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                             ),
                           );
                         }

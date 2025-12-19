@@ -30,10 +30,13 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   final AuthService _authService = AuthService();
   late final EncryptedChatService _encryptedChatService;
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? _familyId;
   String? _chatId;
   bool _encryptMessage = false;
+  bool _isSearching = false;
+  String? _searchQuery;
 
   @override
   void initState() {
@@ -74,8 +77,19 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchQuery = null;
+        _searchController.clear();
+      }
+    });
   }
 
   void _scrollToBottom() {
@@ -159,29 +173,61 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-              child: Text(
-                widget.recipientName.isNotEmpty 
-                    ? widget.recipientName[0].toUpperCase() 
-                    : '?',
-                style: TextStyle(
-                  color: Theme.of(context).primaryColor,
-                  fontWeight: FontWeight.bold,
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search messages...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
                 ),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.isEmpty ? null : value.toLowerCase();
+                  });
+                },
+              )
+            : Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                    child: Text(
+                      widget.recipientName.isNotEmpty 
+                          ? widget.recipientName[0].toUpperCase() 
+                          : '?',
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widget.recipientName,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
+        actions: [
+          if (_isSearching)
+            IconButton(
+              icon: const Icon(Icons.clear),
+              onPressed: _toggleSearch,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: _toggleSearch,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                widget.recipientName,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
       body: SafeArea(
         child: StreamBuilder<List<ChatMessage>>(
@@ -200,12 +246,20 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
               );
             }
 
-            final messages = snapshot.data ?? [];
+            final allMessages = snapshot.data ?? [];
+            
+            // Filter messages by search query if active
+            final messages = _searchQuery != null && _searchQuery!.isNotEmpty
+                ? allMessages.where((message) {
+                    return message.content.toLowerCase().contains(_searchQuery!) ||
+                        message.senderName.toLowerCase().contains(_searchQuery!);
+                  }).toList()
+                : allMessages;
 
             // Mark messages as read when new messages arrive while chat is open
-            if (messages.isNotEmpty && mounted) {
+            if (allMessages.isNotEmpty && mounted && !_isSearching) {
               // Check if the latest message is from the recipient (not current user)
-              final latestMessage = messages.last;
+              final latestMessage = allMessages.last;
               final currentUserId = _chatService.currentUserId;
               if (latestMessage.senderId != currentUserId) {
                 // Mark as read when new message from recipient arrives
@@ -229,25 +283,27 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                Icons.chat_bubble_outline,
+                                _searchQuery != null && _searchQuery!.isNotEmpty
+                                    ? Icons.search_off
+                                    : Icons.chat_bubble_outline,
                                 size: 64,
-                                color: Colors.grey[400],
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'No messages yet',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                ),
+                                _searchQuery != null && _searchQuery!.isNotEmpty
+                                    ? 'No matching messages'
+                                    : 'No messages yet',
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Start a conversation with ${widget.recipientName}!',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
-                                ),
+                                _searchQuery != null && _searchQuery!.isNotEmpty
+                                    ? 'Try a different search term'
+                                    : 'Start a conversation with ${widget.recipientName}!',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                                    ),
                               ),
                             ],
                           ),
@@ -288,7 +344,11 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
             margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: isCurrentUser ? Colors.blue : Colors.grey[300]!,
+              color: isCurrentUser 
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey[800]!
+                      : Colors.grey[300]!,
               borderRadius: BorderRadius.circular(20),
             ),
             constraints: BoxConstraints(
@@ -304,7 +364,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: isCurrentUser ? Colors.white70 : Colors.black87,
+                        color: isCurrentUser 
+                            ? Colors.white70 
+                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                       ),
                     ),
                     // Encryption indicator
@@ -315,7 +377,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         size: 12,
                         color: isCurrentUser
                             ? Colors.white70
-                            : Colors.black54,
+                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
                       ),
                     ],
                     // Expiration indicator
@@ -326,7 +388,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                         size: 12,
                         color: isCurrentUser
                             ? Colors.white70
-                            : Colors.black54,
+                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
                       ),
                     ],
                   ],
@@ -335,7 +397,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                 LinkableText(
                   text: message.content,
                   style: TextStyle(
-                    color: isCurrentUser ? Colors.white : Colors.black87,
+                    color: isCurrentUser 
+                        ? Colors.white 
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -345,7 +409,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                     fontSize: 10,
                     color: isCurrentUser
                         ? Colors.white70
-                        : Colors.black54,
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
                   ),
                 ),
                 if (_familyId != null && _chatId != null) ...[
@@ -417,7 +481,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                 _encryptMessage ? Icons.lock : Icons.lock_open,
                 color: _encryptMessage
                     ? Theme.of(context).colorScheme.primary
-                    : Colors.grey,
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
               onPressed: () {
                 setState(() {

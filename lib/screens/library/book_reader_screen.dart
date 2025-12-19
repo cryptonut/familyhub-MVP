@@ -267,7 +267,11 @@ class _BookReaderScreenState extends State<BookReaderScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.book_outlined, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.book_outlined,
+              size: 64,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: 16),
             Text(
               'Book Not Available Online',

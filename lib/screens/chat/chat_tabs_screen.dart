@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../../providers/user_data_provider.dart';
 import '../../models/user_model.dart';
 import '../../config/config.dart';
+import '../../services/subscription_service.dart';
 import 'chat_screen.dart';
 import 'private_chat_screen.dart';
 import '../feed/feed_screen.dart';
@@ -24,6 +25,8 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
   List<UserModel> _familyMembers = [];
   UserModel? _currentUser;
   int _selectedIndex = 0;
+  bool _hasPremiumAccess = false;
+  bool _isCheckingPremium = true;
 
   @override
   void initState() {
@@ -35,6 +38,18 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
     final userProvider = Provider.of<UserDataProvider>(context, listen: false);
     await userProvider.loadUserData(forceRefresh: false);
     
+    // Check premium access for SMS feature
+    bool hasPremium = false;
+    if (Platform.isAndroid && Config.current.enableSmsFeature) {
+      try {
+        final subscriptionService = SubscriptionService();
+        hasPremium = await subscriptionService.hasActiveSubscription();
+      } catch (e) {
+        Logger.warning('Error checking premium access', error: e, tag: 'ChatTabsScreen');
+        hasPremium = false;
+      }
+    }
+    
     if (mounted) {
       setState(() {
         _currentUser = userProvider.currentUser;
@@ -43,9 +58,12 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
             .where((member) => member.uid != _currentUser?.uid)
             .toList();
         
-        // Calculate tab length: "All" + family members + SMS (if Android and enabled)
+        _hasPremiumAccess = hasPremium;
+        _isCheckingPremium = false;
+        
+        // Calculate tab length: "All" + family members + SMS (if Android, enabled, and premium)
         int tabLength = 1 + _familyMembers.length;
-        if (Platform.isAndroid && Config.current.enableSmsFeature) {
+        if (Platform.isAndroid && Config.current.enableSmsFeature && hasPremium) {
           tabLength += 1; // Add SMS tab
         }
         
@@ -139,7 +157,7 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    if (_familyMembers.isEmpty) {
+    if (_familyMembers.isEmpty || _isCheckingPremium) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Family Chat'),
@@ -188,8 +206,8 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
                 ),
               );
             }),
-            // SMS tab (Android only, if enabled)
-            if (Platform.isAndroid && Config.current.enableSmsFeature)
+            // SMS tab (Android only, if enabled, and user has premium)
+            if (Platform.isAndroid && Config.current.enableSmsFeature && _hasPremiumAccess)
               const Tab(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -206,8 +224,8 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
       body: TabBarView(
         controller: _tabController,
         children: [
-          // "All" tab - shows new social feed
-          const FeedScreen(),
+          // "All" tab - shows full chat (same as preview)
+          ChatScreen(),
           // Individual member tabs - shows private chat
           ..._familyMembers.map((member) {
             return PrivateChatScreen(
@@ -217,8 +235,8 @@ class _ChatTabsScreenState extends State<ChatTabsScreen> with SingleTickerProvid
                   : member.email.split('@')[0],
             );
           }),
-          // SMS tab (Android only, if enabled)
-          if (Platform.isAndroid && Config.current.enableSmsFeature)
+          // SMS tab (Android only, if enabled, and user has premium)
+          if (Platform.isAndroid && Config.current.enableSmsFeature && _hasPremiumAccess)
             const SmsConversationsScreen(),
         ],
       ),

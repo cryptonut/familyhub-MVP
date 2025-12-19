@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/lesson_plan.dart';
+import '../../models/educational_resource.dart';
 import '../../services/homeschooling_service.dart';
 import '../../utils/app_theme.dart';
 
@@ -26,10 +27,10 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
   final _descriptionController = TextEditingController();
   final _durationController = TextEditingController();
   final List<String> _learningObjectives = [];
-  final List<String> _resources = [];
+  final List<String> _selectedResourceIds = []; // Store resource IDs
   final TextEditingController _objectiveController = TextEditingController();
-  final TextEditingController _resourceController = TextEditingController();
   final HomeschoolingService _service = HomeschoolingService();
+  List<EducationalResource> _availableResources = []; // Cache of all resources for display
   String? _selectedSubject;
   DateTime? _scheduledDate;
   bool _isSaving = false;
@@ -44,11 +45,25 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
       _scheduledDate = widget.lessonPlan!.scheduledDate;
       _durationController.text = widget.lessonPlan!.estimatedDurationMinutes.toString();
       _learningObjectives.addAll(widget.lessonPlan!.learningObjectives);
-      _resources.addAll(widget.lessonPlan!.resources);
+      _selectedResourceIds.addAll(widget.lessonPlan!.resources); // Resources are stored as IDs
     } else if (widget.availableSubjects.isNotEmpty) {
       _selectedSubject = widget.availableSubjects.first;
     }
     _durationController.text = '60';
+    _loadResources(); // Load available resources for selection
+  }
+
+  Future<void> _loadResources() async {
+    try {
+      final resources = await _service.getEducationalResources(hubId: widget.hubId);
+      if (mounted) {
+        setState(() {
+          _availableResources = resources;
+        });
+      }
+    } catch (e) {
+      // Silently fail - resources will just be empty
+    }
   }
 
   @override
@@ -57,7 +72,6 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
     _descriptionController.dispose();
     _durationController.dispose();
     _objectiveController.dispose();
-    _resourceController.dispose();
     super.dispose();
   }
 
@@ -106,19 +120,86 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
     });
   }
 
-  void _addResource() {
-    if (_resourceController.text.trim().isNotEmpty) {
-      setState(() {
-        _resources.add(_resourceController.text.trim());
-        _resourceController.clear();
-      });
-    }
+  Future<void> _showResourceSelectionDialog() async {
+    // Create a copy of selected IDs for the dialog state
+    final Set<String> tempSelectedIds = Set<String>.from(_selectedResourceIds);
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Select Resources from Library'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: _availableResources.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('No resources available. Add resources to the Resource Library first.'),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _availableResources.length,
+                      itemBuilder: (context, index) {
+                        final resource = _availableResources[index];
+                        final isSelected = tempSelectedIds.contains(resource.id);
+                        return CheckboxListTile(
+                          title: Text(resource.title),
+                          subtitle: resource.description != null
+                              ? Text(
+                                  resource.description!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          value: isSelected,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              if (value == true) {
+                                tempSelectedIds.add(resource.id);
+                              } else {
+                                tempSelectedIds.remove(resource.id);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedResourceIds.clear();
+                    _selectedResourceIds.addAll(tempSelectedIds);
+                  });
+                  Navigator.pop(context);
+                },
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
-  void _removeResource(int index) {
+  void _removeResource(String resourceId) {
     setState(() {
-      _resources.removeAt(index);
+      _selectedResourceIds.remove(resourceId);
     });
+  }
+
+  String _getResourceTitle(String resourceId) {
+    try {
+      return _availableResources.firstWhere((r) => r.id == resourceId).title;
+    } catch (e) {
+      return resourceId; // Fallback to ID if not found
+    }
   }
 
   Future<void> _saveLessonPlan() async {
@@ -149,7 +230,7 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
               ? null
               : _descriptionController.text.trim(),
           learningObjectives: _learningObjectives,
-          resources: _resources,
+          resources: _selectedResourceIds,
           scheduledDate: _scheduledDate,
           estimatedDurationMinutes: duration,
         );
@@ -162,7 +243,7 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
           learningObjectives: _learningObjectives,
-          resources: _resources,
+          resources: _selectedResourceIds,
           scheduledDate: _scheduledDate,
           estimatedDurationMinutes: duration,
         );
@@ -315,45 +396,45 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
                 }),
               ],
               const SizedBox(height: AppTheme.spacingLG),
-              Text(
-                'Resources',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: AppTheme.spacingMD),
               Row(
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _resourceController,
-                      decoration: const InputDecoration(
-                        hintText: 'Add resource URL or name',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      onFieldSubmitted: (_) => _addResource(),
-                    ),
+                  Text(
+                    'Resources',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _showResourceSelectionDialog,
                     icon: const Icon(Icons.add),
-                    onPressed: _addResource,
+                    label: const Text('Select from Library'),
                   ),
                 ],
               ),
-              if (_resources.isNotEmpty) ...[
-                const SizedBox(height: AppTheme.spacingMD),
-                ..._resources.asMap().entries.map((entry) {
+              const SizedBox(height: AppTheme.spacingMD),
+              if (_selectedResourceIds.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'No resources selected. Resources must be added to the Resource Library first.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                  ),
+                )
+              else
+                ..._selectedResourceIds.map((resourceId) {
                   return ListTile(
-                    title: Text(entry.value),
+                    leading: const Icon(Icons.library_books),
+                    title: Text(_getResourceTitle(resourceId)),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _removeResource(entry.key),
+                      onPressed: () => _removeResource(resourceId),
                     ),
                   );
                 }),
-              ],
                   ],
                 ),
               ),
@@ -370,7 +451,7 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
                 color: Theme.of(context).scaffoldBackgroundColor,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, -2),
                   ),
@@ -392,12 +473,14 @@ class _CreateEditLessonPlanScreenState extends State<CreateEditLessonPlanScreen>
                     }
                   },
                   icon: _isSaving
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Theme.of(context).colorScheme.onPrimary,
+                            ),
                           ),
                         )
                       : const Icon(Icons.check_circle),

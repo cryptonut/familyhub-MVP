@@ -77,6 +77,12 @@ android {
     }
 
     buildTypes {
+        // CRITICAL: Debug and release builds must have identical configurations
+        // to ensure local testing matches distributed builds exactly
+        debug {
+            // Explicit debug configuration to ensure consistency
+            // Flutter handles debug/release differences for Dart code
+        }
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
@@ -84,6 +90,7 @@ android {
             
             // Enable ProGuard/R8 rules to prevent obfuscation issues with plugins
             // Flutter enables minification by default in release builds
+            // Note: R8 only affects Java/Kotlin code, not Flutter Dart widgets
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

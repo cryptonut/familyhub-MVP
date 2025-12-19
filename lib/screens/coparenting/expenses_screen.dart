@@ -124,9 +124,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       if (mounted) {
         _loadData();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Expense approved'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Expense approved'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
       }
@@ -467,7 +467,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                               onPressed: () => _approveExpense(expense),
                                               icon: const Icon(Icons.check, size: 18),
                                               label: const Text('Approve'),
-                                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                              style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
                                             ),
                                           ],
                                         ),

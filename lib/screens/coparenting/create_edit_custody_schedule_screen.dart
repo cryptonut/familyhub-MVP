@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/coparenting_schedule.dart';
+import '../../models/child_profile.dart';
 import '../../models/user_model.dart';
 import '../../services/coparenting_service.dart';
 import '../../services/auth_service.dart';
@@ -28,7 +29,8 @@ class _CreateEditCustodyScheduleScreenState extends State<CreateEditCustodySched
   final HubService _hubService = HubService();
   final AuthService _authService = AuthService();
   
-  List<UserModel> _members = [];
+  List<ChildProfile> _childProfiles = [];
+  List<UserModel> _members = []; // Still needed for parent selection in custom schedule
   String? _selectedChildId;
   ScheduleType _selectedType = ScheduleType.weekOnWeekOff;
   DateTime? _startDate;
@@ -49,6 +51,10 @@ class _CreateEditCustodyScheduleScreenState extends State<CreateEditCustodySched
     });
 
     try {
+      // Load child profiles for child dropdown
+      final childProfiles = await _service.getChildProfiles(widget.hubId);
+      
+      // Still load members for parent selection in custom schedule dialog
       final hub = await _hubService.getHub(widget.hubId);
       final members = <UserModel>[];
       if (hub != null) {
@@ -70,6 +76,7 @@ class _CreateEditCustodyScheduleScreenState extends State<CreateEditCustodySched
 
       if (mounted) {
         setState(() {
+          _childProfiles = childProfiles;
           _members = members;
           _isLoading = false;
         });
@@ -259,7 +266,7 @@ class _CreateEditCustodyScheduleScreenState extends State<CreateEditCustodySched
             content: Text(widget.schedule == null
                 ? 'Schedule created successfully'
                 : 'Schedule updated successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
       }
@@ -314,10 +321,10 @@ class _CreateEditCustodyScheduleScreenState extends State<CreateEditCustodySched
                         border: OutlineInputBorder(),
                         helperText: 'Select the child for this schedule',
                       ),
-                      items: _members.map((member) {
+                      items: _childProfiles.map((child) {
                         return DropdownMenuItem(
-                          value: member.uid,
-                          child: Text(member.displayName),
+                          value: child.id,
+                          child: Text(child.name),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -435,7 +442,7 @@ class _CreateEditCustodyScheduleScreenState extends State<CreateEditCustodySched
           color: Theme.of(context).scaffoldBackgroundColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, -2),
             ),
@@ -453,8 +460,8 @@ class _CreateEditCustodyScheduleScreenState extends State<CreateEditCustodySched
                 : const Icon(Icons.check),
             label: Text(widget.schedule == null ? 'Create Schedule' : 'Update Schedule'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),

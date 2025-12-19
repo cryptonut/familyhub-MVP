@@ -4,6 +4,7 @@ import '../../services/homeschooling_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/ui_components.dart';
 import 'create_edit_resource_screen.dart';
+import 'resource_viewer_screen.dart';
 
 class ResourceLibraryScreen extends StatefulWidget {
   final String hubId;
@@ -68,13 +69,15 @@ class _ResourceLibraryScreenState extends State<ResourceLibraryScreen> {
               child: _resources.isEmpty
                   ? EmptyState(
                       icon: Icons.library_books,
-                      title: 'No Resources Yet',
-                      message: 'Add educational resources to share with students',
-                      action: FloatingActionButton.extended(
-                        onPressed: () => _createResource(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Resource'),
-                      ),
+                      title: 'No Resources',
+                      message: _getEmptyStateMessage(),
+                      action: (_selectedSubject == null && _selectedType == null)
+                          ? FloatingActionButton.extended(
+                              onPressed: () => _createResource(),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Add Resource'),
+                            )
+                          : null,
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.all(AppTheme.spacingMD),
@@ -134,12 +137,14 @@ class _ResourceLibraryScreenState extends State<ResourceLibraryScreen> {
                                   children: [
                                     TextButton.icon(
                                       onPressed: () {
-                                        // Open URL or file
-                                        if (resource.url != null) {
-                                          // Open URL
-                                        } else if (resource.fileUrl != null) {
-                                          // Open file
-                                        }
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => ResourceViewerScreen(
+                                              resource: resource,
+                                            ),
+                                          ),
+                                        );
                                       },
                                       icon: const Icon(Icons.open_in_new, size: 16),
                                       label: const Text('Open'),
@@ -159,6 +164,34 @@ class _ResourceLibraryScreenState extends State<ResourceLibraryScreen> {
         label: const Text('Add Resource'),
       ),
     );
+  }
+
+  String _getEmptyStateMessage() {
+    // Provide context-aware empty state messages based on active filters
+    if (_selectedSubject != null && _selectedType != null) {
+      return 'No ${_getResourceTypeLabel(_selectedType!)} resources found for ${_selectedSubject}';
+    } else if (_selectedSubject != null) {
+      return 'No resources found for ${_selectedSubject}';
+    } else if (_selectedType != null) {
+      return 'No ${_getResourceTypeLabel(_selectedType!)} resources found';
+    } else {
+      return 'Add educational resources to share with students';
+    }
+  }
+
+  String _getResourceTypeLabel(ResourceType type) {
+    switch (type) {
+      case ResourceType.link:
+        return 'link';
+      case ResourceType.document:
+        return 'document';
+      case ResourceType.video:
+        return 'video';
+      case ResourceType.image:
+        return 'image';
+      case ResourceType.other:
+        return '';
+    }
   }
 
   IconData _getResourceIcon(ResourceType type) {

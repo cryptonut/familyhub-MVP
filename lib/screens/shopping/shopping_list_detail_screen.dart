@@ -600,10 +600,10 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
           _buildQuickAddBar(),
           // Items list
           Expanded(
-            child: _items.isEmpty && !_isLoading
-                ? _buildEmptyState()
-                : _isLoading && _items.isEmpty
-                    ? const Center(child: CircularProgressIndicator())
+            child: _isLoading && _items.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : _groupedItems.isEmpty && !_isLoading
+                    ? _buildEmptyState()
                     : _buildGroupedList(),
           ),
         ],
@@ -625,7 +625,7 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
         color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -668,8 +668,10 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
             onPressed: _isListening ? _stopListening : _startListening,
             icon: Icon(_isListening ? Icons.mic : Icons.mic_none),
             style: IconButton.styleFrom(
-              backgroundColor: _isListening ? Colors.red : theme.colorScheme.primary,
-              foregroundColor: Colors.white,
+              backgroundColor: _isListening 
+                  ? theme.colorScheme.error 
+                  : theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
             ),
           ),
           const SizedBox(width: 8),
@@ -684,6 +686,10 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
   }
 
   Widget _buildEmptyState() {
+    // Check if items exist but are filtered out (all completed when hiding completed)
+    final hasItemsButFiltered = _items.isNotEmpty && _groupedItems.isEmpty;
+    final theme = Theme.of(context);
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -691,32 +697,49 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
           Icon(
             Icons.shopping_basket_outlined,
             size: 64,
-            color: Colors.grey[400],
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
-            'No items yet',
+            hasItemsButFiltered ? 'No pending items' : 'No items yet',
             style: TextStyle(
               fontSize: 18,
-              color: Colors.grey[600],
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Add items using the field above or tap +',
+            hasItemsButFiltered
+                ? 'All items are completed. Toggle visibility to see them.'
+                : 'Add items using the field above or tap +',
             style: TextStyle(
-              color: Colors.grey[500],
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _addItemWithDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Add First Item'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          if (hasItemsButFiltered) ...[
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showCompleted = true;
+                  _groupItems();
+                });
+              },
+              icon: const Icon(Icons.visibility),
+              label: const Text('Show Completed Items'),
             ),
-          ),
+          ] else ...[
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _addItemWithDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Add First Item'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -815,16 +838,22 @@ class _ShoppingListDetailScreenState extends State<ShoppingListDetailScreen> {
     return Dismissible(
       key: Key(item.id),
       background: Container(
-        color: Colors.green,
+        color: Theme.of(context).colorScheme.primaryContainer,
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 16),
-        child: const Icon(Icons.check, color: Colors.white),
+        child: Icon(
+          Icons.check,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+        ),
       ),
       secondaryBackground: Container(
-        color: Colors.red,
+        color: Theme.of(context).colorScheme.errorContainer,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: Icon(
+          Icons.delete,
+          color: Theme.of(context).colorScheme.onErrorContainer,
+        ),
       ),
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {

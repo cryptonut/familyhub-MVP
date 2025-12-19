@@ -207,32 +207,42 @@ class HomeschoolingService {
   }
 
   /// Get assignments for a student
+  /// 
+  /// CRITICAL: Handles filtering correctly when studentId and/or status are null.
+  /// Uses in-memory filtering to avoid Firestore composite index requirements
+  /// that can cause queries to fail silently.
   Future<List<Assignment>> getAssignments({
     required String hubId,
     String? studentId,
     AssignmentStatus? status,
   }) async {
     try {
-      var query = _firestore
+      // Always fetch all assignments for the hub, then filter in memory
+      // This avoids Firestore composite index issues when combining where clauses with orderBy
+      final snapshot = await _firestore
           .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'assignments'))
-          .orderBy('dueDate', descending: false);
+          .get();
 
-      if (studentId != null) {
-        query = query.where('studentId', isEqualTo: studentId);
-      }
-
-      if (status != null) {
-        query = query.where('status', isEqualTo: status.name);
-      }
-
-      final snapshot = await query.get();
-
-      return snapshot.docs
+      var assignments = snapshot.docs
           .map((doc) => Assignment.fromJson({
                 'id': doc.id,
                 ...doc.data(),
               }))
           .toList();
+
+      // Apply filters in memory (handles null correctly - null means "all")
+      if (studentId != null) {
+        assignments = assignments.where((a) => a.studentId == studentId).toList();
+      }
+
+      if (status != null) {
+        assignments = assignments.where((a) => a.status == status).toList();
+      }
+
+      // Sort by dueDate
+      assignments.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
+      return assignments;
     } catch (e) {
       Logger.error('Error getting assignments', error: e, tag: 'HomeschoolingService');
       return [];
@@ -284,32 +294,47 @@ class HomeschoolingService {
   }
 
   /// Get lesson plans for a hub
+  /// 
+  /// CRITICAL: Handles filtering correctly when subject and/or status are null.
+  /// Uses in-memory filtering to avoid Firestore composite index requirements
+  /// that can cause queries to fail silently.
   Future<List<LessonPlan>> getLessonPlans({
     required String hubId,
     String? subject,
     LessonStatus? status,
   }) async {
     try {
-      var query = _firestore
+      // Always fetch all lesson plans for the hub, then filter in memory
+      // This avoids Firestore composite index issues when combining where clauses with orderBy
+      final snapshot = await _firestore
           .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'lessonPlans'))
-          .orderBy('scheduledDate', descending: false);
+          .get();
 
-      if (subject != null) {
-        query = query.where('subject', isEqualTo: subject);
-      }
-
-      if (status != null) {
-        query = query.where('status', isEqualTo: status.name);
-      }
-
-      final snapshot = await query.get();
-
-      return snapshot.docs
+      var lessonPlans = snapshot.docs
           .map<LessonPlan>((doc) => LessonPlan.fromJson({
                 'id': doc.id,
                 ...doc.data(),
               }))
           .toList();
+
+      // Apply filters in memory (handles null correctly - null means "all")
+      if (subject != null) {
+        lessonPlans = lessonPlans.where((lp) => lp.subject == subject).toList();
+      }
+
+      if (status != null) {
+        lessonPlans = lessonPlans.where((lp) => lp.status == status).toList();
+      }
+
+      // Sort by scheduledDate (null dates go to end)
+      lessonPlans.sort((a, b) {
+        if (a.scheduledDate == null && b.scheduledDate == null) return 0;
+        if (a.scheduledDate == null) return 1;
+        if (b.scheduledDate == null) return -1;
+        return a.scheduledDate!.compareTo(b.scheduledDate!);
+      });
+
+      return lessonPlans;
     } catch (e) {
       Logger.error('Error getting lesson plans', error: e, tag: 'HomeschoolingService');
       return [];
@@ -540,6 +565,10 @@ class HomeschoolingService {
   }
 
   /// Get educational resources for a hub
+  /// 
+  /// CRITICAL: Handles filtering correctly when subject, gradeLevel, and/or type are null.
+  /// Uses in-memory filtering to avoid Firestore composite index requirements
+  /// that can cause queries to fail silently.
   Future<List<EducationalResource>> getEducationalResources({
     required String hubId,
     String? subject,
@@ -547,30 +576,36 @@ class HomeschoolingService {
     ResourceType? type,
   }) async {
     try {
-      var query = _firestore
+      // Always fetch all resources for the hub, then filter in memory
+      // This avoids Firestore composite index issues when combining where clauses with orderBy
+      final snapshot = await _firestore
           .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'educational_resources'))
-          .orderBy('createdAt', descending: true);
+          .get();
 
-      if (subject != null) {
-        query = query.where('subjects', arrayContains: subject);
-      }
-
-      if (gradeLevel != null) {
-        query = query.where('gradeLevel', isEqualTo: gradeLevel);
-      }
-
-      if (type != null) {
-        query = query.where('type', isEqualTo: type.name);
-      }
-
-      final snapshot = await query.get();
-
-      return snapshot.docs
+      var resources = snapshot.docs
           .map((doc) => EducationalResource.fromJson({
                 'id': doc.id,
                 ...doc.data(),
               }))
           .toList();
+
+      // Apply filters in memory (handles null correctly - null means "all")
+      if (subject != null) {
+        resources = resources.where((r) => r.subjects.contains(subject)).toList();
+      }
+
+      if (gradeLevel != null) {
+        resources = resources.where((r) => r.gradeLevel == gradeLevel).toList();
+      }
+
+      if (type != null) {
+        resources = resources.where((r) => r.type == type).toList();
+      }
+
+      // Sort by createdAt descending
+      resources.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return resources;
     } catch (e) {
       Logger.error('Error getting educational resources', error: e, tag: 'HomeschoolingService');
       return [];
@@ -779,6 +814,10 @@ class HomeschoolingService {
   }
 
   /// Get learning milestones for a student
+  /// 
+  /// CRITICAL: Handles filtering correctly when type and/or subject are null.
+  /// Uses in-memory filtering to avoid Firestore composite index requirements
+  /// that can cause queries to fail silently.
   Future<List<LearningMilestone>> getLearningMilestones({
     required String hubId,
     required String studentId,
@@ -786,27 +825,33 @@ class HomeschoolingService {
     String? subject,
   }) async {
     try {
-      var query = _firestore
+      // Always fetch all milestones for the student, then filter in memory
+      // This avoids Firestore composite index issues when combining where clauses with orderBy
+      final snapshot = await _firestore
           .collection(FirestorePathUtils.getHubSubcollectionPath(hubId, 'learning_milestones'))
           .where('studentId', isEqualTo: studentId)
-          .orderBy('achievedAt', descending: true);
+          .get();
 
-      if (type != null) {
-        query = query.where('type', isEqualTo: type.name);
-      }
-
-      if (subject != null) {
-        query = query.where('subject', isEqualTo: subject);
-      }
-
-      final snapshot = await query.get();
-
-      return snapshot.docs
+      var milestones = snapshot.docs
           .map((doc) => LearningMilestone.fromJson({
                 'id': doc.id,
                 ...doc.data(),
               }))
           .toList();
+
+      // Apply filters in memory (handles null correctly - null means "all")
+      if (type != null) {
+        milestones = milestones.where((m) => m.type == type).toList();
+      }
+
+      if (subject != null) {
+        milestones = milestones.where((m) => m.subject == subject).toList();
+      }
+
+      // Sort by achievedAt descending
+      milestones.sort((a, b) => b.achievedAt.compareTo(a.achievedAt));
+
+      return milestones;
     } catch (e) {
       Logger.error('Error getting learning milestones', error: e, tag: 'HomeschoolingService');
       return [];

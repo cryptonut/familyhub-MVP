@@ -46,6 +46,20 @@ class _ChatWidgetState extends State<ChatWidget> {
   @override
   void initState() {
     super.initState();
+    _subscribeToStream();
+  }
+
+  @override
+  void didUpdateWidget(ChatWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If stream changed, resubscribe (but preserve state like _isExpanded)
+    if (oldWidget.messagesStream != widget.messagesStream) {
+      _messagesSubscription?.cancel();
+      _subscribeToStream();
+    }
+  }
+
+  void _subscribeToStream() {
     // Subscribe to the stream once and cache messages
     _messagesSubscription = widget.messagesStream.listen(
       (messages) {
@@ -156,8 +170,8 @@ class _ChatWidgetState extends State<ChatWidget> {
                       message.senderName.isNotEmpty
                           ? message.senderName[0].toUpperCase()
                           : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
@@ -237,7 +251,7 @@ class _ChatWidgetState extends State<ChatWidget> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Error liking: $e'),
-                  backgroundColor: Colors.red,
+                  backgroundColor: Theme.of(context).colorScheme.error,
                 ),
               );
             }
@@ -254,7 +268,7 @@ class _ChatWidgetState extends State<ChatWidget> {
               isLiked ? Icons.favorite : Icons.favorite_border,
               size: 18.75,
               color: isLiked 
-                  ? Colors.red 
+                  ? theme.colorScheme.error 
                   : theme.brightness == Brightness.dark
                       ? theme.colorScheme.onSurface.withValues(alpha: 0.8)
                       : theme.colorScheme.onSurface.withValues(alpha: 0.7),
@@ -266,7 +280,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                 style: TextStyle(
                   fontSize: 13,
                   color: isLiked 
-                      ? Colors.red 
+                      ? theme.colorScheme.error 
                       : theme.brightness == Brightness.dark
                           ? theme.colorScheme.onSurface.withValues(alpha: 0.8)
                           : theme.colorScheme.onSurface.withValues(alpha: 0.7),
@@ -342,14 +356,10 @@ class _ChatWidgetState extends State<ChatWidget> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isDark 
-            ? Colors.grey.shade900.withOpacity(0.5)
-            : Colors.grey.shade50,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark 
-              ? Colors.grey.shade800
-              : Colors.grey.shade200,
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -362,8 +372,10 @@ class _ChatWidgetState extends State<ChatWidget> {
             height: 36,
             decoration: BoxDecoration(
               color: isMe 
-                  ? theme.primaryColor.withOpacity(0.2)
-                  : Colors.grey.shade300.withOpacity(0.5),
+                  ? theme.colorScheme.primary.withOpacity(0.2)
+                  : isDark
+                      ? theme.colorScheme.surfaceContainerHigh
+                      : theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -375,8 +387,8 @@ class _ChatWidgetState extends State<ChatWidget> {
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: isMe 
-                      ? theme.primaryColor
-                      : Colors.grey.shade700,
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface,
                 ),
               ),
             ),
@@ -395,9 +407,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: isDark 
-                            ? Colors.grey.shade200
-                            : Colors.grey.shade900,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -405,7 +415,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                       app_date_utils.AppDateUtils.formatTime(message.timestamp),
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade500,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -415,9 +425,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                   truncatedText,
                   style: TextStyle(
                     fontSize: 13,
-                    color: isDark 
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade700,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -437,7 +445,7 @@ class _ChatWidgetState extends State<ChatWidget> {
         color: Theme.of(context).scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -459,30 +467,24 @@ class _ChatWidgetState extends State<ChatWidget> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
                       borderSide: BorderSide(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.grey.shade600
-                            : Colors.grey.shade300,
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
                       borderSide: BorderSide(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.grey.shade600
-                            : Colors.grey.shade300,
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
                       borderSide: BorderSide(
-                        color: Theme.of(context).primaryColor,
+                        color: Theme.of(context).colorScheme.primary,
                         width: 2,
                       ),
                     ),
                     filled: true,
-                    fillColor: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.grey.shade900
-                        : Colors.white,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
@@ -490,7 +492,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                     suffixIcon: IconButton(
                       icon: Icon(
                         Icons.send,
-                        color: Theme.of(context).primaryColor,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                       onPressed: _sendMessage,
                       tooltip: 'Send message',
@@ -498,9 +500,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                   ),
                   onSubmitted: (_) => _sendMessage(),
                   style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -551,7 +551,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                     Icon(
                       Icons.chat,
                       size: 18,
-                      color: Theme.of(context).primaryColor,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -560,7 +560,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
-                          color: Theme.of(context).primaryColor,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -573,13 +573,17 @@ class _ChatWidgetState extends State<ChatWidget> {
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            foregroundColor: Theme.of(context).colorScheme.primary,
                           ),
-                          child: const Text('View Full', style: TextStyle(fontSize: 12)),
+                          child: const Text(
+                            'View Full',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                       ),
                     Icon(
                       _isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: Theme.of(context).primaryColor,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 24,
                     ),
                   ],

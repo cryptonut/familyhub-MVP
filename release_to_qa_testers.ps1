@@ -220,11 +220,16 @@ if ($javaProcesses -or $gradleProcesses) {
     Write-Host "   [OK] No lingering processes found" -ForegroundColor Green
 }
 
-# Clean Flutter build
+# Clean Flutter and Gradle builds (CRITICAL: Ensures identical release builds)
 Write-Host "   Cleaning Flutter build cache..." -ForegroundColor Gray
 flutter clean 2>&1 | Out-Null
 Start-Sleep -Seconds 2
-Write-Host "[OK] Build environment ready" -ForegroundColor Green
+Write-Host "   Cleaning Gradle build cache..." -ForegroundColor Gray
+Push-Location android
+& .\gradlew clean 2>&1 | Out-Null
+Pop-Location
+Start-Sleep -Seconds 2
+Write-Host "[OK] Build environment ready (full clean)" -ForegroundColor Green
 
 # Step 12: Get dependencies
 Write-Host "`n[INFO] Getting dependencies..." -ForegroundColor Yellow
@@ -252,6 +257,10 @@ while ($retryCount -lt $maxRetries -and -not $buildSuccess) {
         Start-Sleep -Seconds 4
         
         flutter clean 2>&1 | Out-Null
+        Start-Sleep -Seconds 2
+        Push-Location android
+        & .\gradlew clean 2>&1 | Out-Null
+        Pop-Location
         Start-Sleep -Seconds 2
     }
     

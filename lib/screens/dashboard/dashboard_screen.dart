@@ -19,6 +19,7 @@ import '../../utils/relationship_utils.dart';
 import '../wallet/wallet_screen.dart';
 import '../chat/private_chat_screen.dart';
 import '../chat/chat_tabs_screen.dart';
+import '../chat/chat_screen.dart';
 import '../hubs/my_hubs_screen.dart';
 import '../tasks/add_edit_task_screen.dart';
 import '../tasks/refund_notification_dialog.dart';
@@ -559,7 +560,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'View insights and trends',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[700],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 8),
@@ -636,7 +637,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Earned from completed jobs',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[600],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 16),
@@ -670,7 +671,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Available for job rewards',
             style: TextStyle(
               fontSize: 11,
-              color: Colors.grey[600],
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -816,8 +817,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     : member.email.isNotEmpty
                                         ? member.email[0].toUpperCase()
                                         : '?',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onPrimary,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 28,
                                 ),
@@ -2532,7 +2533,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildFamilyChatWidget() {
+    // Use a stable key to preserve ChatWidget state across rebuilds (e.g., on refresh)
     return ChatWidget(
+      key: const ValueKey('dashboard_family_chat'),
       messagesStream: _chatService.getMessagesStream(),
       onSendMessage: (messageText) async {
         final currentUserId = _chatService.currentUserId;
@@ -2557,11 +2560,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       currentUserName: _chatService.currentUserName,
       maxHeight: 400, // Max height for embedded chat
       onViewFullChat: () {
-        // Navigate to full chat screen (ChatTabsScreen)
+        // Navigate to full chat screen (ChatScreen) - use ChatService stream, not FeedService
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const ChatTabsScreen(),
+            builder: (context) => ChatScreen(),
           ),
         );
       },

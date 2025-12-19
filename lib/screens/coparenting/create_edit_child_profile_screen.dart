@@ -219,8 +219,8 @@ class _CreateEditChildProfileScreenState
             label: Text(widget.profile == null ? 'Create Profile' : 'Save Changes'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.all(AppTheme.spacingMD),
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
           ),
         ),

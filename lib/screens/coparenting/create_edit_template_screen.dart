@@ -139,8 +139,8 @@ class _CreateEditTemplateScreenState extends State<CreateEditTemplateScreen> {
             label: Text(widget.template == null ? 'Create Template' : 'Save Changes'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.all(AppTheme.spacingMD),
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
             ),
           ),
         ),

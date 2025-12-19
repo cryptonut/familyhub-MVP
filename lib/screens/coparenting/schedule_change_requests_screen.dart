@@ -153,7 +153,9 @@ class _ScheduleChangeRequestsScreenState extends State<ScheduleChangeRequestsScr
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
             child: const Text('Approve'),
           ),
         ],
@@ -373,7 +375,9 @@ class _ScheduleChangeRequestsScreenState extends State<ScheduleChangeRequestsScr
                                               onPressed: () => _showApproveDialog(request),
                                               icon: const Icon(Icons.check, size: 18),
                                               label: const Text('Approve'),
-                                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                              style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
                                             ),
                                           ],
                                         ),

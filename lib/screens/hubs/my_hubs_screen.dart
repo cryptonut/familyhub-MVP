@@ -101,14 +101,14 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
                       Icon(
                         Icons.group_outlined,
                         size: 64,
-                        color: Colors.grey[400],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'No hubs yet',
                         style: TextStyle(
                           fontSize: 18,
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -116,7 +116,7 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
                         'Create a hub to get started',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[500],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -239,7 +239,7 @@ class _MyHubsScreenState extends State<MyHubsScreen> {
                 '${hub.memberIds.length} member${hub.memberIds.length == 1 ? '' : 's'}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
                 textAlign: TextAlign.center,
               ),

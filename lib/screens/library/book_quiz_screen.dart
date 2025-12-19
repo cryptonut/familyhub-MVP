@@ -199,11 +199,11 @@ class _BookQuizScreenState extends State<BookQuizScreen> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                          : Colors.grey[100],
+                          : theme.colorScheme.surfaceContainerHighest,
                       border: Border.all(
                         color: isSelected
                             ? theme.colorScheme.primary
-                            : Colors.grey[300]!,
+                            : theme.colorScheme.outline.withValues(alpha: 0.3),
                         width: isSelected ? 2 : 1,
                       ),
                       borderRadius: BorderRadius.circular(8),
@@ -221,14 +221,14 @@ class _BookQuizScreenState extends State<BookQuizScreen> {
                             border: Border.all(
                               color: isSelected
                                   ? theme.colorScheme.primary
-                                  : Colors.grey[400]!,
+                                  : theme.colorScheme.outline.withValues(alpha: 0.4),
                             ),
                           ),
                           child: isSelected
-                              ? const Icon(
+                              ? Icon(
                                   Icons.check,
                                   size: 16,
-                                  color: Colors.white,
+                                  color: theme.colorScheme.onPrimary,
                                 )
                               : null,
                         ),

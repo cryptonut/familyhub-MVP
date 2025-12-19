@@ -46,7 +46,10 @@ class _LibraryHubScreenState extends State<LibraryHubScreen> {
   Future<void> _loadHubData() async {
     setState(() => _isLoading = true);
     try {
-      final books = await _bookService.getHubBooks(widget.hub.id, limit: 20);
+      final allBooks = await _bookService.getHubBooks(widget.hub.id, limit: 20);
+      // Filter to only show available books (books that can be read in-app)
+      final books = await _bookService.filterAvailableBooks(widget.hub.id, allBooks);
+      
       final userId = _getCurrentUserId();
       final challenges = userId != null
           ? await _explodingBooksService.getUserChallenges(
@@ -226,7 +229,9 @@ class _LibraryHubScreenState extends State<LibraryHubScreen> {
 
             // Featured/Popular Books (only show if we have available books)
             FutureBuilder<List<Book>>(
-              future: _bookService.getPopularBooks(limit: 10),
+              future: _bookService.getPopularBooks(limit: 10).then(
+                (books) => _bookService.filterAvailableBooks(widget.hub.id, books),
+              ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SizedBox.shrink(); // Don't show loading, just hide section
@@ -459,10 +464,10 @@ class _LibraryHubScreenState extends State<LibraryHubScreen> {
                             color: Colors.green.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
+                          child: Text(
                             'FREE',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
