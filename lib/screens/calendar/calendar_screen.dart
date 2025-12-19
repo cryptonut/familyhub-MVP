@@ -321,7 +321,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 ? Text(
                                     '${events.length}',
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: Theme.of(context).colorScheme.onPrimary,
                                       fontSize: 8,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -513,7 +513,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         _formatRecurrence(event.recurrenceRule ?? ''),
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ],

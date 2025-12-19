@@ -517,7 +517,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
             const SizedBox(height: 8),
             const Text(
               'Select family members to invite (optional)',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),
             const SizedBox(height: 12),
             if (_familyMembers.isEmpty)
@@ -526,7 +526,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                 child: Center(
                   child: Text(
                     'No family members available',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                   ),
                 ),
               )
@@ -553,7 +553,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                       member.displayName.isNotEmpty
                           ? member.displayName[0].toUpperCase()
                           : member.email[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                     ),
                   ),
                 );
@@ -568,7 +568,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
             const SizedBox(height: 8),
             const Text(
               'Select which hubs/family calendars this event appears on',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),
             const SizedBox(height: 12),
             // Family Calendar (always available, shown as toggle)
@@ -611,7 +611,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                 child: Center(
                   child: Text(
                     'No hubs available',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                   ),
                 ),
               )
@@ -692,7 +692,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                                   return Container(
                                     width: 100,
                                     height: 100,
-                                    color: Colors.grey[300],
+                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                     child: const Icon(Icons.broken_image),
                                   );
                                 },
@@ -706,7 +706,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                                 backgroundColor: Colors.red,
                                 child: IconButton(
                                   padding: EdgeInsets.zero,
-                                  icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                                  icon: Icon(Icons.close, size: 16, color: Theme.of(context).colorScheme.onPrimary),
                                   onPressed: () {
                                     setState(() {
                                       _photoUrls.removeAt(index);
@@ -742,7 +742,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                                 backgroundColor: Colors.red,
                                 child: IconButton(
                                   padding: EdgeInsets.zero,
-                                  icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                                  icon: Icon(Icons.close, size: 16, color: Theme.of(context).colorScheme.onPrimary),
                                   onPressed: () {
                                     setState(() {
                                       _pendingPhotos.removeAt(photoIndex);
@@ -786,7 +786,7 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                                 backgroundColor: Colors.red,
                                 child: IconButton(
                                   padding: EdgeInsets.zero,
-                                  icon: const Icon(Icons.close, size: 16, color: Colors.white),
+                                  icon: Icon(Icons.close, size: 16, color: Theme.of(context).colorScheme.onPrimary),
                                   onPressed: () {
                                     setState(() {
                                       _pendingPhotosWeb.removeAt(photoIndex);
@@ -842,12 +842,12 @@ class _AddEditEventScreenState extends State<AddEditEventScreen> {
                       color: _parseColor(color),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isSelected ? Colors.black : Colors.transparent,
+                        color: isSelected ? Theme.of(context).colorScheme.onSurface : Colors.transparent,
                         width: 3,
                       ),
                     ),
                     child: isSelected
-                        ? const Icon(Icons.check, color: Colors.white)
+                        ? Icon(Icons.check, color: Theme.of(context).colorScheme.onPrimary)
                         : null,
                   ),
                 );

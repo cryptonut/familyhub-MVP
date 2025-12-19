@@ -152,11 +152,11 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                                Icon(Icons.access_time, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                                 const SizedBox(width: 4),
                                 Text(
                                   '${dateFormat.format(event.startTime)} • ${timeFormat.format(event.startTime)} - ${timeFormat.format(event.endTime)}',
-                                  style: TextStyle(color: Colors.grey[700]),
+                                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                                 ),
                               ],
                             ),
@@ -169,12 +169,12 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                        Icon(Icons.location_on, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             event.location!,
-                            style: TextStyle(color: Colors.grey[700]),
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                           ),
                         ),
                       ],
@@ -184,11 +184,11 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Icon(Icons.repeat, size: 16, color: Colors.grey[600]),
+                        Icon(Icons.repeat, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                         const SizedBox(width: 4),
                         Text(
                           _formatRecurrence(event.recurrenceRule ?? ''),
-                          style: TextStyle(color: Colors.grey[700]),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)),
                         ),
                       ],
                     ),
@@ -198,7 +198,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
@@ -217,7 +217,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                                 child: Text(
                                   event.sourceCalendar!,
                                   style: TextStyle(
-                                    color: Colors.grey[800],
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -244,14 +244,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                                     Icon(
                                       Icons.person_outline,
                                       size: 16,
-                                      color: Colors.grey[700],
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                     ),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
                                         'Event Owner: $ownerName',
                                         style: TextStyle(
-                                          color: Colors.grey[700],
+                                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                           fontSize: 13,
                                         ),
                                       ),
@@ -283,14 +283,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                                   Icon(
                                     Icons.person,
                                     size: 14,
-                                    color: Colors.grey[600],
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                   ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       'Created by $creatorName',
                                       style: TextStyle(
-                                        color: Colors.grey[600],
+                                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                         fontSize: 12,
                                         fontStyle: FontStyle.italic,
                                       ),
@@ -305,7 +305,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                           Text(
                             'Created in FamilyHub',
                             style: TextStyle(
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                               fontSize: 13,
                               fontStyle: FontStyle.italic,
                             ),
@@ -338,7 +338,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                       event.description,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[700],
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -381,7 +381,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                                   return Container(
                                     width: 200,
                                     height: 200,
-                                    color: Colors.grey[300],
+                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                                     child: const Icon(Icons.broken_image),
                                   );
                                 },
@@ -434,7 +434,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                                 displayName.isNotEmpty
                                     ? displayName[0].toUpperCase()
                                     : '?',
-                                style: const TextStyle(color: Colors.white),
+                                style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
                               ),
                             ),
                             title: Text(displayName),
@@ -535,7 +535,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       case 'declined':
         return Colors.red[100];
       default:
-        return Colors.grey[100];
+        return Theme.of(context).colorScheme.surfaceContainerHighest;
     }
   }
 

@@ -182,7 +182,7 @@ class _SchedulingConflictsScreenState extends State<SchedulingConflictsScreen> {
           const SizedBox(height: 8),
           Text(
             'Your schedule for this $_timeFilter looks clear.',
-            style: const TextStyle(color: Colors.grey),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
           ),
         ],
       ),

@@ -132,7 +132,7 @@ class _EventTemplatesScreenState extends State<EventTemplatesScreen> {
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: template.color ?? Colors.blue,
-                              child: const Icon(Icons.event, color: Colors.white),
+                              child: Icon(Icons.event, color: Theme.of(context).colorScheme.onPrimary),
                             ),
                             title: Text(template.name),
                             subtitle: Column(

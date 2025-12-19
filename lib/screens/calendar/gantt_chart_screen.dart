@@ -115,17 +115,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
       lastDate: DateTime(2030),
       // Add event indicators - we'll need to load events first
       builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Colors.blue,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
+        return child!;
       },
     );
     
@@ -309,12 +299,12 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.warning, size: 16, color: Colors.white),
+                                  Icon(Icons.warning, size: 16, color: Theme.of(context).colorScheme.onPrimary),
                                   const SizedBox(width: 4),
                                   Flexible(
                                     child: Text(
                                       '${conflicts.length} conflict${conflicts.length > 1 ? 's' : ''}',
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontWeight: FontWeight.bold),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -340,7 +330,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -348,7 +338,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                           spacing: 12,
                           runSpacing: 8,
                           children: _familyMembers.map((member) {
-                            final color = _memberColors[member.uid] ?? Colors.grey;
+                            final color = _memberColors[member.uid] ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
                             final hasEvents = _events.any((event) {
                               final participants = _getEventParticipants(event);
                               return participants.contains(member.uid);
@@ -372,8 +362,8 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                                           .map((n) => n[0])
                                           .take(2)
                                           .join(),
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onPrimary,
                                         fontSize: 9,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -387,7 +377,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                                     fontSize: 12,
                                     color: hasEvents
                                         ? Theme.of(context).colorScheme.onSurface
-                                        : Colors.grey.shade600,
+                                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                     fontWeight: hasEvents ? FontWeight.w500 : FontWeight.normal,
                                   ),
                                 ),
@@ -459,13 +449,13 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                               Icon(
                                 Icons.event_busy,
                                 size: 64,
-                                color: Colors.grey.shade400,
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                               ),
                               const SizedBox(height: 16),
                               Text(
                                 'No events for this day',
                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: Colors.grey,
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                     ),
                               ),
                             ],
@@ -522,7 +512,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceVariant,
         border: Border(
-          right: BorderSide(color: Colors.grey.shade300, width: 1),
+          right: BorderSide(color: Theme.of(context).colorScheme.surfaceContainerHighest, width: 1),
         ),
       ),
       child: Column(
@@ -534,7 +524,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceVariant,
               border: Border(
-                bottom: BorderSide(color: Colors.grey.shade300, width: 1),
+                bottom: BorderSide(color: Theme.of(context).colorScheme.surfaceContainerHighest, width: 1),
               ),
             ),
             child: const Center(
@@ -557,7 +547,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
               height: _rowHeight,
               decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade200),
+                  bottom: BorderSide(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                 ),
               ),
               child: Padding(
@@ -583,7 +573,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                       '$startTimeStr - $endTimeStr',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.grey.shade600,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -606,7 +596,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceVariant,
         border: Border(
-          bottom: BorderSide(color: Colors.grey.shade300, width: 1),
+          bottom: BorderSide(color: Theme.of(context).colorScheme.surfaceContainerHighest, width: 1),
         ),
       ),
       child: Stack(
@@ -636,7 +626,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                           color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
-                            color: Colors.grey.shade300,
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             width: 0.5,
                           ),
                         ),
@@ -669,7 +659,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                       Container(
                         width: 1,
                         height: 8,
-                        color: Colors.grey.shade400,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
                     ],
                   ),
@@ -688,7 +678,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                 child: Container(
                   width: 0.5,
                   height: 8,
-                  color: Colors.grey.shade200,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
               );
             },
@@ -713,7 +703,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
       width: totalWidth,
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Colors.grey.shade200),
+          bottom: BorderSide(color: Theme.of(context).colorScheme.surfaceContainerHighest),
         ),
       ),
       child: Stack(
@@ -728,7 +718,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                 child: Container(
                   width: 1,
                   height: _rowHeight,
-                  color: Colors.grey.shade300,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
               );
             },
@@ -743,7 +733,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                 child: Container(
                   width: 0.5,
                   height: _rowHeight,
-                  color: Colors.grey.shade200,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
               );
             },
@@ -785,7 +775,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                                     final index = entry.key;
                                     final memberId = entry.value;
                                     final name = _memberNames[memberId] ?? 'Unknown';
-                                    final color = _memberColors[memberId] ?? Colors.grey;
+                                    final color = _memberColors[memberId] ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
                                     
                                     return SizedBox(
                                       height: chipHeight,
@@ -796,7 +786,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                                           border: index < participants.length - 1
                                               ? Border(
                                                   bottom: BorderSide(
-                                                    color: Colors.white.withOpacity(0.4),
+                                                    color: Theme.of(context).colorScheme.onPrimary.withValues(alpha: 0.4),
                                                     width: 1,
                                                   ),
                                                 )
@@ -808,7 +798,7 @@ class _GanttChartScreenState extends State<GanttChartScreen> {
                                             child: Text(
                                               name.split(' ').first, // Show first name
                                               style: TextStyle(
-                                                color: Colors.white,
+                                                color: Theme.of(context).colorScheme.onPrimary,
                                                 fontSize: chipHeight > 20 ? 11 : (chipHeight > 16 ? 9 : 8),
                                                 fontWeight: FontWeight.bold,
                                                 height: 1.0,

@@ -265,12 +265,12 @@ class _CreateEditTemplateScreenState extends State<CreateEditTemplateScreen> {
                         color: color,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? Colors.black : Colors.transparent,
+                          color: isSelected ? Theme.of(context).colorScheme.onSurface : Colors.transparent,
                           width: 3,
                         ),
                       ),
                       child: isSelected
-                          ? const Icon(Icons.check, color: Colors.white, size: 24)
+                          ? Icon(Icons.check, color: Theme.of(context).colorScheme.onPrimary, size: 24)
                           : null,
                     ),
                   );
