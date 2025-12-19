@@ -835,9 +835,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               color: Colors.red,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.notifications,
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               size: 12,
                             ),
                           ),
@@ -850,7 +850,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       fontSize: 14,
-                      color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black87,
+                      color: Theme.of(context).textTheme.bodyLarge?.color ?? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.87),
                     ),
                   ),
                 ],
@@ -1208,8 +1208,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   child: Text(
                     '$_pendingApprovalsCount',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
@@ -1243,7 +1243,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -1287,7 +1287,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Text(
                             'Reward: \$${task.reward!.toStringAsFixed(2)} AUD',
                             style: TextStyle(
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                               fontSize: 12,
                             ),
                           ),
@@ -1364,7 +1364,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     label: const Text('Approve Claim'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     ),
                   ),
                 ] else if (isAwaitingApproval) ...[
@@ -1377,7 +1377,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     icon: const Icon(Icons.visibility, size: 18),
                     label: const Text('View'),
                     style: TextButton.styleFrom(
-                      foregroundColor: Colors.grey[700],
+                      foregroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1409,7 +1409,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     label: const Text('Approve Job'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     ),
                   ),
                 ],
@@ -1465,8 +1465,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   child: Text(
                     '$_refundNotificationsCount',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
@@ -1502,7 +1502,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -1543,7 +1543,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Text(
                           'Reason: $reason',
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             fontSize: 11,
                           ),
                         ),
@@ -1553,7 +1553,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Text(
                           'Note: $note',
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             fontSize: 11,
                             fontStyle: FontStyle.italic,
                           ),
@@ -1583,7 +1583,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   icon: const Icon(Icons.close, size: 18),
                   label: const Text('Dismiss'),
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.grey[700],
+                    foregroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1612,7 +1612,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: const Text('Manage Job'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   ),
                 ),
               ],
@@ -1667,8 +1667,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   child: Text(
                     '$_pendingPayoutRequestsCount',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
@@ -1715,7 +1715,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -1810,7 +1810,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             onPressed: () => Navigator.pop(context, reasonController.text),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
                             ),
                             child: const Text('Reject'),
                           ),
@@ -1859,7 +1859,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Seamless design - no card wrapper, full-width integration
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade200, width: 1),
+        border: Border.all(color: Theme.of(context).colorScheme.surfaceContainerHighest, width: 1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -1903,7 +1903,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1912,7 +1912,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-              Container(width: 1, height: 60, color: Colors.grey.shade200), // Divider
+              Container(width: 1, height: 60, color: Theme.of(context).colorScheme.surfaceContainerHighest), // Divider
               Expanded(
                 child: InkWell(
                   onTap: () {
@@ -1950,7 +1950,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2063,7 +2063,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           '${app_date_utils.AppDateUtils.formatDate(event.startTime)} '
           '${DateFormat('HH:mm').format(event.startTime)}',
         ),
-        trailing: Icon(Icons.chevron_right, color: Colors.grey[400]),
+        trailing: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
         onTap: () {
           // Navigate to calendar tab (index 1)
           Provider.of<AppState>(context, listen: false).setCurrentIndex(1);
@@ -2247,7 +2247,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Text(
                     'Due: ${app_date_utils.AppDateUtils.formatDate(task.dueDate!)}',
                     style: TextStyle(
-                      color: isOverdue ? Colors.red : Colors.grey[600],
+                      color: isOverdue ? Colors.red : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
                       fontSize: 12,
                     ),
@@ -2299,7 +2299,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       label: const Text('Job Done!'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                       ),
                     ),
@@ -2340,7 +2340,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       label: const Text('Claim Now'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                       ),
                     ),
@@ -2363,7 +2363,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 'low':
         return Colors.green;
       default:
-        return Colors.grey;
+        return Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
     }
   }
 
@@ -2456,8 +2456,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   member.displayName.isNotEmpty
                                       ? member.displayName[0].toUpperCase()
                                       : member.email[0].toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onPrimary,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 18,
                                   ),
@@ -2472,9 +2472,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     color: Colors.pink,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.cake,
-                                    color: Colors.white,
+                                    color: Theme.of(context).colorScheme.onPrimary,
                                     size: 14,
                                   ),
                                 ),
@@ -2501,7 +2501,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             'Turning ${birthday.ageTurning}',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -2512,7 +2512,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               fontSize: 9,
                               color: daysUntil <= 1 
                                   ? Colors.pink[700] 
-                                  : Colors.grey[600],
+                                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                               fontWeight: daysUntil <= 1 
                                   ? FontWeight.bold 
                                   : FontWeight.normal,

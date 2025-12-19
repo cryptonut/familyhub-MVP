@@ -45,30 +45,42 @@ void main() async {
 
   // Set up error widget builder for better error display
   ErrorWidget.builder = (FlutterErrorDetails details) {
-    return Material(
-      child: Container(
-        color: Colors.white,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              const Text('An error occurred'),
-              if (kDebugMode) ...[
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: SelectableText(
-                    details.exception.toString(),
-                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Material(
+          child: Container(
+            color: theme.colorScheme.surface,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'An error occurred',
+                    style: TextStyle(color: theme.colorScheme.onSurface),
                   ),
-                ),
-              ],
-            ],
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: SelectableText(
+                        details.exception.toString(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   };
 
@@ -495,14 +507,15 @@ class FirebaseInitErrorApp extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: SelectableText(
                       error!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontFamily: 'monospace',
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
