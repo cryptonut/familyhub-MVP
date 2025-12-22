@@ -1,0 +1,119 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
+  workflow_dispatch:
+
+jobs:
+  ios-build:
+    name: Build iOS App
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+
+    - name: Cache Flutter dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.pub-cache
+        key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-flutter-
+
+    - name: Get Flutter dependencies
+      run: flutter pub get
+
+    - name: Analyze code
+      run: flutter analyze
+
+    - name: Run tests
+      run: flutter test
+
+    - name: Set up Xcode
+      run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+    - name: Cache CocoaPods
+      uses: actions/cache@v3
+      with:
+        path: ios/Pods
+        key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pods-
+
+    - name: Install CocoaPods
+      run: |
+        cd ios
+        pod install
+        cd ..
+
+    - name: Build iOS (QA flavor)
+      run: flutter build ios --flavor qa --release --no-codesign
+
+    - name: Create IPA
+      run: |
+        mkdir -p ios/build/Payload
+        cp -r build/ios/iphoneos/Release-qa/*.app ios/build/Payload/
+        cd ios/build
+        zip -r FamilyHub-QA.ipa Payload
+
+    - name: Upload IPA artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: family-hub-ios-qa
+        path: ios/build/FamilyHub-QA.ipa
+        retention-days: 30
+
+  ios-development-build:
+    name: iOS Development Build (No Tests)
+    runs-on: macos-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+
+    - name: Get Flutter dependencies
+      run: flutter pub get
+
+    - name: Set up Xcode
+      run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+    - name: Install CocoaPods
+      run: |
+        cd ios
+        pod install
+        cd ..
+
+    - name: Build iOS Development
+      run: flutter build ios --flavor qa --debug --no-codesign
+
+    - name: Create Debug IPA
+      run: |
+        mkdir -p ios/build/Payload
+        cp -r build/ios/iphoneos/Debug-qa/*.app ios/build/Payload/
+        cd ios/build
+        zip -r FamilyHub-Debug.ipa Payload
+
+    - name: Upload Debug IPA
+      uses: actions/upload-artifact@v4
+      with:
+        name: family-hub-ios-debug
+        path: ios/build/FamilyHub-Debug.ipa
+        retention-days: 7
